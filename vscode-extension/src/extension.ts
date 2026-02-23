@@ -124,7 +124,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Hover provider for keywords, types, and stdlib functions
   context.subscriptions.push(
-    vscode.languages.registerHoverProvider("nex", { provideHover: nexHoverProvider })
+    vscode.languages.registerHoverProvider("nex", { provideHover: nexHoverProvider }),
+    vscode.languages.registerHoverProvider("nexui", { provideHover: nexHoverProvider })
   );
 
   if (!enableLsp) {
@@ -144,9 +145,15 @@ export async function activate(context: vscode.ExtensionContext) {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "nex" }],
+    documentSelector: [
+      { scheme: "file", language: "nex" },
+      { scheme: "file", language: "nexui" },
+    ],
     synchronize: {
-      fileEvents: vscode.workspace.createFileSystemWatcher("**/*.nex"),
+      fileEvents: [
+        vscode.workspace.createFileSystemWatcher("**/*.nex"),
+        vscode.workspace.createFileSystemWatcher("**/*.nexui"),
+      ],
     },
     traceOutputChannel: trace === "off" ? undefined : vscode.window.createOutputChannel("Nex LSP Trace"),
   };
@@ -444,6 +451,16 @@ const DOCS: Record<string, string> = {
   "ui_set_justify_content": "**ui_set_justify_content**(widget: Int64, justify: Int) -> Unit\n\n`std.ui` — Set main-axis distribution: 0=Start, 1=Center, 2=End, 3=SpaceBetween, 4=SpaceAround, 5=SpaceEvenly.",
   "ui_set_align_items": "**ui_set_align_items**(widget: Int64, align: Int) -> Unit\n\n`std.ui` — Set cross-axis alignment for all children: 0=Start, 1=Center, 2=End, 3=Stretch.",
   "ui_set_gap": "**ui_set_gap**(widget: Int64, gap: Double) -> Unit\n\n`std.ui` — Set the spacing between children in a container.\n\n```nex\ncol = ui_column()\nui_set_gap(col, 12.0)\n```",
+  "ui_set_max_width": "**ui_set_max_width**(widget: Int64, value: Double) -> Unit\n\n`std.ui` — Set the maximum width in logical pixels.",
+  "ui_set_max_height": "**ui_set_max_height**(widget: Int64, value: Double) -> Unit\n\n`std.ui` — Set the maximum height in logical pixels.",
+  "ui_set_padding_all": "**ui_set_padding_all**(widget: Int64, value: Double) -> Unit\n\n`std.ui` — Set equal padding on all four sides.",
+  "ui_set_margin_all": "**ui_set_margin_all**(widget: Int64, value: Double) -> Unit\n\n`std.ui` — Set equal margin on all four sides.",
+  "ui_set_flex_shrink": "**ui_set_flex_shrink**(widget: Int64, shrink: Double) -> Unit\n\n`std.ui` — Set flex shrink factor. Default is 1.0. Use 0.0 to prevent shrinking.",
+  "ui_set_border_width": "**ui_set_border_width**(widget: Int64, width: Double) -> Unit\n\n`std.ui` — Set border width in logical pixels.",
+  "ui_set_border_color": "**ui_set_border_color**(widget: Int64, rgba: Int64) -> Unit\n\n`std.ui` — Set border color. RGBA packed as `(R<<24)|(G<<16)|(B<<8)|A`.",
+  "ui_set_checked": "**ui_set_checked**(widget: Int64, checked: Bool) -> Unit\n\n`std.ui` — Set the checked state of a Checkbox widget.",
+  "ui_set_h_align": "**ui_set_h_align**(widget: Int64, align: Int) -> Unit\n\n`std.ui` — Set horizontal alignment when the widget is a child of a Column: 0=Left, 1=Center, 2=Right, 3=Stretch.",
+  "ui_set_v_align": "**ui_set_v_align**(widget: Int64, align: Int) -> Unit\n\n`std.ui` — Set vertical alignment when the widget is a child of a Row: 0=Top, 1=Center, 2=Bottom, 3=Stretch.",
 
   "ui_on_click": "**ui_on_click**(widget: Int64, callback: (Int64, Int64) -> Unit) -> Unit\n\n`std.ui` — Register a click handler. Callback receives `(widget_id, event_kind)`.\n\n```nex\ndef on_click(id: Int64, kind: Int64) {\n    println(\"Clicked!\")\n}\nui_on_click(btn, on_click)\n```",
   "ui_on_change": "**ui_on_change**(widget: Int64, callback: (Int64, Int64) -> Unit) -> Unit\n\n`std.ui` — Register a value-change handler. Fires on TextInput changes, Checkbox toggles, and Slider moves.",

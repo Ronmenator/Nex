@@ -1,6 +1,6 @@
 [package]
 name = "nex"
-version = "0.1.51"
+version = "0.1.53"
 
 [dependencies]
 nex_runtime = "0.1.0"

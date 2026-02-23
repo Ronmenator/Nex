@@ -709,19 +709,31 @@ impl LowerCtx {
             "AlignItems" => {
                 self.init_stmts.push(stmt_call(
                     "ui_set_align_items",
-                    vec![ident(field), str_lit(val)],
+                    vec![ident(field), int_lit(alignment_val(val))],
                 ));
             }
             "JustifyContent" => {
                 self.init_stmts.push(stmt_call(
                     "ui_set_justify_content",
-                    vec![ident(field), str_lit(val)],
+                    vec![ident(field), int_lit(justification_val(val))],
                 ));
             }
             "AlignSelf" => {
                 self.init_stmts.push(stmt_call(
                     "ui_set_align_self",
-                    vec![ident(field), str_lit(val)],
+                    vec![ident(field), int_lit(alignment_val(val))],
+                ));
+            }
+            "HorizontalAlignment" => {
+                self.init_stmts.push(stmt_call(
+                    "ui_set_h_align",
+                    vec![ident(field), int_lit(alignment_val(val))],
+                ));
+            }
+            "VerticalAlignment" => {
+                self.init_stmts.push(stmt_call(
+                    "ui_set_v_align",
+                    vec![ident(field), int_lit(alignment_val(val))],
                 ));
             }
             _ => {}
@@ -1085,6 +1097,30 @@ fn func_ret(
     }
 }
 
+/// Convert an alignment string to its integer encoding.
+/// Matches `Alignment::from_i64` in the runtime: 0=Start, 1=Center, 2=End, 3=Stretch.
+fn alignment_val(val: &str) -> i64 {
+    match val.to_ascii_lowercase().as_str() {
+        "center" => 1,
+        "end" | "right" | "bottom" => 2,
+        "stretch" => 3,
+        _ => 0, // start / left / top
+    }
+}
+
+/// Convert a justification string to its integer encoding.
+/// Matches `Justification::from_i64` in the runtime.
+fn justification_val(val: &str) -> i64 {
+    match val.to_ascii_lowercase().as_str() {
+        "center" => 1,
+        "end" => 2,
+        "spacebetween" | "space-between" => 3,
+        "spacearound" | "space-around" => 4,
+        "spaceevenly" | "space-evenly" => 5,
+        _ => 0, // start
+    }
+}
+
 /// Parse a color value from either `0xRRGGBBAA` hex or plain decimal.
 fn parse_color(val: &str) -> Option<i64> {
     let trimmed = val.trim();
@@ -1346,6 +1382,46 @@ mod tests {
                 "expected call to {expected} but it was not generated"
             );
         }
+    }
+
+    #[test]
+    fn horizontal_and_vertical_alignment_are_lowered() {
+        let src = r#"<Window xmlns="std.ui">
+  <Column>
+    <Row HorizontalAlignment="Right" VerticalAlignment="Center" />
+  </Column>
+</Window>"#;
+        let mut sink = DiagnosticSink::new();
+        let doc = nexui_parse::parse_nexui(src, "Align.nexui", &mut sink).unwrap();
+        let cls = lower_document(&doc, &mut sink);
+        assert!(!sink.has_errors());
+
+        let init = cls.methods.iter().find(|m| m.name == "_init_ui").unwrap();
+        let Expr::Block(block) = init.body.as_ref().unwrap() else {
+            panic!("must be block");
+        };
+        let calls: Vec<(&str, i64)> = block
+            .statements
+            .iter()
+            .filter_map(|s| match s {
+                Stmt::Expr(Expr::Call { callee, args, .. }) => {
+                    if let Expr::Identifier { name, .. } = callee.as_ref() {
+                        if (name == "ui_set_h_align" || name == "ui_set_v_align") && args.len() == 2 {
+                            if let Expr::Literal { value: Literal::Int(v), .. } = &args[1] {
+                                return Some((name.as_str(), *v));
+                            }
+                        }
+                    }
+                    None
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert!(calls.iter().any(|&(n, v)| n == "ui_set_h_align" && v == 2), // 2 = End/Right
+            "HorizontalAlignment=\"Right\" should emit ui_set_h_align with value 2");
+        assert!(calls.iter().any(|&(n, v)| n == "ui_set_v_align" && v == 1), // 1 = Center
+            "VerticalAlignment=\"Center\" should emit ui_set_v_align with value 1");
     }
 
     #[test]

@@ -562,10 +562,29 @@ pub unsafe extern "C" fn nex_ui_set_flex_grow(widget: i64, grow_bits: i64) {
 
 #[no_mangle]
 pub unsafe extern "C" fn nex_ui_set_align_self(widget: i64, align: i64) {
-    let _ = Alignment::from_i64(align);
     with_state(|s| {
         if let Some(w) = s.widgets.get_mut(widget) {
-            w.align_items = Alignment::from_i64(align);
+            w.align_self = Some(Alignment::from_i64(align));
+            s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_h_align(widget: i64, align: i64) {
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.h_align = Some(Alignment::from_i64(align));
+            s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_v_align(widget: i64, align: i64) {
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.v_align = Some(Alignment::from_i64(align));
             s.needs_layout = true;
         }
     });
@@ -598,6 +617,79 @@ pub unsafe extern "C" fn nex_ui_set_gap(widget: i64, gap_bits: i64) {
         if let Some(w) = s.widgets.get_mut(widget) {
             w.style.gap = g;
             s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_max_width(widget: i64, val_bits: i64) {
+    let v = f64::from_bits(val_bits as u64) as f32;
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.style.max_width = Some(v);
+            s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_max_height(widget: i64, val_bits: i64) {
+    let v = f64::from_bits(val_bits as u64) as f32;
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.style.max_height = Some(v);
+            s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_flex_shrink(widget: i64, val_bits: i64) {
+    let v = f64::from_bits(val_bits as u64) as f32;
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.style.flex_shrink = v;
+            s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_margin_all(widget: i64, value_bits: i64) {
+    let v = f64::from_bits(value_bits as u64) as f32;
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.style.margin = Edges::all(v);
+            s.needs_layout = true;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_checked(widget: i64, checked: i64) {
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.checked = checked != 0;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_border_width(widget: i64, width_bits: i64) {
+    let width = f64::from_bits(width_bits as u64) as f32;
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.style.border_width = width;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_ui_set_border_color(widget: i64, rgba: i64) {
+    let color = Color::from_packed(rgba);
+    with_state(|s| {
+        if let Some(w) = s.widgets.get_mut(widget) {
+            w.style.border_color = color;
         }
     });
 }

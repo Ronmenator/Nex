@@ -16,4 +16,5 @@ nexc_driver = { path = "../nexc_driver" }
 nexc_lint = { path = "../nexc_lint" }
 nexc_parse = { path = "../nexc_parse" }
 nexc_lex = { path = "../nexc_lex" }
+nexui_parse = { path = "../nexui_parse" }
 serde_json = { workspace = true }

@@ -27,7 +27,7 @@ impl LayoutEngine {
         self.widget_to_node.clear();
         self.computed_rects.clear();
 
-        if let Some(root_node) = self.build_node(root, arena) {
+        if let Some(root_node) = self.build_node(root, None, arena) {
             let _ = self.tree.compute_layout(
                 root_node,
                 Size {
@@ -39,19 +39,26 @@ impl LayoutEngine {
         }
     }
 
-    fn build_node(&mut self, handle: i64, arena: &WidgetArena) -> Option<NodeId> {
+    fn build_node(&mut self, handle: i64, parent_kind: Option<WidgetKind>, arena: &WidgetArena) -> Option<NodeId> {
         let widget = arena.get(handle)?;
 
         if !widget.style.visible {
             return None;
         }
 
-        let style = self.widget_to_taffy_style(widget);
+        let mut style = self.widget_to_taffy_style(widget);
 
-        let child_nodes: Vec<NodeId> = widget
-            .children
+        // Resolve align_self: direct CSS > directional WPF-style alignment
+        if let Some(align_self) = Self::resolve_align_self(widget, parent_kind.as_ref()) {
+            style.align_self = Some(align_self);
+        }
+
+        let own_kind = widget.kind.clone();
+        let child_handles: Vec<i64> = widget.children.clone();
+
+        let child_nodes: Vec<NodeId> = child_handles
             .iter()
-            .filter_map(|&child_handle| self.build_node(child_handle, arena))
+            .filter_map(|&child_handle| self.build_node(child_handle, Some(own_kind.clone()), arena))
             .collect();
 
         let node = if child_nodes.is_empty() {
@@ -62,6 +69,34 @@ impl LayoutEngine {
 
         self.widget_to_node.insert(handle, node);
         Some(node)
+    }
+
+    /// Resolves the effective `align_self` Taffy value for a widget, considering:
+    /// 1. A direct `align_self` override on the widget (from `AlignSelf` attribute).
+    /// 2. `h_align` when the parent is a Column/Stack/Scroll (cross-axis is horizontal).
+    /// 3. `v_align` when the parent is a Row (cross-axis is vertical).
+    fn resolve_align_self(widget: &Widget, parent_kind: Option<&WidgetKind>) -> Option<AlignSelf> {
+        if let Some(a) = widget.align_self {
+            return Some(Self::to_taffy_align_self(a));
+        }
+        match parent_kind {
+            Some(WidgetKind::Column | WidgetKind::Stack | WidgetKind::Scroll) => {
+                widget.h_align.map(Self::to_taffy_align_self)
+            }
+            Some(WidgetKind::Row) => {
+                widget.v_align.map(Self::to_taffy_align_self)
+            }
+            _ => None,
+        }
+    }
+
+    fn to_taffy_align_self(a: Alignment) -> AlignSelf {
+        match a {
+            Alignment::Start => AlignSelf::FlexStart,
+            Alignment::Center => AlignSelf::Center,
+            Alignment::End => AlignSelf::FlexEnd,
+            Alignment::Stretch => AlignSelf::Stretch,
+        }
     }
 
     fn widget_to_taffy_style(&self, widget: &Widget) -> Style {

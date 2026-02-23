@@ -1,0 +1,143 @@
+{
+  "Window": {
+    "prefix": "window",
+    "body": [
+      "<Window xmlns=\"std.ui\" Title=\"${1:My App}\" Width=\"${2:800}\" Height=\"${3:600}\">",
+      "  <Column Gap=\"${4:8}\">",
+      "    $0",
+      "  </Column>",
+      "</Window>"
+    ],
+    "description": "NexUI Window root element"
+  },
+  "Widget": {
+    "prefix": "widget",
+    "body": [
+      "<Widget xmlns=\"std.ui\" Extends=\"${1:BaseWidget}\">",
+      "  <Column Gap=\"${2:8}\">",
+      "    $0",
+      "  </Column>",
+      "</Widget>"
+    ],
+    "description": "NexUI Widget component"
+  },
+  "Row": {
+    "prefix": "row",
+    "body": [
+      "<Row Gap=\"${1:8}\">",
+      "  $0",
+      "</Row>"
+    ],
+    "description": "Horizontal flex container"
+  },
+  "Column": {
+    "prefix": "col",
+    "body": [
+      "<Column Gap=\"${1:8}\">",
+      "  $0",
+      "</Column>"
+    ],
+    "description": "Vertical flex container"
+  },
+  "Stack": {
+    "prefix": "stack",
+    "body": [
+      "<Stack>",
+      "  $0",
+      "</Stack>"
+    ],
+    "description": "Overlapping stack container"
+  },
+  "Scroll": {
+    "prefix": "scroll",
+    "body": [
+      "<Scroll>",
+      "  $0",
+      "</Scroll>"
+    ],
+    "description": "Scrollable vertical container"
+  },
+  "Grid": {
+    "prefix": "grid",
+    "body": [
+      "<Grid Columns=\"${1:3}\" Gap=\"${2:8}\">",
+      "  $0",
+      "</Grid>"
+    ],
+    "description": "CSS grid container"
+  },
+  "Text": {
+    "prefix": "text",
+    "body": "<Text Text=\"${1:Hello}\" />",
+    "description": "Static text label"
+  },
+  "Button": {
+    "prefix": "btn",
+    "body": "<Button Label=\"${1:Click Me}\" Click=\"${2:on_click}\" />",
+    "description": "Clickable button"
+  },
+  "TextInput": {
+    "prefix": "input",
+    "body": "<TextInput Placeholder=\"${1:Enter text...}\" Change=\"${2:on_change}\" />",
+    "description": "Text input field"
+  },
+  "Image": {
+    "prefix": "img",
+    "body": "<Image Source=\"${1:path/to/image.png}\" Width=\"${2:100}\" Height=\"${3:100}\" />",
+    "description": "Image widget"
+  },
+  "Checkbox": {
+    "prefix": "checkbox",
+    "body": "<Checkbox Label=\"${1:Enable feature}\" Change=\"${2:on_change}\" />",
+    "description": "Checkbox widget"
+  },
+  "Slider": {
+    "prefix": "slider",
+    "body": "<Slider Min=\"${1:0}\" Max=\"${2:100}\" Value=\"${3:50}\" Change=\"${4:on_change}\" />",
+    "description": "Horizontal slider"
+  },
+  "Canvas": {
+    "prefix": "canvas",
+    "body": "<Canvas Width=\"${1:400}\" Height=\"${2:300}\" />",
+    "description": "Drawing canvas"
+  },
+  "WidgetSwitcher": {
+    "prefix": "switcher",
+    "body": [
+      "<WidgetSwitcher Active=\"{Binding ${1:ActiveScreen}}\">",
+      "  <Include Widget=\"${2:HomeWidget}\" />",
+      "  $0",
+      "</WidgetSwitcher>"
+    ],
+    "description": "Shows one child widget at a time"
+  },
+  "Include": {
+    "prefix": "include",
+    "body": "<Include Widget=\"${1:MyWidget}\" />",
+    "description": "Include a widget inside a WidgetSwitcher"
+  },
+  "Binding": {
+    "prefix": "bind",
+    "body": "{Binding ${1:PropertyName}}",
+    "description": "One-way data binding expression"
+  },
+  "TwoWayBinding": {
+    "prefix": "bind2",
+    "body": "{Binding ${1:PropertyName}, Mode=TwoWay}",
+    "description": "Two-way data binding expression"
+  },
+  "Resources": {
+    "prefix": "res",
+    "body": [
+      "<Window.Resources>",
+      "  <ResourceDictionary Source=\"${1:Styles/AppStyles.nexuistyle}\"/>",
+      "</Window.Resources>"
+    ],
+    "description": "Window resource dictionary block"
+  },
+  "StyledButton": {
+    "prefix": "stybtn",
+    "body": "<Button Style=\"${1:NavButton}\" Label=\"${2:Home}\" Click=\"${3:on_click}\" />",
+    "description": "Button with a named style"
+  }
+}
