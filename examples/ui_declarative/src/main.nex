@@ -1,0 +1,17 @@
+// Nex Declarative UI — MVVM Counter Demo
+//
+// This example demonstrates the .nexui markup system:
+// - MainWindow.nexui defines the UI tree declaratively
+// - MainWindow.nex provides the code-behind (partial class)
+// - Data binding connects model properties to UI elements
+//
+// Run: nex run (from this directory)
+
+import std.ui
+
+def main() {
+    _init_ui()
+    _setup_bindings()
+    _run_app()
+    return
+}

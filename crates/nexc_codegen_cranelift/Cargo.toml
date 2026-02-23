@@ -1,0 +1,22 @@
+[package]
+name = "nexc_codegen_cranelift"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+torch = ["nex_runtime/torch"]
+ui = ["nex_runtime/ui"]
+engine = ["nex_runtime/engine"]
+
+[dependencies]
+nexc_ir = { path = "../nexc_ir" }
+nexc_type = { path = "../nexc_type" }
+nex_runtime = { path = "../nex_runtime" }
+cranelift-codegen = "0.128"
+cranelift-frontend = "0.128"
+cranelift-module = "0.128"
+cranelift-object = "0.128"
+cranelift-jit = "0.128"
+target-lexicon = "0.13"

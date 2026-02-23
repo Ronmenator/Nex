@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error Handling - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Error Handling</div>
+
+  <h1>Error Handling</h1>
+  <p class="page-subtitle">Exception-based error handling with try/catch/finally and throw.</p>
+
+  <h2>Try / Catch / Finally</h2>
+
+  <pre><code><span class="kw">try</span> {
+    <span class="cmt">// code that might throw</span>
+    result <span class="op">=</span> <span class="fn">risky_operation</span>()
+} <span class="kw">catch</span> (err: <span class="typ">Error</span>) {
+    <span class="cmt">// handle the error</span>
+    <span class="fn">println</span>(<span class="str">"Error: "</span> <span class="op">+</span> err)
+} <span class="kw">finally</span> {
+    <span class="cmt">// always runs, whether or not an exception occurred</span>
+    <span class="fn">println</span>(<span class="str">"cleanup complete"</span>)
+}</code></pre>
+
+  <h2>Throwing Exceptions</h2>
+
+  <p>Use <code>throw</code> to raise an exception. Exceptions are heap objects derived from <code>Object</code>:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">divide</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">if</span> (b <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">throw</span> <span class="str">"Division by zero"</span>
+    }
+    <span class="kw">return</span> a <span class="op">/</span> b
+}</code></pre>
+
+  <h2>Catch Clause</h2>
+
+  <p>The <code>catch</code> clause specifies the variable name and type of exception to catch:</p>
+
+  <pre><code><span class="kw">try</span> {
+    <span class="fn">divide</span>(<span class="num">10</span>, <span class="num">0</span>)
+} <span class="kw">catch</span> (err: <span class="typ">Error</span>) {
+    <span class="fn">println</span>(<span class="str">"Caught: "</span> <span class="op">+</span> err)
+}</code></pre>
+
+  <h2>Finally Block</h2>
+
+  <p>The <code>finally</code> block always executes, regardless of whether an exception was thrown. It's useful for cleanup operations:</p>
+
+  <pre><code><span class="kw">try</span> {
+    <span class="fn">println</span>(<span class="str">"processing..."</span>)
+} <span class="kw">catch</span> (err: <span class="typ">Error</span>) {
+    <span class="fn">println</span>(<span class="str">"error occurred"</span>)
+} <span class="kw">finally</span> {
+    <span class="fn">println</span>(<span class="str">"this always runs"</span>)
+}</code></pre>
+
+  <h2>Practical Example</h2>
+
+  <pre><code><span class="kw">from</span> std.io <span class="kw">import</span> open_console
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="kw">using</span> (resource <span class="op">=</span> <span class="fn">open_console</span>()) {
+        <span class="kw">try</span> {
+            <span class="fn">println</span>(<span class="str">"app started"</span>)
+            <span class="cmt">// ... application logic ...</span>
+        } <span class="kw">catch</span> (err: <span class="typ">Error</span>) {
+            <span class="fn">println</span>(<span class="str">"failed: "</span> <span class="op">+</span> err)
+        } <span class="kw">finally</span> {
+            <span class="fn">println</span>(<span class="str">"shutdown"</span>)
+        }
+    }
+}</code></pre>
+
+  <div class="callout tip">
+    <div class="callout-title">Tip</div>
+    <p>For resource cleanup, prefer <code>using</code> blocks (see <a href="resource-management.html">Resource Management</a>) over manually writing try/finally.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="modules-imports.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Modules &amp; Imports</span>
+    </a>
+    <a href="resource-management.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Resource Management &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

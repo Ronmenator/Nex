@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.logging - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.logging</div>
+
+  <h1>std.logging</h1>
+  <p class="page-subtitle">Structured logging with severity levels and tags.</p>
+
+  <pre><code><span class="kw">import</span> std.logging</code></pre>
+
+  <h2>Log Functions</h2>
+
+  <h4>log_debug</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log_debug</span>(msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Logs a message at the <strong>DEBUG</strong> level (0). Intended for detailed diagnostic information useful during development.</p>
+
+  <h4>log_info</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log_info</span>(msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Logs a message at the <strong>INFO</strong> level (1). Suitable for general operational messages that confirm the program is working as expected.</p>
+
+  <h4>log_warn</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log_warn</span>(msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Logs a message at the <strong>WARN</strong> level (2). Indicates a potential problem or unexpected situation that doesn't prevent the program from continuing.</p>
+
+  <h4>log_error</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log_error</span>(msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Logs a message at the <strong>ERROR</strong> level (3). Indicates a serious problem that may prevent part of the program from functioning correctly.</p>
+
+  <h2>Configuration</h2>
+
+  <h4>log_set_level</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log_set_level</span>(level: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the minimum severity level for log output. Messages below this level are suppressed. Level values:</p>
+  <table>
+    <thead><tr><th>Value</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>0</code></td><td>DEBUG</td></tr>
+      <tr><td><code>1</code></td><td>INFO</td></tr>
+      <tr><td><code>2</code></td><td>WARN</td></tr>
+      <tr><td><code>3</code></td><td>ERROR</td></tr>
+    </tbody>
+  </table>
+  <p>The default level is <code>0</code> (DEBUG), meaning all messages are shown.</p>
+
+  <h2>Tagged Logging</h2>
+
+  <h4>log_with_tag</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log_with_tag</span>(tag: <span class="typ">String</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Logs a message with a custom tag prefix. Useful for categorizing log output by subsystem or component. The tag is included in the log output as <code>[tag]</code>.</p>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.logging
+
+<span class="cmt">// Set minimum log level to INFO (suppress DEBUG)</span>
+<span class="fn">log_set_level</span>(<span class="num">1</span>)
+
+<span class="cmt">// These messages demonstrate each severity level</span>
+<span class="fn">log_debug</span>(<span class="str">"Cache hit ratio: 0.95"</span>)       <span class="cmt">// suppressed (below INFO)</span>
+<span class="fn">log_info</span>(<span class="str">"Server started on port 8080"</span>)   <span class="cmt">// [INFO] Server started on port 8080</span>
+<span class="fn">log_warn</span>(<span class="str">"Disk usage above 80%"</span>)          <span class="cmt">// [WARN] Disk usage above 80%</span>
+<span class="fn">log_error</span>(<span class="str">"Failed to connect to database"</span>) <span class="cmt">// [ERROR] Failed to connect to database</span>
+
+<span class="cmt">// Tagged logging for different subsystems</span>
+<span class="fn">log_with_tag</span>(<span class="str">"HTTP"</span>, <span class="str">"Request received: GET /api/users"</span>)
+<span class="fn">log_with_tag</span>(<span class="str">"DB"</span>, <span class="str">"Query executed in 12ms"</span>)
+<span class="fn">log_with_tag</span>(<span class="str">"AUTH"</span>, <span class="str">"Token validated for user 42"</span>)
+
+<span class="cmt">// Switch to WARN-only in production</span>
+<span class="fn">log_set_level</span>(<span class="num">2</span>)
+<span class="fn">log_info</span>(<span class="str">"This will not appear"</span>)   <span class="cmt">// suppressed</span>
+<span class="fn">log_warn</span>(<span class="str">"This will appear"</span>)       <span class="cmt">// [WARN] This will appear</span></code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-crypto.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.crypto</span>
+    </a>
+    <a href="stdlib-testing.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.testing &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

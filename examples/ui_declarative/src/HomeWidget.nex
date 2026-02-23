@@ -1,0 +1,92 @@
+// HomeWidget code-behind — popup dialog logic.
+//
+// popup_mode: 0 = hidden | 1 = info (OK) | 2 = confirm (Yes / No)
+
+import std.ui
+
+public partial class HomeWidget {
+    dialog_result = ""
+    popup_mode = 0
+    popup_title = ""
+    popup_body = ""
+
+    // ── Computed properties bound in .nexui ──────────────────────────
+
+    def DialogResultText() -> String {
+        return dialog_result
+    }
+
+    def PopupVisible() -> Bool {
+        return popup_mode != 0
+    }
+
+    def PopupOkVisible() -> Bool {
+        return popup_mode == 1
+    }
+
+    def PopupConfirmVisible() -> Bool {
+        return popup_mode == 2
+    }
+
+    def PopupTitle() -> String {
+        return popup_title
+    }
+
+    def PopupBody() -> String {
+        return popup_body
+    }
+
+    // Helper: refresh all popup-related bindings
+    def notify_popup() {
+        notify_changed("PopupVisible")
+        notify_changed("PopupOkVisible")
+        notify_changed("PopupConfirmVisible")
+        notify_changed("PopupTitle")
+        notify_changed("PopupBody")
+        return
+    }
+
+    // ── Show handlers ─────────────────────────────────────────────────
+
+    def on_show_info(widget_id: Int64, event_kind: Int64) {
+        popup_mode = 1
+        popup_title = "Info"
+        popup_body = "Welcome to the Nex Declarative UI Demo. This app demonstrates Widget inheritance, WidgetSwitcher navigation, and MVVM data binding."
+        notify_popup()
+        return
+    }
+
+    def on_show_confirm(widget_id: Int64, event_kind: Int64) {
+        popup_mode = 2
+        popup_title = "Question"
+        popup_body = "Do you enjoy using Nex UI?"
+        notify_popup()
+        return
+    }
+
+    // ── Close handlers ────────────────────────────────────────────────
+
+    def on_popup_ok(widget_id: Int64, event_kind: Int64) {
+        popup_mode = 0
+        dialog_result = "Info dialog dismissed."
+        notify_popup()
+        notify_changed("DialogResultText")
+        return
+    }
+
+    def on_popup_yes(widget_id: Int64, event_kind: Int64) {
+        popup_mode = 0
+        dialog_result = "You answered: Yes!"
+        notify_popup()
+        notify_changed("DialogResultText")
+        return
+    }
+
+    def on_popup_no(widget_id: Int64, event_kind: Int64) {
+        popup_mode = 0
+        dialog_result = "You answered: No."
+        notify_popup()
+        notify_changed("DialogResultText")
+        return
+    }
+}

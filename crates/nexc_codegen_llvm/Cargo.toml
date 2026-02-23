@@ -1,0 +1,13 @@
+[package]
+name = "nexc_codegen_llvm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nexc_ast = { path = "../nexc_ast" }
+nexc_diag = { path = "../nexc_diag" }
+nexc_ir = { path = "../nexc_ir" }
+nexc_type = { path = "../nexc_type" }
+

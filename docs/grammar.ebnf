@@ -1,0 +1,167 @@
+Program           = { Item } EOF ;
+
+Item              = ImportDecl
+                  | ClassDecl
+                  | InterfaceDecl
+                  | FunctionDecl
+                  | Statement
+                  ;
+
+ImportDecl        = "import" ModulePath [ "as" Ident ] Terminator
+                  | "from" ModulePath "import" ImportList Terminator
+                  ;
+
+ImportList        = Ident { "," Ident } ;
+
+ModulePath        = Ident { "." Ident } ;
+
+ClassDecl         = [ "public" ] "class" Ident [ ":" BaseSpecList ] "{" { ClassMember } "}" ;
+
+BaseSpecList      = BaseSpec { "," BaseSpec } ;
+BaseSpec          = [ "shared" ] TypeRef [ "(" [ ArgList ] ")" ] ;
+
+InterfaceDecl     = [ "public" ] "interface" Ident "{" { FunctionSig Terminator } "}" ;
+
+ClassMember       = FieldDecl Terminator
+                  | FunctionDecl
+                  | AliasDecl Terminator
+                  ;
+
+FieldDecl         = [ "public" ] Ident ":" TypeRef [ "=" Expr ] ;
+
+AliasDecl         = "alias" Ident "=" QualifiedMember ;
+
+QualifiedMember   = TypeRef "::" Ident ;
+
+FunctionSig       = [ "public" ] "def" Ident "(" [ Parameters ] ")" [ "->" TypeRef ] ;
+
+FunctionDecl      = [ "public" ] "def" Ident "(" [ Parameters ] ")" [ "->" TypeRef ] Block ;
+
+Parameters        = Param { "," Param } ;
+Param             = Ident ":" TypeRef ;
+
+Block             = "{" { Statement } "}" ;
+
+Statement         = Block
+                  | IfStmt
+                  | WhileStmt
+                  | ForStmt
+                  | TryStmt
+                  | UsingStmt
+                  | ReturnStmt Terminator
+                  | BreakStmt Terminator
+                  | ContinueStmt Terminator
+                  | ThrowStmt Terminator
+                  | VarStmt Terminator
+                  | ExprStmt Terminator
+                  ;
+
+IfStmt            = "if" "(" Expr ")" Block [ "else" Block ] ;
+
+WhileStmt         = "while" "(" Expr ")" Block ;
+
+ForStmt           = "for" "(" ForInit ";" [ Expr ] ";" [ Expr ] ")" Block ;
+ForInit           = VarStmtNoTerminator | Expr ;
+
+TryStmt           = "try" Block { CatchClause } [ FinallyClause ] ;
+CatchClause       = "catch" "(" [ Ident ":" TypeRef ] ")" Block ;
+FinallyClause     = "finally" Block ;
+
+UsingStmt         = "using" "(" UsingBinder { "," UsingBinder } ")" Block ;
+UsingBinder       = [ "var" ] Ident "=" Expr ;
+
+ReturnStmt        = "return" [ Expr ] ;
+BreakStmt         = "break" ;
+ContinueStmt      = "continue" ;
+ThrowStmt         = "throw" Expr ;
+
+VarStmt           = "var" Ident "=" Expr ;
+VarStmtNoTerminator = "var" Ident "=" Expr ;
+
+ExprStmt          = Expr ;
+
+Terminator        = ";" | ASI ;
+
+Expr              = Assignment ;
+
+Assignment        = LogicalOr [ AssignOp Assignment ] ;
+AssignOp          = "=" | "+=" | "-=" | "*=" | "/=" ;
+
+LogicalOr         = LogicalAnd { "||" LogicalAnd } ;
+LogicalAnd        = Equality { "&&" Equality } ;
+
+Equality          = Relational { ( "==" | "!=" ) Relational } ;
+Relational        = Additive   { ( "<" | ">" | "<=" | ">=" ) Additive } ;
+Additive          = Multiplicative { ( "+" | "-" ) Multiplicative } ;
+Multiplicative    = Unary { ( "*" | "/" | "%" ) Unary } ;
+
+Unary             = ( "!" | "-" ) Unary
+                  | Postfix
+                  ;
+
+Postfix           = Primary { PostfixOp } ;
+PostfixOp         = CallOp | MemberOp | QualifiedOp ;
+
+CallOp            = "(" [ ArgList ] ")" ;
+MemberOp          = "." Ident ;
+QualifiedOp       = "::" Ident ;
+
+ArgList           = Expr { "," Expr } ;
+
+Primary           = Literal
+                  | Ident
+                  | "self"
+                  | "(" Expr ")"
+                  | Block
+                  ;
+
+Literal           = IntegerLiteral
+                  | FloatLiteral
+                  | StringLiteral
+                  | CharLiteral
+                  | "true"
+                  | "false"
+                  | "null"
+                  ;
+
+IntegerLiteral    = IntegerDigits [ IntSuffix ] ;
+IntegerDigits     = Digit { Digit } ;
+IntSuffix         = "i" | "u" | "l" | "I" | "U" | "L" ;
+
+FloatLiteral      = IntegerDigits "." Digit { Digit } [ FloatSuffix ]
+                  | IntegerDigits [ "." ] [ Digit { Digit } ] FloatSuffix ;
+FloatSuffix       = "f" | "F" | "d" | "D" ;
+
+CharLiteral       = "'" ( UnicodeChar | Escape ) "'" ;
+UnicodeChar       = ? any Unicode scalar except "\\" and "'" ? ;
+Escape            = "\\" ( "\\" | "'" | "\"" | "n" | "r" | "t" | "0" | "b" | "x" Hex Hex ) ;
+Digit             = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+Hex               = Digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
+
+TypeRef           = BuiltinType | Ident { "." Ident } ;
+
+BuiltinType       = "Bool"
+                  | "Byte"
+                  | "Short"
+                  | "UShort"
+                  | "Int"
+                  | "UInt"
+                  | "Long"
+                  | "ULong"
+                  | "Int8"
+                  | "Int16"
+                  | "Int32"
+                  | "Int64"
+                  | "UInt8"
+                  | "UInt16"
+                  | "UInt32"
+                  | "UInt64"
+                  | "Float"
+                  | "Float32"
+                  | "Float64"
+                  | "Double"
+                  | "Char"
+                  | "String"
+                  | "Unit"
+                  | "Var"
+                  ;

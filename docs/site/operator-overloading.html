@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator Overloading - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Operator Overloading</div>
+
+  <h1>Operator Overloading</h1>
+  <p class="page-subtitle">Define custom behavior for built-in operators on your own types.</p>
+
+  <h2>Syntax</h2>
+
+  <p>Operators are defined as <code>public static</code> functions with reserved names like <code>operator+</code>. They take the operands as parameters and return a result:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">struct</span> <span class="typ">Vec2</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator+</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Vec2</span> {
+        <span class="kw">return</span> <span class="typ">Vec2</span>(a.x <span class="op">+</span> b.x, a.y <span class="op">+</span> b.y)
+    }
+}</code></pre>
+
+  <p>With this definition, you can use the <code>+</code> operator naturally:</p>
+
+  <pre><code>a <span class="op">=</span> <span class="typ">Vec2</span>(<span class="num">1.0f</span>, <span class="num">2.0f</span>)
+b <span class="op">=</span> <span class="typ">Vec2</span>(<span class="num">3.0f</span>, <span class="num">4.0f</span>)
+c <span class="op">=</span> a <span class="op">+</span> b  <span class="cmt">// Vec2(4.0, 6.0)</span></code></pre>
+
+  <h2>Overloadable Operators</h2>
+
+  <p>The following operators can be overloaded in Nex v1:</p>
+
+  <table>
+    <tr><th>Category</th><th>Operators</th><th>Function Name</th></tr>
+    <tr><td>Arithmetic</td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td><code>operator+</code> <code>operator-</code> <code>operator*</code> <code>operator/</code> <code>operator%</code></td></tr>
+    <tr><td>Comparison</td><td><code>==</code> <code>!=</code></td><td><code>operator==</code> <code>operator!=</code></td></tr>
+    <tr><td>Relational</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td><code>operator&lt;</code> <code>operator&lt;=</code> <code>operator&gt;</code> <code>operator&gt;=</code></td></tr>
+    <tr><td>Unary</td><td><code>!</code> <code>-</code></td><td><code>operator!</code> <code>operator-</code> (1 param)</td></tr>
+  </table>
+
+  <p>Unary <code>operator-</code> is distinguished from binary <code>operator-</code> by the number of parameters: unary takes one, binary takes two.</p>
+
+  <h2>Resolution Rules</h2>
+
+  <p>When the compiler encounters an expression like <code>a + b</code>, it resolves the operator using these rules in order:</p>
+
+  <ol>
+    <li><strong>Built-in numeric operators</strong> &mdash; if both operands are numeric primitives (<code>Int</code>, <code>Int64</code>, <code>Float</code>, <code>Double</code>, <code>Byte</code>), the built-in operator is used. No overload is considered.</li>
+    <li><strong>Left operand type</strong> &mdash; if the left operand's type defines a matching <code>operator+</code>, that overload is called.</li>
+    <li><strong>Compile error</strong> &mdash; if no matching operator is found, the expression is rejected.</li>
+  </ol>
+
+  <div class="callout warning">
+    <div class="callout-title">No commutative fallback</div>
+    <p>In v1, the compiler does <em>not</em> check the right operand type if the left operand has no matching operator. If you need <code>Int + Vec2</code>, define the operator on a wrapper or use an explicit method call.</p>
+  </div>
+
+  <h2>Equality Semantics</h2>
+
+  <p>Default equality behavior depends on the type category:</p>
+
+  <table>
+    <tr><th>Type</th><th>Default <code>==</code></th><th>Override</th></tr>
+    <tr><td>Classes</td><td>Reference equality (same object in memory)</td><td>Define <code>operator==</code></td></tr>
+    <tr><td>Structs</td><td>Fieldwise comparison (compiler-generated)</td><td>Define <code>operator==</code></td></tr>
+  </table>
+
+  <pre><code><span class="cmt">// Class: reference equality by default</span>
+<span class="kw">class</span> <span class="typ">Token</span> {
+    value: <span class="typ">String</span>
+}
+
+a <span class="op">=</span> <span class="typ">Token</span>(<span class="str">"hello"</span>)
+b <span class="op">=</span> <span class="typ">Token</span>(<span class="str">"hello"</span>)
+<span class="fn">println</span>(a <span class="op">==</span> b)  <span class="cmt">// false (different objects)</span>
+
+<span class="cmt">// Struct: fieldwise equality by default</span>
+<span class="kw">struct</span> <span class="typ">Point</span> {
+    x: <span class="typ">Int</span>
+    y: <span class="typ">Int</span>
+}
+
+p1 <span class="op">=</span> <span class="typ">Point</span>(<span class="num">1</span>, <span class="num">2</span>)
+p2 <span class="op">=</span> <span class="typ">Point</span>(<span class="num">1</span>, <span class="num">2</span>)
+<span class="fn">println</span>(p1 <span class="op">==</span> p2)  <span class="cmt">// true (same field values)</span></code></pre>
+
+  <h2>Full Example: Vec2</h2>
+
+  <p>Here is a complete <code>Vec2</code> struct with arithmetic and equality operators:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">struct</span> <span class="typ">Vec2</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator+</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Vec2</span> {
+        <span class="kw">return</span> <span class="typ">Vec2</span>(a.x <span class="op">+</span> b.x, a.y <span class="op">+</span> b.y)
+    }
+
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator-</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Vec2</span> {
+        <span class="kw">return</span> <span class="typ">Vec2</span>(a.x <span class="op">-</span> b.x, a.y <span class="op">-</span> b.y)
+    }
+
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator*</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Vec2</span> {
+        <span class="kw">return</span> <span class="typ">Vec2</span>(a.x <span class="op">*</span> b.x, a.y <span class="op">*</span> b.y)
+    }
+
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator==</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Bool</span> {
+        <span class="kw">return</span> a.x <span class="op">==</span> b.x <span class="op">&amp;&amp;</span> a.y <span class="op">==</span> b.y
+    }
+
+    <span class="cmt">// Unary negation (one parameter)</span>
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator-</span>(v: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Vec2</span> {
+        <span class="kw">return</span> <span class="typ">Vec2</span>(<span class="num">0.0f</span> <span class="op">-</span> v.x, <span class="num">0.0f</span> <span class="op">-</span> v.y)
+    }
+}
+
+<span class="cmt">// Usage</span>
+a <span class="op">=</span> <span class="typ">Vec2</span>(<span class="num">1.0f</span>, <span class="num">2.0f</span>)
+b <span class="op">=</span> <span class="typ">Vec2</span>(<span class="num">3.0f</span>, <span class="num">4.0f</span>)
+
+sum <span class="op">=</span> a <span class="op">+</span> b          <span class="cmt">// Vec2(4.0, 6.0)</span>
+diff <span class="op">=</span> a <span class="op">-</span> b         <span class="cmt">// Vec2(-2.0, -2.0)</span>
+neg <span class="op">=</span> <span class="op">-</span>a             <span class="cmt">// Vec2(-1.0, -2.0)</span>
+eq <span class="op">=</span> a <span class="op">==</span> b          <span class="cmt">// false</span>
+eq2 <span class="op">=</span> a <span class="op">==</span> <span class="typ">Vec2</span>(<span class="num">1.0f</span>, <span class="num">2.0f</span>)  <span class="cmt">// true</span></code></pre>
+
+  <div class="page-nav">
+    <a href="multiple-inheritance.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Multiple Inheritance</span>
+    </a>
+    <a href="dynamic-var.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Dynamic Typing (Var) &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

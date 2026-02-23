@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nex Language Documentation</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right">
+    <span class="version-badge">v0.1.0</span>
+  </div>
+</header>
+
+<nav class="sidebar"></nav>
+
+<main class="main-content">
+
+  <h1>The Nex Programming Language</h1>
+  <p class="page-subtitle">
+    A compiled, statically-typed language with classes, interfaces, multiple inheritance,
+    and native code generation. Designed for both rapid prototyping and production applications.
+  </p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <h4>Static Typing</h4>
+      <p>Type-safe by default with local type inference. Catch errors at compile time while writing concise code.</p>
+    </div>
+    <div class="feature-card">
+      <h4>OOP First</h4>
+      <p>Classes with real multiple inheritance, interfaces, structs, and virtual dispatch built into the core.</p>
+    </div>
+    <div class="feature-card">
+      <h4>Native Performance</h4>
+      <p>Compiles to native machine code via Cranelift &mdash; both AOT executables and JIT for scripting.</p>
+    </div>
+    <div class="feature-card">
+      <h4>Rich Standard Library</h4>
+      <p>20 modules covering I/O, networking, crypto, JSON, threading, and even PyTorch bindings.</p>
+    </div>
+    <div class="feature-card">
+      <h4>Garbage Collected</h4>
+      <p>Tracing GC manages memory automatically. Deterministic cleanup with <code>using</code> blocks.</p>
+    </div>
+    <div class="feature-card">
+      <h4>Developer Friendly</h4>
+      <p>REPL, formatter, linter, LSP, and VS Code extension included out of the box.</p>
+    </div>
+  </div>
+
+  <h2>Quick Example</h2>
+
+  <pre><code><span class="kw">def</span> <span class="fn">factorial</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">if</span> (n <span class="op">&lt;=</span> <span class="num">1</span>) {
+        <span class="kw">return</span> <span class="num">1</span>
+    }
+    <span class="kw">return</span> n <span class="op">*</span> <span class="fn">factorial</span>(n <span class="op">-</span> <span class="num">1</span>)
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Factorial of 10:"</span>)
+    <span class="fn">println</span>(<span class="fn">factorial</span>(<span class="num">10</span>))
+}</code></pre>
+
+  <h2>Language at a Glance</h2>
+
+  <table>
+    <tr><th>Feature</th><th>Details</th></tr>
+    <tr><td>File extension</td><td><code>.nex</code></td></tr>
+    <tr><td>Typing</td><td>Static by default, optional <code>var</code> for dynamic</td></tr>
+    <tr><td>Paradigm</td><td>Object-oriented with multiple inheritance</td></tr>
+    <tr><td>Memory</td><td>Tracing garbage collector</td></tr>
+    <tr><td>Compilation</td><td>AOT native binaries or JIT execution</td></tr>
+    <tr><td>Semicolons</td><td>Optional (Automatic Semicolon Insertion)</td></tr>
+    <tr><td>Blocks</td><td>Brace-delimited <code>{ }</code></td></tr>
+    <tr><td>Entry point</td><td><code>def main() -> Unit { }</code></td></tr>
+    <tr><td>Generics</td><td>Monomorphized type parameters <code>[T]</code></td></tr>
+    <tr><td>Toolchain</td><td><code>aur</code> build tool, formatter, linter, REPL, LSP</td></tr>
+  </table>
+
+  <h2>Get Started</h2>
+
+  <p>Ready to dive in? Start with the <a href="getting-started.html">Installation &amp; Setup</a> guide, or jump straight to <a href="hello-world.html">Hello World</a>.</p>
+
+  <div class="page-nav">
+    <span></span>
+    <a href="getting-started.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Installation &amp; Setup &rarr;</span>
+    </a>
+  </div>
+
+</main>
+
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

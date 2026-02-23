@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>.nexui Markup - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-ui.html">std.ui</a><span class="sep">/</span>.nexui Markup</div>
+
+  <h1>.nexui Declarative Markup</h1>
+  <p class="page-subtitle">XAML-style declarative UI markup with code-behind, data binding, and MVVM support. Compiles down to the imperative <code>std.ui</code> API.</p>
+
+  <div class="callout info">
+    <div class="callout-title">File Convention</div>
+    <p><code>.nexui</code> files are XML documents that define UI structure. Each <code>.nexui</code> file pairs with a <code>.nex</code> code-behind file using partial classes.</p>
+  </div>
+
+  <h2>Overview</h2>
+  <p>The <code>.nexui</code> markup system provides a declarative way to build UIs. Instead of writing imperative widget construction code, you describe the UI tree in XML and bind properties to your model.</p>
+
+  <h3>File structure</h3>
+  <pre><code>my_app/src/
+  main.nex              <span class="cmt">// Entry point</span>
+  MainWindow.nexui      <span class="cmt">// Markup (partial class MainWindow)</span>
+  MainWindow.nex        <span class="cmt">// Code-behind (partial class MainWindow)</span>
+  BaseWidget.nexui      <span class="cmt">// Shared base widget (optional)</span>
+  HomeWidget.nexui      <span class="cmt">// Screen widget, extends BaseWidget</span>
+  HomeWidget.nex        <span class="cmt">// Code-behind for HomeWidget</span></code></pre>
+
+  <h2>Markup Format</h2>
+
+  <h3>Basic Window</h3>
+  <pre><code>&lt;Window xmlns="std.ui" Title="My App" Width="800" Height="600"&gt;
+  &lt;Column Gap="10" Padding="20"&gt;
+    &lt;Text Text="Hello, World!" FontSize="24" /&gt;
+    &lt;Button Label="Click Me" Click="OnClick" /&gt;
+  &lt;/Column&gt;
+&lt;/Window&gt;</code></pre>
+
+  <h3>Available Elements</h3>
+  <table>
+    <thead><tr><th>Element</th><th>Maps to</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>Window</code></td><td><code>ui_app_create</code></td><td>Application window root element</td></tr>
+      <tr><td><code>Widget</code></td><td><em>generated methods</em></td><td>Reusable widget file root; generates <code>_create_container</code> / <code>_build_widget</code></td></tr>
+      <tr><td><code>WidgetSwitcher</code></td><td><code>ui_stack</code></td><td>Shows one child widget at a time; driven by an <code>Active</code> binding</td></tr>
+      <tr><td><code>Include</code></td><td><em>instantiation</em></td><td>Declares a widget class to load inside a <code>WidgetSwitcher</code></td></tr>
+      <tr><td><code>Text</code></td><td><code>ui_text</code></td><td>Static or bound text label</td></tr>
+      <tr><td><code>Button</code></td><td><code>ui_button</code></td><td>Clickable button</td></tr>
+      <tr><td><code>TextInput</code></td><td><code>ui_text_input</code></td><td>Text entry field</td></tr>
+      <tr><td><code>Image</code></td><td><code>ui_image</code></td><td>Image display</td></tr>
+      <tr><td><code>Checkbox</code></td><td><code>ui_checkbox</code></td><td>Toggle checkbox</td></tr>
+      <tr><td><code>Slider</code></td><td><code>ui_slider</code></td><td>Range slider</td></tr>
+      <tr><td><code>Row</code></td><td><code>ui_row</code></td><td>Horizontal layout container</td></tr>
+      <tr><td><code>Column</code></td><td><code>ui_column</code></td><td>Vertical layout container</td></tr>
+      <tr><td><code>Stack</code></td><td><code>ui_stack</code></td><td>Overlay container</td></tr>
+      <tr><td><code>Scroll</code></td><td><code>ui_scroll</code></td><td>Scrollable container</td></tr>
+      <tr><td><code>Grid</code></td><td><code>ui_grid</code></td><td>Grid layout</td></tr>
+      <tr><td><code>Canvas</code></td><td><code>ui_canvas</code></td><td>Custom drawing surface</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Widget Files</h2>
+  <p>A <code>.nexui</code> file whose root element is <code>&lt;Widget&gt;</code> (instead of <code>&lt;Window&gt;</code>) defines a reusable widget component. Widget files participate in the same auto-discovery as window files — every <code>.nexui</code> in the source directory is compiled automatically.</p>
+
+  <h3>Base widget</h3>
+  <p>A base widget provides a shared layout container. The compiler generates a <code>_create_container() -&gt; Int64</code> method that builds the widget tree and returns the root handle, plus a <code>virtual _build_widget() -&gt; Int64</code> that delegates to it.</p>
+
+  <pre><code><span class="cmt">&lt;!-- BaseWidget.nexui --&gt;</span>
+&lt;Widget xmlns="std.ui"&gt;
+  &lt;Column Gap="16" Padding="24" FlexGrow="1"&gt;
+  &lt;/Column&gt;
+&lt;/Widget&gt;</code></pre>
+
+  <h3>Widget Inheritance</h3>
+  <p>A derived widget extends a base widget using the <code>Extends</code> attribute on the root <code>&lt;Widget&gt;</code> element. The compiler:</p>
+  <ul>
+    <li>Adds the base class to <code>base_specs</code> on the generated <code>ClassDecl</code></li>
+    <li>Generates <code>override _build_widget() -&gt; Int64</code> which calls the inherited <code>_create_container()</code> and then appends the derived children to that container</li>
+  </ul>
+
+  <pre><code><span class="cmt">&lt;!-- CounterWidget.nexui — inherits BaseWidget's Column --&gt;</span>
+&lt;Widget xmlns="std.ui" Extends="BaseWidget"&gt;
+  &lt;Text Text="Counter" FontSize="28" /&gt;
+  &lt;Text Text="{Binding CounterText}" FontSize="22" /&gt;
+  &lt;Row Gap="8"&gt;
+    &lt;Button Label="+" Click="on_increment" /&gt;
+    &lt;Button Label="-" Click="on_decrement" /&gt;
+  &lt;/Row&gt;
+&lt;/Widget&gt;</code></pre>
+
+  <pre><code><span class="cmt">// CounterWidget.nex — code-behind with its own state</span>
+<span class="kw">import</span> std.ui
+
+<span class="kw">public partial class</span> CounterWidget {
+    counter = 0
+
+    <span class="kw">def</span> CounterText() -> String {
+        <span class="kw">return</span> "Count: " + counter
+    }
+
+    <span class="kw">def</span> on_increment(widget_id: Int64, event_kind: Int64) {
+        counter = counter + 1
+        notify_changed("CounterText")
+        <span class="kw">return</span>
+    }
+}</code></pre>
+
+  <h2>WidgetSwitcher</h2>
+  <p><code>&lt;WidgetSwitcher&gt;</code> is a screen-switching container backed by <code>ui_stack</code>. It holds one or more <code>&lt;Include&gt;</code> children — each names a widget class to instantiate. Only the active child is visible at a time.</p>
+
+  <table>
+    <thead><tr><th>Attribute</th><th>On</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>Active="{Binding Prop}"</code></td><td><code>WidgetSwitcher</code></td><td>Bound to an <code>Int</code>-returning method; index 0 = first child</td></tr>
+      <tr><td><code>Widget="ClassName"</code></td><td><code>Include</code></td><td>The widget class to instantiate for this slot</td></tr>
+    </tbody>
+  </table>
+
+  <pre><code><span class="cmt">&lt;!-- MainWindow.nexui --&gt;</span>
+&lt;Window xmlns="std.ui" Title="My App" Width="900" Height="650"&gt;
+  &lt;Column Gap="0"&gt;
+    &lt;Row Gap="8" Padding="12" BgColor="0x1E293BFF"&gt;
+      &lt;Button Label="Home"    Click="on_nav_home"    /&gt;
+      &lt;Button Label="Counter" Click="on_nav_counter" /&gt;
+    &lt;/Row&gt;
+    &lt;WidgetSwitcher Active="{Binding ActiveScreen}"&gt;
+      &lt;Include Widget="HomeWidget"    /&gt;
+      &lt;Include Widget="CounterWidget" /&gt;
+    &lt;/WidgetSwitcher&gt;
+  &lt;/Column&gt;
+&lt;/Window&gt;</code></pre>
+
+  <pre><code><span class="cmt">// MainWindow.nex — orchestrates navigation only</span>
+<span class="kw">import</span> std.ui
+
+<span class="kw">public partial class</span> MainWindow {
+    active_screen = 0
+
+    <span class="kw">def</span> ActiveScreen() -> Int { <span class="kw">return</span> active_screen }
+
+    <span class="kw">def</span> on_nav_home(widget_id: Int64, event_kind: Int64) {
+        active_screen = 0
+        notify_changed("ActiveScreen")
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> on_nav_counter(widget_id: Int64, event_kind: Int64) {
+        active_screen = 1
+        notify_changed("ActiveScreen")
+        <span class="kw">return</span>
+    }
+}</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Generated code for WidgetSwitcher</div>
+    <p>For each <code>&lt;Include&gt;</code>, the compiler emits code equivalent to:</p>
+    <pre><code>_sw_inst_1 = HomeWidget()
+HomeWidget::_setup_bindings()
+_sw_handle_1 = HomeWidget::_build_widget()
+ui_add_child(_switcher_1, _sw_handle_1)</code></pre>
+    <p>The generated calls are class-qualified to avoid ambiguity when multiple widgets expose methods with the same generated names.</p>
+    <p>The <code>Active</code> binding generates an <code>_update_ActiveScreen()</code> method that calls <code>ui_set_visible</code> for each handle using integer index comparison.</p>
+  </div>
+
+  <h2>Data Binding</h2>
+  <p>Binding expressions connect UI properties to code-behind methods or fields.</p>
+
+  <h3>Syntax</h3>
+  <pre><code><span class="cmt">&lt;!-- One-way binding (default) --&gt;</span>
+&lt;Text Text="{Binding CounterText}" /&gt;
+
+<span class="cmt">&lt;!-- Two-way binding --&gt;</span>
+&lt;TextInput Text="{Binding name_value, Mode=TwoWay}" /&gt;
+
+<span class="cmt">&lt;!-- With converter --&gt;</span>
+&lt;Text FgColor="{Binding StatusColor, Converter=ColorFromStatus}" /&gt;</code></pre>
+
+  <h3>Binding Modes</h3>
+  <table>
+    <thead><tr><th>Mode</th><th>Direction</th><th>Use case</th></tr></thead>
+    <tbody>
+      <tr><td><code>OneWay</code></td><td>Model &rarr; UI</td><td>Display values (default)</td></tr>
+      <tr><td><code>TwoWay</code></td><td>Model &harr; UI</td><td>Input fields, checkboxes</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Event Handling</h2>
+  <p>Events bind to methods in the code-behind class.</p>
+  <pre><code>&lt;Button Label="Save" Click="OnSave" /&gt;
+&lt;TextInput Change="OnNameChanged" /&gt;
+&lt;Row Hover="OnRowHover" /&gt;</code></pre>
+
+  <table>
+    <thead><tr><th>Attribute</th><th>Event</th></tr></thead>
+    <tbody>
+      <tr><td><code>Click</code></td><td>Mouse click / tap</td></tr>
+      <tr><td><code>Change</code></td><td>Value changed (text input, slider, checkbox)</td></tr>
+      <tr><td><code>Hover</code></td><td>Mouse enters element</td></tr>
+      <tr><td><code>Key</code></td><td>Key press while focused</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Code-Behind (MVVM)</h2>
+  <p>The <code>.nex</code> code-behind uses a partial class to define the model and event handlers.</p>
+
+  <pre><code><span class="kw">public partial class</span> MainWindow {
+    counter = 0
+
+    <span class="kw">def</span> CounterText() -> String {
+        <span class="kw">return</span> "Count: " + counter
+    }
+
+    <span class="kw">def</span> OnIncrement(widget_id: Int64, event_kind: Int64) {
+        counter = counter + 1
+        notify_changed("CounterText")
+    }
+
+    <span class="kw">def</span> OnDecrement(widget_id: Int64, event_kind: Int64) {
+        counter = counter - 1
+        notify_changed("CounterText")
+    }
+}</code></pre>
+
+  <h3>Property Change Notification</h3>
+  <p>Call <code>notify_changed("PropertyName")</code> to trigger all bindings for that property. The binding engine calls the bound method and updates the UI widget.</p>
+  <p>For <code>TextInput</code> with <code>Mode=TwoWay</code>, keystrokes already update the bound model value directly. Do not call <code>notify_changed</code> from the text input change path itself.</p>
+  <p><code>ui_get_text</code> values are treated as <code>String</code> in bindings, so expressions like <code>"Hello, " + name_value</code> use text content, not numeric handle values.</p>
+  <p>Callback identifiers (such as <code>on_click</code>) are treated as function references only when no variable with the same name exists in scope.</p>
+  <p>Bound class fields (for example <code>name_value</code>) retain their declared/inferred <code>String</code> type across generated methods, so string concatenation remains textual.</p>
+  <p>Generated private widget-handle fields are class-scoped (name-prefixed) so multiple widgets can coexist without handle-name collisions.</p>
+
+  <h2>Generated Lifecycle Methods</h2>
+  <p>The <code>.nexui</code> compiler generates methods on the partial class. Which methods are generated depends on the root element kind:</p>
+
+  <h3>Window root</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>_init_ui()</code></td><td>Creates all widgets, builds the tree, and sets the app root</td></tr>
+      <tr><td><code>_setup_bindings()</code></td><td>Registers property-change listeners for all <code>{Binding}</code> expressions</td></tr>
+      <tr><td><code>_run_app()</code></td><td>Runs the event loop and destroys the app on exit</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Widget root (base)</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>_create_container() -&gt; Int64</code></td><td>Builds the widget tree and returns the root widget handle. <code>public</code>; inherited by derived classes.</td></tr>
+      <tr><td><code>virtual _build_widget() -&gt; Int64</code></td><td>Delegates to <code>_create_container()</code>. Overridden by derived widgets.</td></tr>
+      <tr><td><code>_setup_bindings()</code></td><td>Registers property-change listeners.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Widget root (derived, <code>Extends="Base"</code>)</h3>
+  <table>
+    <thead><tr><th>Method</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>override _build_widget() -&gt; Int64</code></td><td>Calls the inherited <code>_create_container()</code>, appends derived children to the returned container, and returns it.</td></tr>
+      <tr><td><code>_setup_bindings()</code></td><td>Registers the derived widget's property-change listeners.</td></tr>
+    </tbody>
+  </table>
+  <p>Typical <code>main.nex</code> entry point:</p>
+  <pre><code><span class="kw">import</span> std.ui
+
+<span class="kw">def</span> main() {
+    _init_ui()
+    _setup_bindings()
+    _run_app()
+    <span class="kw">return</span>
+}</code></pre>
+
+  <h2>Styling Attributes</h2>
+  <table>
+    <thead><tr><th>Attribute</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>Width</code>, <code>Height</code></td><td>Int</td><td>Fixed size</td></tr>
+      <tr><td><code>Padding</code>, <code>Margin</code></td><td>Int</td><td>Spacing (packed edges)</td></tr>
+      <tr><td><code>BgColor</code>, <code>FgColor</code></td><td>Int (RGBA packed)</td><td>Colors — accepts <code>0xRRGGBBAA</code> hex literals or plain decimal</td></tr>
+      <tr><td><code>FontSize</code></td><td>Int</td><td>Text size in pixels</td></tr>
+      <tr><td><code>Gap</code></td><td>Int</td><td>Spacing between children</td></tr>
+      <tr><td><code>FlexGrow</code></td><td>Int</td><td>Flex grow factor</td></tr>
+      <tr><td><code>Visible</code>, <code>Enabled</code></td><td>"true"/"false"</td><td>Visibility and interactivity</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-nav">
+    <a href="stdlib-ui.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.ui (Imperative)</span>
+    </a>
+    <a href="tooling-aur.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Build Tool &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

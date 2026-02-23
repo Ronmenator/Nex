@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.crypto - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.crypto</div>
+
+  <h1>std.crypto</h1>
+  <p class="page-subtitle">Cryptographic hashing, encoding, and random byte generation.</p>
+
+  <pre><code><span class="kw">import</span> std.crypto</code></pre>
+
+  <h2>Hashing</h2>
+
+  <h4>sha256</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">sha256</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the hex-encoded SHA-256 hash of the input string. Produces a 64-character lowercase hex string.</p>
+
+  <pre><code><span class="kw">import</span> std.crypto
+
+hash <span class="op">=</span> <span class="fn">sha256</span>(<span class="str">"hello"</span>)
+<span class="fn">println</span>(hash)   <span class="cmt">// 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824</span></code></pre>
+
+  <h4>sha512</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">sha512</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the hex-encoded SHA-512 hash of the input string. Produces a 128-character lowercase hex string.</p>
+
+  <h4>md5</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">md5</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the hex-encoded MD5 hash of the input string. Produces a 32-character lowercase hex string. Not recommended for security-sensitive purposes; prefer SHA-256 or SHA-512.</p>
+
+  <h4>hmac_sha256</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">hmac_sha256</span>(key: <span class="typ">String</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Computes the HMAC-SHA256 message authentication code using <code>key</code> and <code>msg</code>. Returns a hex-encoded digest string. Useful for verifying message integrity and authenticity.</p>
+
+  <h2>Encoding</h2>
+
+  <h4>base64_encode</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">base64_encode</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Encodes the input string to Base64 format. Useful for embedding binary data in text-based protocols like JSON or HTTP headers.</p>
+
+  <h4>base64_decode</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">base64_decode</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Decodes a Base64-encoded string back to its original form.</p>
+
+  <h2>Random Bytes</h2>
+
+  <h4>random_bytes</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">random_bytes</span>(count: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Fills a buffer with <code>count</code> cryptographically secure random bytes and returns it. Suitable for generating keys, nonces, and salts.</p>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.crypto
+
+<span class="cmt">// Hash a password with SHA-256</span>
+password <span class="op">=</span> <span class="str">"my_secret_password"</span>
+hashed <span class="op">=</span> <span class="fn">sha256</span>(password)
+<span class="fn">print</span>(<span class="str">"SHA-256: "</span>)
+<span class="fn">println</span>(hashed)
+
+<span class="cmt">// Compare with SHA-512</span>
+hashed512 <span class="op">=</span> <span class="fn">sha512</span>(password)
+<span class="fn">print</span>(<span class="str">"SHA-512: "</span>)
+<span class="fn">println</span>(hashed512)
+
+<span class="cmt">// HMAC for API authentication</span>
+secret <span class="op">=</span> <span class="str">"api_key_2024"</span>
+message <span class="op">=</span> <span class="str">"GET /api/users?ts=1708617600"</span>
+signature <span class="op">=</span> <span class="fn">hmac_sha256</span>(secret, message)
+<span class="fn">print</span>(<span class="str">"HMAC signature: "</span>)
+<span class="fn">println</span>(signature)
+
+<span class="cmt">// Base64 encode/decode a payload</span>
+payload <span class="op">=</span> <span class="str">"username:password"</span>
+encoded <span class="op">=</span> <span class="fn">base64_encode</span>(payload)
+<span class="fn">print</span>(<span class="str">"Encoded: "</span>)
+<span class="fn">println</span>(encoded)   <span class="cmt">// dXNlcm5hbWU6cGFzc3dvcmQ=</span>
+
+decoded <span class="op">=</span> <span class="fn">base64_decode</span>(encoded)
+<span class="fn">print</span>(<span class="str">"Decoded: "</span>)
+<span class="fn">println</span>(decoded)   <span class="cmt">// username:password</span>
+
+<span class="cmt">// Generate random bytes for a salt</span>
+salt <span class="op">=</span> <span class="fn">random_bytes</span>(<span class="num">16</span>)
+<span class="fn">print</span>(<span class="str">"Random salt generated: "</span>)
+<span class="fn">println</span>(salt)</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-threading.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.threading</span>
+    </a>
+    <a href="stdlib-logging.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.logging &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

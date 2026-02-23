@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Configuration - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Tooling<span class="sep">/</span>Project Configuration</div>
+
+  <h1>Project Configuration</h1>
+  <p class="page-subtitle">The project.toml file format and project structure.</p>
+
+  <p>Every Nex project is defined by a <code>project.toml</code> file at the project root. This file declares the package name, version, entry point, and library dependencies.</p>
+
+  <h2>project.toml Format</h2>
+
+  <pre><code>name = "my_project"
+version = "0.1.0"
+entry = "src/main.nex"
+src = "src"
+
+[libs]
+graphics = { path = "../graphics" }
+utils = { path = "../shared/utils" }</code></pre>
+
+  <h2>Fields</h2>
+
+  <table>
+    <thead><tr><th>Field</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>name</code></td>
+        <td>Yes</td>
+        <td>—</td>
+        <td>The package name. Used as the output binary name and for import resolution.</td>
+      </tr>
+      <tr>
+        <td><code>version</code></td>
+        <td>Yes</td>
+        <td>—</td>
+        <td>A semver string (e.g. <code>"0.1.0"</code>, <code>"1.2.3"</code>).</td>
+      </tr>
+      <tr>
+        <td><code>entry</code></td>
+        <td>No</td>
+        <td><code>"src/main.nex"</code></td>
+        <td>The entry point file path, relative to the project root. This is the file executed by <code>aur run</code> and the starting point for <code>aur build</code>.</td>
+      </tr>
+      <tr>
+        <td><code>src</code></td>
+        <td>No</td>
+        <td><code>"src"</code></td>
+        <td>The source directory, relative to the project root. All <code>.nex</code> files in this directory (and its subdirectories) form the module graph.</td>
+      </tr>
+      <tr>
+        <td><code>[libs]</code></td>
+        <td>No</td>
+        <td>—</td>
+        <td>A section declaring external library dependencies. Each entry maps a name to <code>{ path = "..." }</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Project Structure</h2>
+
+  <p>A typical Nex project has the following layout:</p>
+
+  <pre><code>my_project/
+  project.toml          <span class="cmt"># Project configuration</span>
+  src/
+    main.nex             <span class="cmt"># Entry point</span>
+    utils.nex            <span class="cmt"># Module: import utils</span>
+    net/
+      http.nex           <span class="cmt"># Module: import net.http</span>
+      json.nex           <span class="cmt"># Module: import net.json</span>
+  build/                <span class="cmt"># Output directory (created by aur build)</span>
+    my_project          <span class="cmt"># Compiled binary</span></code></pre>
+
+  <p>Module names are derived from file paths relative to <code>src/</code>. For example, <code>src/net/http.nex</code> becomes the module <code>net.http</code>, importable as <code>import net.http</code>.</p>
+
+  <h2>Library Dependencies</h2>
+
+  <p>External libraries are other Nex projects referenced by local path. The library name in <code>[libs]</code> becomes the import namespace prefix.</p>
+
+  <pre><code><span class="cmt"># project.toml</span>
+name = "my_app"
+version = "1.0.0"
+
+[libs]
+graphics = { path = "../graphics" }</code></pre>
+
+  <p>With this configuration, modules in the <code>graphics</code> library's <code>src/</code> directory are imported using the <code>graphics.</code> prefix:</p>
+
+  <pre><code><span class="kw">import</span> graphics.shapes
+<span class="kw">import</span> graphics.renderer
+<span class="kw">from</span> graphics.colors <span class="kw">import</span> RGB, HSL</code></pre>
+
+  <h3>Library Rules</h3>
+
+  <ul>
+    <li>A library must be a valid Nex project with its own <code>project.toml</code> and <code>src/</code> directory.</li>
+    <li>Library sources are compiled alongside the main project and linked into a single executable.</li>
+    <li>Only local paths are supported in v1 (no registry, no git URLs).</li>
+    <li>Libraries cannot declare their own <code>[libs]</code> — no transitive dependencies in v1.</li>
+  </ul>
+
+  <h3>Library Project Example</h3>
+
+  <p>Create a library with <code>aur new</code>:</p>
+
+  <pre><code>$ aur new my_lib --lib</code></pre>
+
+  <p>Library <code>project.toml</code>:</p>
+
+  <pre><code>name = "my_lib"
+version = "0.1.0"
+src = "src"</code></pre>
+
+  <p>Library source (<code>my_lib/src/helpers.nex</code>):</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    <span class="fn">print</span>(<span class="str">"Hello, "</span>)
+    <span class="fn">println</span>(name)
+}</code></pre>
+
+  <p>Main project consuming the library:</p>
+
+  <pre><code><span class="cmt">// project.toml: [libs] my_lib = { path = "../my_lib" }</span>
+<span class="kw">import</span> my_lib.helpers
+
+<span class="fn">greet</span>(<span class="str">"Nex"</span>)   <span class="cmt">// Hello, Nex</span></code></pre>
+
+  <div class="page-nav">
+    <a href="tooling-aur.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Build Tool (aur)</span>
+    </a>
+    <a href="tooling-repl.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">REPL &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

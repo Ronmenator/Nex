@@ -1,0 +1,27 @@
+<Window xmlns="std.ui" Title="Nex MVVM Demo" Width="900" Height="650">
+
+  <Window.Resources>
+    <ResourceDictionary Source="Styles/AppStyles.nexuistyle"/>
+  </Window.Resources>
+
+  <Column Gap="0">
+
+    <!-- Navigation header -->
+    <Row Gap="8" Padding="12" BgColor="0x1E293BFF" HorizontalAlignment="Right" VerticalAlignment="Center">
+      <Text Style="AppTitle" Text="Nex Demo" />
+      <Button Style="NavButton" Label="Home"     Click="on_nav_home"     />
+      <Button Style="NavButton" Label="Counter"  Click="on_nav_counter"  />
+      <Button Style="NavButton" Label="Greeting" Click="on_nav_greeting" />
+      <Button Style="NavButton" Label="About"    Click="on_nav_about"    />
+    </Row>
+
+    <!-- Screen switcher — shows one widget at a time -->
+    <WidgetSwitcher Active="{Binding ActiveScreen}">
+      <Include Widget="HomeWidget"     />
+      <Include Widget="CounterWidget"  />
+      <Include Widget="GreetingWidget" />
+      <Include Widget="AboutWidget"    />
+    </WidgetSwitcher>
+
+  </Column>
+</Window>

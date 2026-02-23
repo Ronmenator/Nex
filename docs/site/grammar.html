@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grammar (EBNF) - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Reference<span class="sep">/</span>Grammar (EBNF)</div>
+
+  <h1>Grammar (EBNF)</h1>
+  <p class="page-subtitle">Formal grammar specification for the Nex language.</p>
+
+  <p>This is the complete Extended Backus-Naur Form (EBNF) grammar for Nex v0.1.0. Terminal symbols are shown in double quotes. <code>{ X }</code> means zero or more repetitions of X, and <code>[ X ]</code> means X is optional.</p>
+
+  <div class="callout info">
+    <div class="callout-title">Notation</div>
+    <p><code>Terminator</code> refers to either an explicit semicolon <code>;</code> or an implicit terminator inserted by the ASI (Automatic Semicolon Insertion) rules. See <a href="control-flow.html">Control Flow</a> for ASI details.</p>
+  </div>
+
+  <h2>Top-Level</h2>
+
+  <pre><code>Program           = { Item } EOF ;
+
+Item              = ImportDecl
+                  | ClassDecl
+                  | InterfaceDecl
+                  | StructDecl
+                  | FunctionDecl
+                  | Statement ;</code></pre>
+
+  <h2>Imports</h2>
+
+  <pre><code>ImportDecl        = "import" ModulePath [ "as" Ident ] Terminator
+                  | "from" ModulePath "import" ImportList Terminator ;
+
+ImportList        = Ident { "," Ident } ;
+
+ModulePath        = Ident { "." Ident } ;</code></pre>
+
+  <h2>Classes</h2>
+
+  <pre><code>ClassDecl         = [ "public" ] "class" Ident [ TypeParams ]
+                    [ ":" BaseSpecList ] "{" { ClassMember } "}" ;
+
+BaseSpecList      = BaseSpec { "," BaseSpec } ;
+
+BaseSpec          = [ "shared" ] TypeRef [ "(" [ ArgList ] ")" ] ;
+
+ClassMember       = FieldDecl Terminator
+                  | FunctionDecl
+                  | AliasDecl Terminator ;
+
+FieldDecl         = [ "public" ] Ident ":" TypeRef [ "=" Expr ] ;
+
+AliasDecl         = "alias" Ident "=" QualifiedMember ;
+
+QualifiedMember   = TypeRef "::" Ident ;</code></pre>
+
+  <h2>Interfaces</h2>
+
+  <pre><code>InterfaceDecl     = [ "public" ] "interface" Ident [ TypeParams ]
+                    [ ":" InterfaceBaseList ] "{" { FunctionSig Terminator } "}" ;
+
+InterfaceBaseList = TypeRef { "," TypeRef } ;
+
+FunctionSig       = [ "public" ] "def" Ident "(" [ Parameters ] ")" [ "->" TypeRef ] ;</code></pre>
+
+  <h2>Structs</h2>
+
+  <pre><code>StructDecl        = [ "public" ] "struct" Ident [ TypeParams ]
+                    [ ":" InterfaceBaseList ] "{" { StructMember } "}" ;
+
+StructMember      = FieldDecl Terminator
+                  | FunctionDecl ;</code></pre>
+
+  <h2>Functions</h2>
+
+  <pre><code>FunctionDecl      = [ "public" ] [ "virtual" ] [ "override" ] [ "static" ]
+                    "def" Ident [ TypeParams ] "(" [ Parameters ] ")"
+                    [ "->" TypeRef ] Block ;
+
+Parameters        = Param { "," Param } ;
+
+Param             = Ident ":" TypeRef ;
+
+TypeParams        = "[" Ident { "," Ident } "]" ;</code></pre>
+
+  <h2>Statements</h2>
+
+  <pre><code>Block             = "{" { Statement } "}" ;
+
+Statement         = Block
+                  | IfStmt
+                  | WhileStmt
+                  | ForStmt
+                  | TryStmt
+                  | UsingStmt
+                  | ReturnStmt Terminator
+                  | BreakStmt Terminator
+                  | ContinueStmt Terminator
+                  | ThrowStmt Terminator
+                  | VarStmt Terminator
+                  | ExprStmt Terminator ;
+
+IfStmt            = "if" "(" Expr ")" Block [ "else" ( IfStmt | Block ) ] ;
+
+WhileStmt         = "while" "(" Expr ")" Block ;
+
+ForStmt           = "for" "(" ForInit ";" Expr ";" ForStep ")" Block ;
+
+ForInit           = VarStmt | ExprStmt ;
+
+ForStep           = ExprStmt ;
+
+TryStmt           = "try" Block { CatchClause } [ "finally" Block ] ;
+
+CatchClause       = "catch" "(" Ident ":" TypeRef ")" Block ;
+
+UsingStmt         = "using" "(" UsingBindings ")" Block ;
+
+UsingBindings     = UsingBinding { "," UsingBinding } ;
+
+UsingBinding      = [ "var" ] Ident "=" Expr ;
+
+ReturnStmt        = "return" [ Expr ] ;
+
+BreakStmt         = "break" ;
+
+ContinueStmt      = "continue" ;
+
+ThrowStmt         = "throw" Expr ;
+
+VarStmt           = "var" Ident "=" Expr ;
+
+ExprStmt          = Expr ;</code></pre>
+
+  <h2>Expressions</h2>
+
+  <pre><code>Expr              = Assignment ;
+
+Assignment        = LogicalOr [ ( "=" | "+=" | "-=" | "*=" | "/=" ) Assignment ] ;
+
+LogicalOr         = LogicalAnd { "||" LogicalAnd } ;
+
+LogicalAnd        = Equality { "&&" Equality } ;
+
+Equality          = Relational { ( "==" | "!=" ) Relational } ;
+
+Relational        = Additive { ( "<" | "<=" | ">" | ">=" ) Additive } ;
+
+Additive          = Multiplicative { ( "+" | "-" ) Multiplicative } ;
+
+Multiplicative    = Unary { ( "*" | "/" | "%" ) Unary } ;
+
+Unary             = ( "-" | "!" ) Unary
+                  | Postfix ;
+
+Postfix           = Primary { PostfixOp } ;
+
+PostfixOp         = "." Ident [ "(" [ ArgList ] ")" ]
+                  | "(" [ ArgList ] ")"
+                  | "[" Expr "]"
+                  | "::" Ident ;
+
+ArgList           = Expr { "," Expr } ;</code></pre>
+
+  <h2>Primary Expressions</h2>
+
+  <pre><code>Primary           = Ident
+                  | Literal
+                  | "self"
+                  | "null"
+                  | "(" Expr ")"
+                  | TypeRef "(" [ ArgList ] ")"
+                  | TypeRef "[" TypeRef { "," TypeRef } "]" "(" [ ArgList ] ")" ;
+
+Literal           = IntLiteral
+                  | FloatLiteral
+                  | StringLiteral
+                  | CharLiteral
+                  | "true"
+                  | "false" ;
+
+IntLiteral        = Digit { Digit } [ IntSuffix ] ;
+
+IntSuffix         = "b" | "i" | "i64" ;
+
+FloatLiteral      = Digit { Digit } "." Digit { Digit } [ FloatSuffix ] ;
+
+FloatSuffix       = "f" | "d" ;
+
+StringLiteral     = '"' { StringChar } '"' ;
+
+StringChar        = &lt;any character except '"' and '\'&gt;
+                  | '\' EscapeChar ;
+
+EscapeChar        = '"' | '\' | 'n' | 't' | 'r' ;
+
+CharLiteral       = "'" ( &lt;any character except "'" and "\"&gt; | "\" CharEscape ) "'" ;
+
+CharEscape        = "\" | "'" | "n" | "t" | "r" | "u" HexDigit HexDigit HexDigit HexDigit ;</code></pre>
+
+  <h2>Types</h2>
+
+  <pre><code>TypeRef           = BuiltinType [ "?" ]
+                  | Ident [ TypeArgs ] [ "?" ]
+                  | FunctionType [ "?" ] ;
+
+TypeArgs          = "[" TypeRef { "," TypeRef } "]" ;
+
+FunctionType      = "(" [ TypeRef { "," TypeRef } ] ")" "->" TypeRef ;
+
+BuiltinType       = "Bool"
+                  | "Byte"
+                  | "Int"
+                  | "Int64"
+                  | "Float"
+                  | "Double"
+                  | "Char"
+                  | "String"
+                  | "Unit"
+                  | "Var"
+                  | "Object" ;</code></pre>
+
+  <h2>Lexical Elements</h2>
+
+  <pre><code>Ident             = Letter { Letter | Digit | "_" } ;
+
+Letter            = "a".."z" | "A".."Z" | "_" ;
+
+Digit             = "0".."9" ;
+
+HexDigit          = Digit | "a".."f" | "A".."F" ;
+
+LineComment       = "//" { &lt;any character except newline&gt; } ;
+
+BlockComment      = "/*" { &lt;any character&gt; } "*/" ;
+
+Terminator        = ";" | &lt;ASI-inserted newline terminator&gt; ;</code></pre>
+
+  <h2>ASI (Automatic Semicolon Insertion)</h2>
+
+  <p>A newline acts as a statement terminator when the <strong>previous</strong> token is one of:</p>
+  <ul>
+    <li>Identifier</li>
+    <li>Literal (number, string, char, <code>true</code>, <code>false</code>, <code>null</code>)</li>
+    <li><code>)</code> <code>]</code> <code>}</code></li>
+    <li><code>return</code> (with no expression), <code>break</code>, <code>continue</code></li>
+  </ul>
+
+  <p>A newline does <strong>not</strong> terminate a statement when the previous token is:</p>
+  <ul>
+    <li>Binary operator: <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code> <code>&amp;&amp;</code> <code>||</code> <code>==</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code></li>
+    <li>Assignment operator: <code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code></li>
+    <li>Delimiter: <code>.</code> <code>,</code> <code>:</code> <code>(</code> <code>[</code> <code>{</code></li>
+    <li><code>::</code> <code>-&gt;</code></li>
+  </ul>
+
+  <h2>Operator Precedence</h2>
+
+  <p>From lowest to highest precedence:</p>
+
+  <table>
+    <thead><tr><th>Precedence</th><th>Operators</th><th>Associativity</th></tr></thead>
+    <tbody>
+      <tr><td>1 (lowest)</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code></td><td>Right</td></tr>
+      <tr><td>2</td><td><code>||</code></td><td>Left</td></tr>
+      <tr><td>3</td><td><code>&amp;&amp;</code></td><td>Left</td></tr>
+      <tr><td>4</td><td><code>==</code> <code>!=</code></td><td>Left</td></tr>
+      <tr><td>5</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Left</td></tr>
+      <tr><td>6</td><td><code>+</code> <code>-</code></td><td>Left</td></tr>
+      <tr><td>7</td><td><code>*</code> <code>/</code> <code>%</code></td><td>Left</td></tr>
+      <tr><td>8</td><td><code>-</code> (unary) <code>!</code></td><td>Right</td></tr>
+      <tr><td>9 (highest)</td><td><code>.</code> <code>()</code> <code>[]</code> <code>::</code></td><td>Left</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-nav">
+    <a href="tooling-vscode.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; VS Code Extension</span>
+    </a>
+    <a href="keywords.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Keywords &amp; Operators &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

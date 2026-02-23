@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Variables &amp; Types - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Variables &amp; Types</div>
+
+  <h1>Variables &amp; Types</h1>
+  <p class="page-subtitle">Nex is statically typed by default with local type inference. Variables are introduced by first assignment.</p>
+
+  <h2>Variable Declaration</h2>
+
+  <p>in Nex, you don't need a keyword to declare a variable. The first assignment to a name creates it with an inferred type:</p>
+
+  <pre><code>x <span class="op">=</span> <span class="num">42</span>          <span class="cmt">// x is Int</span>
+name <span class="op">=</span> <span class="str">"Nex"</span>   <span class="cmt">// name is String</span>
+pi <span class="op">=</span> <span class="num">3.14</span>        <span class="cmt">// pi is Double</span>
+flag <span class="op">=</span> <span class="kw">true</span>       <span class="cmt">// flag is Bool</span></code></pre>
+
+  <p>Once a variable's type is established, you cannot assign a value of a different type:</p>
+
+  <pre><code>a <span class="op">=</span> <span class="num">1</span>            <span class="cmt">// a: Int</span>
+a <span class="op">=</span> <span class="str">"test"</span>       <span class="cmt">// compile error: cannot assign String to Int</span></code></pre>
+
+  <h2>Dynamic Variables with <code>var</code></h2>
+
+  <p>Use the <code>var</code> keyword to declare a dynamically-typed variable of type <code>Var</code>:</p>
+
+  <pre><code><span class="kw">var</span> b <span class="op">=</span> <span class="num">1</span>
+b <span class="op">=</span> <span class="str">"test"</span>       <span class="cmt">// OK &mdash; Var can hold any type</span>
+b <span class="op">=</span> <span class="num">3.14</span>         <span class="cmt">// OK</span>
+b <span class="op">=</span> <span class="kw">true</span>          <span class="cmt">// OK</span></code></pre>
+
+  <div class="callout warning">
+    <div class="callout-title">Warning</div>
+    <p>Using <code>Var</code> in public APIs produces a lint warning. Suppress it with the <code>@allow_var_api</code> annotation if intentional. See <a href="dynamic-var.html">Dynamic Typing</a> for details.</p>
+  </div>
+
+  <h2>Built-in Value Types</h2>
+
+  <table>
+    <tr><th>Type</th><th>Description</th><th>Size</th><th>Literal Examples</th></tr>
+    <tr><td><code>Bool</code></td><td>Boolean</td><td>1 byte</td><td><code>true</code>, <code>false</code></td></tr>
+    <tr><td><code>Byte</code></td><td>Unsigned 8-bit integer</td><td>1 byte</td><td><code>255b</code></td></tr>
+    <tr><td><code>Int</code></td><td>Signed 32-bit integer</td><td>4 bytes</td><td><code>42</code>, <code>42i</code></td></tr>
+    <tr><td><code>Int64</code></td><td>Signed 64-bit integer</td><td>8 bytes</td><td><code>42i64</code></td></tr>
+    <tr><td><code>Float</code></td><td>32-bit floating point</td><td>4 bytes</td><td><code>1.0f</code></td></tr>
+    <tr><td><code>Double</code></td><td>64-bit floating point</td><td>8 bytes</td><td><code>3.14</code>, <code>1.0d</code></td></tr>
+    <tr><td><code>Char</code></td><td>Unicode character</td><td>4 bytes</td><td><code>'A'</code>, <code>'\n'</code>, <code>'\uFFFF'</code></td></tr>
+  </table>
+
+  <h3>Integer Literal Defaults</h3>
+  <p>An unsuffixed integer literal defaults to <code>Int</code> if the value fits, otherwise <code>Int64</code>. If it doesn't fit either, it's a compile error.</p>
+
+  <h3>Float Literal Defaults</h3>
+  <p>An unsuffixed float literal (e.g. <code>3.14</code>) defaults to <code>Double</code>. Use the <code>f</code> suffix for <code>Float</code>.</p>
+
+  <h2>Reference Types</h2>
+
+  <table>
+    <tr><th>Type</th><th>Description</th></tr>
+    <tr><td><code>String</code></td><td>Immutable, heap-allocated, GC-managed string</td></tr>
+    <tr><td><code>Object</code></td><td>Universal base class for all class types</td></tr>
+    <tr><td><code>Var</code></td><td>Dynamic type that can hold any value</td></tr>
+    <tr><td>All <code>class</code> types</td><td>User-defined reference types</td></tr>
+  </table>
+
+  <h2>String Type</h2>
+
+  <p><code>String</code> is a compiler-known primitive reference type. Strings are immutable, heap-allocated, and garbage collected.</p>
+
+  <pre><code>greeting <span class="op">=</span> <span class="str">"Hello"</span>
+name <span class="op">=</span> <span class="str">"World"</span>
+message <span class="op">=</span> greeting <span class="op">+</span> <span class="str">", "</span> <span class="op">+</span> name <span class="op">+</span> <span class="str">"!"</span>  <span class="cmt">// String concatenation</span>
+<span class="fn">println</span>(message)  <span class="cmt">// Hello, World!</span></code></pre>
+
+  <h3>String Escape Sequences</h3>
+  <table>
+    <tr><th>Escape</th><th>Meaning</th></tr>
+    <tr><td><code>\"</code></td><td>Double quote</td></tr>
+    <tr><td><code>\\</code></td><td>Backslash</td></tr>
+    <tr><td><code>\n</code></td><td>Newline</td></tr>
+    <tr><td><code>\t</code></td><td>Tab</td></tr>
+    <tr><td><code>\r</code></td><td>Carriage return</td></tr>
+  </table>
+
+  <h3>Character Escape Sequences</h3>
+  <p>Characters support the same escapes plus Unicode: <code>'\uFFFF'</code> (4 hex digits).</p>
+
+  <h2>Type Categories Summary</h2>
+
+  <h3>Value Types</h3>
+  <ul>
+    <li>Stored inline on the stack or within another object.</li>
+    <li>Copy semantics on assignment and when passed to functions.</li>
+    <li>Do <strong>not</strong> inherit from <code>Object</code>.</li>
+    <li>Includes: <code>Bool</code>, <code>Byte</code>, <code>Int</code>, <code>Int64</code>, <code>Float</code>, <code>Double</code>, <code>Char</code>, and all <code>struct</code> types.</li>
+  </ul>
+
+  <h3>Reference Types</h3>
+  <ul>
+    <li>Heap-allocated and managed by the garbage collector.</li>
+    <li>Variables hold a reference (pointer) to the object.</li>
+    <li>Assignment copies the reference, not the object.</li>
+    <li>All <code>class</code> types derive from <code>Object</code>.</li>
+  </ul>
+
+  <h2>The <code>Unit</code> Type</h2>
+
+  <p><code>Unit</code> is Nex's void type. Functions that don't return a meaningful value use <code>Unit</code> as their return type:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Hello, "</span> <span class="op">+</span> name)
+}</code></pre>
+
+  <h2>Null and Nullable Types</h2>
+
+  <p>A type followed by <code>?</code> denotes a nullable variant. See <a href="nullable-types.html">Nullable Types</a> for full details.</p>
+
+  <pre><code>name: <span class="typ">String</span>? <span class="op">=</span> <span class="kw">null</span>
+
+<span class="kw">if</span> (name <span class="op">!=</span> <span class="kw">null</span>) {
+    <span class="fn">println</span>(name)
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="hello-world.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Hello World</span>
+    </a>
+    <a href="operators.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Operators &amp; Expressions &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

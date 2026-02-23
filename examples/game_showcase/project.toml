@@ -1,0 +1,6 @@
+name = "game_showcase"
+version = "0.1.0"
+entry = "src/main.nex"
+
+[libs]
+nex3d = { path = "../../libs/nex3d" }

@@ -1,0 +1,126 @@
+// nex3d.math — Vector and matrix types for 2D and 3D games.
+// Pure Nex implementation using std.math; no runtime engine dependency.
+
+import std.math
+
+// ===========================================================================
+// Vec2 — 2D vector for sprites, UI, and 2D games
+// ===========================================================================
+
+public struct Vec2 {
+    x: Float
+    y: Float
+}
+
+public def vec2(x: Float, y: Float) -> Vec2 {
+    return Vec2(x, y)
+}
+
+public def vec2_zero() -> Vec2 {
+    return Vec2(0.0f, 0.0f)
+}
+
+public def vec2_one() -> Vec2 {
+    return Vec2(1.0f, 1.0f)
+}
+
+public def vec2_add(a: Vec2, b: Vec2) -> Vec2 {
+    return Vec2(a.x + b.x, a.y + b.y)
+}
+
+public def vec2_sub(a: Vec2, b: Vec2) -> Vec2 {
+    return Vec2(a.x - b.x, a.y - b.y)
+}
+
+public def vec2_mul(a: Vec2, s: Float) -> Vec2 {
+    return Vec2(a.x * s, a.y * s)
+}
+
+public def vec2_dot(a: Vec2, b: Vec2) -> Float {
+    return a.x * b.x + a.y * b.y
+}
+
+public def vec2_length(v: Vec2) -> Float {
+    return sqrt(v.x * v.x + v.y * v.y)
+}
+
+public def vec2_normalize(v: Vec2) -> Vec2 {
+    len = vec2_length(v)
+    if (len < 0.0001f) {
+        return vec2_zero()
+    }
+    return vec2_mul(v, 1.0f / len)
+}
+
+// ===========================================================================
+// Vec3 — 3D vector for 3D positions, directions, colors (RGB)
+// ===========================================================================
+
+public struct Vec3 {
+    x: Float
+    y: Float
+    z: Float
+}
+
+public def vec3(x: Float, y: Float, z: Float) -> Vec3 {
+    return Vec3(x, y, z)
+}
+
+public def vec3_zero() -> Vec3 {
+    return Vec3(0.0f, 0.0f, 0.0f)
+}
+
+public def vec3_one() -> Vec3 {
+    return Vec3(1.0f, 1.0f, 1.0f)
+}
+
+public def vec3_add(a: Vec3, b: Vec3) -> Vec3 {
+    return Vec3(a.x + b.x, a.y + b.y, a.z + b.z)
+}
+
+public def vec3_sub(a: Vec3, b: Vec3) -> Vec3 {
+    return Vec3(a.x - b.x, a.y - b.y, a.z - b.z)
+}
+
+public def vec3_mul(a: Vec3, s: Float) -> Vec3 {
+    return Vec3(a.x * s, a.y * s, a.z * s)
+}
+
+public def vec3_dot(a: Vec3, b: Vec3) -> Float {
+    return a.x * b.x + a.y * b.y + a.z * b.z
+}
+
+public def vec3_length(v: Vec3) -> Float {
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+}
+
+public def vec3_normalize(v: Vec3) -> Vec3 {
+    len = vec3_length(v)
+    if (len < 0.0001f) {
+        return vec3_zero()
+    }
+    return vec3_mul(v, 1.0f / len)
+}
+
+// ===========================================================================
+// Vec4 — 4D vector for homogeneous coordinates and RGBA colors
+// ===========================================================================
+
+public struct Vec4 {
+    x: Float
+    y: Float
+    z: Float
+    w: Float
+}
+
+public def vec4(x: Float, y: Float, z: Float, w: Float) -> Vec4 {
+    return Vec4(x, y, z, w)
+}
+
+public def vec4_from_vec3(v: Vec3, w: Float) -> Vec4 {
+    return Vec4(v.x, v.y, v.z, w)
+}
+
+public def vec4_zero() -> Vec4 {
+    return Vec4(0.0f, 0.0f, 0.0f, 0.0f)
+}

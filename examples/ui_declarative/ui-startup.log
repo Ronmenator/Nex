@@ -1,0 +1,48 @@
+[ui][nex_ui_on_click] register callback | widget=3, callback=0x23d894e014f
+[ui][nex_ui_on_click] register callback | widget=4, callback=0x23d894e0181
+[ui][nex_ui_on_click] register callback | widget=5, callback=0x23d894e01b3
+[ui][nex_ui_on_click] register callback | widget=6, callback=0x23d894e01e5
+[ui][nex_ui_on_click] register callback | widget=14, callback=0x23d894d09c2
+[ui][nex_ui_on_click] register callback | widget=15, callback=0x23d894d0a08
+[ui][nex_ui_on_click] register callback | widget=22, callback=0x23d894d0a4e
+[ui][nex_ui_on_click] register callback | widget=24, callback=0x23d894d0a97
+[ui][nex_ui_on_click] register callback | widget=25, callback=0x23d894d0ae0
+[ui][nex_ui_on_click] register callback | widget=31, callback=0x23d894c07c6
+[ui][nex_ui_on_click] register callback | widget=32, callback=0x23d894c085a
+[ui][nex_ui_on_click] register callback | widget=33, callback=0x23d894c08ec
+[ui][nex_ui_on_change] register callback | widget=37, callback=0x23d894c0bb0
+[ui][nex_ui_on_click] register callback | widget=38, callback=0x23d894c0c42
+[ui][fire_pending] invoking callback | widget=4, kind=Click, fn_ptr=0x23d894e0181
+[ui][fire_pending] callback returned | widget=4, kind=Click
+[ui][fire_pending] invoking callback | widget=5, kind=Click, fn_ptr=0x23d894e01b3
+[ui][fire_pending] callback returned | widget=5, kind=Click
+[ui][fire_pending] invoking callback | widget=6, kind=Click, fn_ptr=0x23d894e01e5
+[ui][fire_pending] callback returned | widget=6, kind=Click
+[ui][fire_pending] invoking callback | widget=22, kind=Click, fn_ptr=0x23d894d0a4e
+[ui][fire_pending] callback returned | widget=22, kind=Click
+[ui][fire_pending] invoking callback | widget=4, kind=Click, fn_ptr=0x23d894e0181
+[ui][fire_pending] callback returned | widget=4, kind=Click
+[ui][fire_pending] invoking callback | widget=14, kind=Click, fn_ptr=0x23d894d09c2
+[ui][fire_pending] callback returned | widget=14, kind=Click
+[ui][fire_pending] invoking callback | widget=22, kind=Click, fn_ptr=0x23d894d0a4e
+[ui][fire_pending] callback returned | widget=22, kind=Click
+[ui][fire_pending] invoking callback | widget=15, kind=Click, fn_ptr=0x23d894d0a08
+[ui][fire_pending] callback returned | widget=15, kind=Click
+[ui][fire_pending] invoking callback | widget=25, kind=Click, fn_ptr=0x23d894d0ae0
+[ui][fire_pending] callback returned | widget=25, kind=Click
+[ui][fire_pending] invoking callback | widget=15, kind=Click, fn_ptr=0x23d894d0a08
+[ui][fire_pending] callback returned | widget=15, kind=Click
+[ui][fire_pending] invoking callback | widget=24, kind=Click, fn_ptr=0x23d894d0a97
+[ui][fire_pending] callback returned | widget=24, kind=Click
+[ui][fire_pending] invoking callback | widget=14, kind=Click, fn_ptr=0x23d894d09c2
+[ui][fire_pending] callback returned | widget=14, kind=Click
+[ui][fire_pending] invoking callback | widget=22, kind=Click, fn_ptr=0x23d894d0a4e
+[ui][fire_pending] callback returned | widget=22, kind=Click
+[ui][fire_pending] invoking callback | widget=3, kind=Click, fn_ptr=0x23d894e014f
+[ui][fire_pending] callback returned | widget=3, kind=Click
+[ui][fire_pending] invoking callback | widget=4, kind=Click, fn_ptr=0x23d894e0181
+[ui][fire_pending] callback returned | widget=4, kind=Click
+[ui][fire_pending] invoking callback | widget=5, kind=Click, fn_ptr=0x23d894e01b3
+[ui][fire_pending] callback returned | widget=5, kind=Click
+[ui][fire_pending] invoking callback | widget=6, kind=Click, fn_ptr=0x23d894e01e5
+[ui][fire_pending] callback returned | widget=6, kind=Click

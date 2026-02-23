@@ -1,0 +1,21 @@
+[package]
+name = "nexc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+torch = ["nexc_driver/torch"]
+ui = ["nexc_driver/ui"]
+engine = ["nexc_driver/engine"]
+
+[dependencies]
+nexc_diag = { path = "../nexc_diag" }
+nexc_driver = { path = "../nexc_driver" }
+
+[[bin]]
+name = "nexc"
+path = "src/main.rs"
+

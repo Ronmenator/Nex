@@ -1,0 +1,40 @@
+// CounterWidget code-behind — standalone counter with its own state.
+
+import std.ui
+
+public partial class CounterWidget {
+    counter = 0
+    status = "Ready"
+
+    def CounterText() -> String {
+        return "Count: " + counter
+    }
+
+    def StatusText() -> String {
+        return status
+    }
+
+    def on_increment(widget_id: Int64, event_kind: Int64) {
+        counter = counter + 1
+        status = "Incremented to " + counter
+        notify_changed("CounterText")
+        notify_changed("StatusText")
+        return
+    }
+
+    def on_decrement(widget_id: Int64, event_kind: Int64) {
+        counter = counter - 1
+        status = "Decremented to " + counter
+        notify_changed("CounterText")
+        notify_changed("StatusText")
+        return
+    }
+
+    def on_reset(widget_id: Int64, event_kind: Int64) {
+        counter = 0
+        status = "Counter reset"
+        notify_changed("CounterText")
+        notify_changed("StatusText")
+        return
+    }
+}

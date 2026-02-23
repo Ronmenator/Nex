@@ -1,0 +1,41 @@
+# Rust / Cargo
+target/
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock - keep for executables (workspace has binary crates)
+# Cargo.lock
+
+# Generated metadata files
+**/*.nexmeta
+
+# VSCode Extension - Node.js
+vscode-extension/node_modules/
+vscode-extension/dist/
+vscode-extension/.vscode-test/
+vscode-extension/*.vsix
+
+# Editor / IDE
+.cursor/
+.claude/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary / scratch files
+temp_sink_render.rs
+*.tmp
+*.bak
+
+# LLVM / build outputs
+*.bc
+*.ll
+*.o
+*.so
+*.dylib
+*.dll

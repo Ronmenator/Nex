@@ -1,0 +1,45 @@
+// MainWindow code-behind — orchestrates screen navigation via WidgetSwitcher.
+//
+// Screen IDs: 0 = home | 1 = counter | 2 = greeting | 3 = about
+//
+// Each screen is a separate Widget class (HomeWidget, CounterWidget, etc.)
+// that extends BaseWidget.  All per-screen state and event handlers live
+// in the respective widget's .nex code-behind.
+
+import std.ui
+
+public partial class MainWindow {
+    active_screen = 0
+
+    // ActiveScreen() is called by the generated _update_ActiveScreen updater
+    // whenever notify_changed("ActiveScreen") fires.
+    def ActiveScreen() -> Int {
+        return active_screen
+    }
+
+    // ── Navigation handlers ───────────────────────────────────────────
+
+    def on_nav_home(widget_id: Int64, event_kind: Int64) {
+        active_screen = 0
+        notify_changed("ActiveScreen")
+        return
+    }
+
+    def on_nav_counter(widget_id: Int64, event_kind: Int64) {
+        active_screen = 1
+        notify_changed("ActiveScreen")
+        return
+    }
+
+    def on_nav_greeting(widget_id: Int64, event_kind: Int64) {
+        active_screen = 2
+        notify_changed("ActiveScreen")
+        return
+    }
+
+    def on_nav_about(widget_id: Int64, event_kind: Int64) {
+        active_screen = 3
+        notify_changed("ActiveScreen")
+        return
+    }
+}

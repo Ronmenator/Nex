@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Typing (Var) - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Dynamic Typing (Var)</div>
+
+  <h1>Dynamic Typing (Var)</h1>
+  <p class="page-subtitle">Opt into runtime-dynamic variables with the <code>var</code> keyword and the <code>Var</code> type.</p>
+
+  <h2>The <code>var</code> Keyword</h2>
+
+  <p>Nex is statically typed by default, but the <code>var</code> keyword creates a variable of type <code>Var</code>, which can hold any value and change types at runtime:</p>
+
+  <pre><code><span class="kw">var</span> x <span class="op">=</span> <span class="num">42</span>
+<span class="fn">println</span>(x)       <span class="cmt">// 42</span>
+
+x <span class="op">=</span> <span class="str">"hello"</span>
+<span class="fn">println</span>(x)       <span class="cmt">// hello</span>
+
+x <span class="op">=</span> <span class="num">3.14</span>
+<span class="fn">println</span>(x)       <span class="cmt">// 3.14</span>
+
+x <span class="op">=</span> <span class="kw">null</span>
+<span class="fn">println</span>(x)       <span class="cmt">// null</span></code></pre>
+
+  <p>Compare this with a regular static variable, which is locked to its inferred type:</p>
+
+  <pre><code>y <span class="op">=</span> <span class="num">42</span>         <span class="cmt">// y: Int</span>
+y <span class="op">=</span> <span class="str">"hello"</span>   <span class="cmt">// COMPILE ERROR: cannot assign String to Int</span></code></pre>
+
+  <h2>What <code>Var</code> Can Hold</h2>
+
+  <p>A <code>Var</code> variable can store:</p>
+
+  <ul>
+    <li><strong>Boxed primitives</strong> &mdash; <code>Int</code>, <code>Int64</code>, <code>Float</code>, <code>Double</code>, <code>Bool</code>, <code>Byte</code>, <code>Char</code> are automatically boxed</li>
+    <li><strong>Object references</strong> &mdash; any class instance</li>
+    <li><strong>Strings</strong></li>
+    <li><strong><code>null</code></strong></li>
+  </ul>
+
+  <h2>Runtime Dispatch</h2>
+
+  <p>Operators and member calls on <code>Var</code> values are resolved at runtime. The runtime inspects the actual type of the value and dispatches the operation accordingly:</p>
+
+  <pre><code><span class="kw">var</span> a <span class="op">=</span> <span class="num">10</span>
+<span class="kw">var</span> b <span class="op">=</span> <span class="num">20</span>
+<span class="kw">var</span> result <span class="op">=</span> a <span class="op">+</span> b   <span class="cmt">// runtime: both are Int, use Int addition</span>
+<span class="fn">println</span>(result)        <span class="cmt">// 30</span>
+
+a <span class="op">=</span> <span class="str">"hello "</span>
+b <span class="op">=</span> <span class="str">"world"</span>
+result <span class="op">=</span> a <span class="op">+</span> b        <span class="cmt">// runtime: both are String, use String concatenation</span>
+<span class="fn">println</span>(result)        <span class="cmt">// hello world</span></code></pre>
+
+  <p>If the runtime cannot perform the requested operation on the actual types, a runtime error is thrown.</p>
+
+  <h2>Implementation</h2>
+
+  <p><code>Var</code> is a GC-managed reference type. Internally, it holds a type tag and a boxed payload. The garbage collector traces <code>Var</code> values like any other heap object, so there is no risk of dangling references.</p>
+
+  <h2>Public API Lint Warning</h2>
+
+  <p>Using <code>Var</code> in public APIs is discouraged because it bypasses compile-time type safety. The linter emits a warning when <code>Var</code> appears in:</p>
+
+  <ul>
+    <li>Public function parameters</li>
+    <li>Public function return types</li>
+    <li>Public fields</li>
+  </ul>
+
+  <pre><code><span class="cmt">// WARNING: public function parameter has type Var</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">process</span>(data: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
+    <span class="cmt">// ...</span>
+}</code></pre>
+
+  <h2>Suppressing the Warning</h2>
+
+  <p>When <code>Var</code> in a public API is intentional, annotate the declaration with <code>@allow_var_api</code> to suppress the warning:</p>
+
+  <pre><code><span class="op">@</span><span class="fn">allow_var_api</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
+    <span class="cmt">// intentionally dynamic API</span>
+    <span class="kw">return</span> action
+}</code></pre>
+
+  <h2>When to Use <code>Var</code></h2>
+
+  <table>
+    <tr><th>Use <code>Var</code> when</th><th>Prefer static types when</th></tr>
+    <tr><td>Rapid prototyping and scripting</td><td>Building production libraries and APIs</td></tr>
+    <tr><td>Interfacing with dynamic data (e.g. JSON)</td><td>Type safety is important for correctness</td></tr>
+    <tr><td>REPL experimentation</td><td>Performance is critical (avoids boxing overhead)</td></tr>
+    <tr><td>Generic dispatch patterns not yet expressible with generics</td><td>Working with well-known, stable data shapes</td></tr>
+  </table>
+
+  <div class="callout warning">
+    <div class="callout-title">Performance note</div>
+    <p><code>Var</code> operations involve boxing, runtime type checks, and indirect dispatch. For performance-sensitive code, prefer static types which compile to direct operations with no overhead.</p>
+  </div>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">def</span> <span class="fn">describe</span>(value: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">return</span> <span class="str">"value = "</span> <span class="op">+</span> value
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="kw">var</span> data <span class="op">=</span> <span class="num">100</span>
+    <span class="fn">println</span>(<span class="fn">describe</span>(data))  <span class="cmt">// value = 100</span>
+
+    data <span class="op">=</span> <span class="str">"Nex"</span>
+    <span class="fn">println</span>(<span class="fn">describe</span>(data))  <span class="cmt">// value = Nex</span>
+
+    data <span class="op">=</span> <span class="kw">true</span>
+    <span class="fn">println</span>(<span class="fn">describe</span>(data))  <span class="cmt">// value = true</span>
+
+    data <span class="op">=</span> <span class="kw">null</span>
+    <span class="fn">println</span>(<span class="fn">describe</span>(data))  <span class="cmt">// value = null</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="operator-overloading.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Operator Overloading</span>
+    </a>
+    <a href="nullable-types.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Nullable Types &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

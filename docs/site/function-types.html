@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Function Types - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Function Types</div>
+
+  <h1>Function Types</h1>
+  <p class="page-subtitle">First-class function references with arrow-notation type syntax.</p>
+
+  <h2>Syntax</h2>
+
+  <p>Function types are written using arrow notation: parameter types in parentheses, followed by <code>-&gt;</code> and the return type:</p>
+
+  <pre><code><span class="cmt">// A function that takes two Ints and returns a Bool</span>
+callback: (<span class="typ">Int</span>, <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Bool</span>
+
+<span class="cmt">// A function that takes a String and returns Unit</span>
+handler: (<span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span>
+
+<span class="cmt">// A function that takes no arguments and returns an Int</span>
+supplier: () <span class="op">-></span> <span class="typ">Int</span></code></pre>
+
+  <h2>First-Class Functions</h2>
+
+  <p>Function types are first-class in Nex. They can be stored in variables, passed as arguments to other functions, and returned from functions:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">add</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> a <span class="op">+</span> b
+}
+
+<span class="cmt">// Store a function reference in a variable</span>
+op: (<span class="typ">Int</span>, <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> <span class="op">=</span> add
+
+<span class="cmt">// Call through the variable</span>
+result <span class="op">=</span> <span class="fn">op</span>(<span class="num">3</span>, <span class="num">4</span>)  <span class="cmt">// 7</span></code></pre>
+
+  <h2>Function References</h2>
+
+  <p>In v1, Nex supports <strong>function references only</strong> &mdash; closures and lambdas are deferred to v2. A function reference is created simply by naming the function:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">double</span>(x: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> x <span class="op">*</span> <span class="num">2</span>
+}
+
+<span class="kw">def</span> <span class="fn">negate</span>(x: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> <span class="num">0</span> <span class="op">-</span> x
+}
+
+<span class="cmt">// Function references by name</span>
+transform <span class="op">=</span> double
+<span class="fn">println</span>(<span class="fn">transform</span>(<span class="num">5</span>))  <span class="cmt">// 10</span>
+
+transform <span class="op">=</span> negate
+<span class="fn">println</span>(<span class="fn">transform</span>(<span class="num">5</span>))  <span class="cmt">// -5</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">v2 roadmap</div>
+    <p>Closures (anonymous functions that capture variables from the enclosing scope) and lambda syntax are planned for Nex v2.</p>
+  </div>
+
+  <h2>Passing Functions as Arguments</h2>
+
+  <p>Functions that accept other functions as parameters enable powerful composition patterns:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">apply</span>(f: (<span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span>, value: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> <span class="fn">f</span>(value)
+}
+
+<span class="kw">def</span> <span class="fn">square</span>(x: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> x <span class="op">*</span> x
+}
+
+<span class="kw">def</span> <span class="fn">triple</span>(x: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> x <span class="op">*</span> <span class="num">3</span>
+}
+
+<span class="fn">println</span>(<span class="fn">apply</span>(square, <span class="num">4</span>))  <span class="cmt">// 16</span>
+<span class="fn">println</span>(<span class="fn">apply</span>(triple, <span class="num">4</span>))  <span class="cmt">// 12</span></code></pre>
+
+  <h2>Returning Functions</h2>
+
+  <p>Functions can return function references:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">safe_divide</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">if</span> (b <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="num">0</span>
+    }
+    <span class="kw">return</span> a <span class="op">/</span> b
+}
+
+<span class="kw">def</span> <span class="fn">get_divider</span>() <span class="op">-></span> (<span class="typ">Int</span>, <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> safe_divide
+}
+
+divider <span class="op">=</span> <span class="fn">get_divider</span>()
+<span class="fn">println</span>(<span class="fn">divider</span>(<span class="num">10</span>, <span class="num">3</span>))  <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">divider</span>(<span class="num">10</span>, <span class="num">0</span>))  <span class="cmt">// 0</span></code></pre>
+
+  <h2>Function Types as Fields</h2>
+
+  <p>Classes and structs can have fields of function types:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">EventHandler</span> {
+    on_click: (<span class="typ">Int</span>, <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(handler: (<span class="typ">Int</span>, <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.on_click <span class="op">=</span> handler
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">trigger</span>(x: <span class="typ">Int</span>, y: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.<span class="fn">on_click</span>(x, y)
+        <span class="kw">return</span>
+    }
+}</code></pre>
+
+  <h2>Implementation</h2>
+
+  <p>At the ABI level, function types are represented as <strong>function pointers</strong>. They carry no captured state and do not derive from <code>Object</code>. This means:</p>
+
+  <ul>
+    <li>Function values are not garbage collected &mdash; they are plain code pointers</li>
+    <li>They cannot be stored in a <code>Var</code> without boxing</li>
+    <li>They have minimal overhead &mdash; calling a function through a function type is an indirect call</li>
+  </ul>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">def</span> <span class="fn">is_positive</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Bool</span> {
+    <span class="kw">return</span> n <span class="op">></span> <span class="num">0</span>
+}
+
+<span class="kw">def</span> <span class="fn">is_even</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Bool</span> {
+    <span class="kw">return</span> n <span class="op">%</span> <span class="num">2</span> <span class="op">==</span> <span class="num">0</span>
+}
+
+<span class="kw">def</span> <span class="fn">count_matching</span>(list: <span class="typ">List</span>[<span class="typ">Int</span>], predicate: (<span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Bool</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    count <span class="op">=</span> <span class="num">0</span>
+    i <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">while</span> (i <span class="op">&lt;</span> list.<span class="fn">length</span>()) {
+        <span class="kw">if</span> (<span class="fn">predicate</span>(list.<span class="fn">get</span>(i))) {
+            count <span class="op">=</span> count <span class="op">+</span> <span class="num">1</span>
+        }
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+    <span class="kw">return</span> count
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    numbers <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+    numbers.<span class="fn">add</span>(<span class="num">-2</span>)
+    numbers.<span class="fn">add</span>(<span class="num">5</span>)
+    numbers.<span class="fn">add</span>(<span class="num">0</span>)
+    numbers.<span class="fn">add</span>(<span class="num">8</span>)
+    numbers.<span class="fn">add</span>(<span class="num">-1</span>)
+
+    <span class="fn">println</span>(<span class="fn">count_matching</span>(numbers, is_positive))  <span class="cmt">// 2</span>
+    <span class="fn">println</span>(<span class="fn">count_matching</span>(numbers, is_even))      <span class="cmt">// 3</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="nullable-types.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Nullable Types</span>
+    </a>
+    <a href="annotations.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Annotations &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

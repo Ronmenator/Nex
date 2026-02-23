@@ -1,0 +1,13 @@
+{
+  "module": ".\\src\\main.au",
+  "compiler_version": "0.1.0",
+  "signatures": [],
+  "exported_symbols": [],
+  "layout_hashes": {
+    "BaseGreeter": "1957e6cee2c5edfa",
+    "ConsoleGreeter": "b2ad7592274c800"
+  },
+  "dependency_hashes": [],
+  "source_hash": "98b1977c085d007",
+  "warnings": 0
+}

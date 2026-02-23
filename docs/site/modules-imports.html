@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modules &amp; Imports - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Modules &amp; Imports</div>
+
+  <h1>Modules &amp; Imports</h1>
+  <p class="page-subtitle">Organizing code into modules, importing dependencies, and controlling visibility.</p>
+
+  <h2>Module System</h2>
+
+  <p>Each <code>.nex</code> file is a module. The module name is derived from the file's path relative to the <code>src/</code> directory:</p>
+
+  <pre><code>src/main.nex          <span class="cmt">→ main</span>
+src/net/http.nex      <span class="cmt">→ net.http</span>
+src/utils/helpers.nex <span class="cmt">→ utils.helpers</span></code></pre>
+
+  <h2>Import Syntax</h2>
+
+  <h3>Import a Module</h3>
+  <pre><code><span class="kw">import</span> std.math</code></pre>
+
+  <h3>Import with Alias</h3>
+  <pre><code><span class="kw">import</span> std.math <span class="kw">as</span> math</code></pre>
+
+  <h3>Import Specific Items</h3>
+  <pre><code><span class="kw">from</span> std.io <span class="kw">import</span> open_console
+<span class="kw">from</span> std.collections <span class="kw">import</span> List, Map</code></pre>
+
+  <div class="callout warning">
+    <div class="callout-title">Not Supported in v1</div>
+    <p>Wildcard imports (e.g., <code>from std.math import *</code>) are not supported.</p>
+  </div>
+
+  <h2>Visibility</h2>
+
+  <p>All declarations are <strong>module-internal by default</strong>. Use <code>public</code> to export a declaration for use in other modules:</p>
+
+  <pre><code><span class="cmt">// Only visible within this file/module</span>
+<span class="kw">def</span> <span class="fn">internal_helper</span>() <span class="op">-></span> <span class="typ">Unit</span> { }
+
+<span class="cmt">// Visible to any module that imports this one</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">api_function</span>() <span class="op">-></span> <span class="typ">Unit</span> { }
+
+<span class="cmt">// Public class with some internal members</span>
+<span class="kw">public</span> <span class="kw">class</span> <span class="typ">Client</span> {
+    <span class="kw">public</span> url: <span class="typ">String</span>     <span class="cmt">// exported</span>
+    token: <span class="typ">String</span>          <span class="cmt">// internal to module</span>
+}</code></pre>
+
+  <h2>Library Dependencies</h2>
+
+  <p>External libraries are declared in <code>project.toml</code> under the <code>[libs]</code> section:</p>
+
+  <pre><code>[libs]
+graphics <span class="op">=</span> { path <span class="op">=</span> <span class="str">"../graphics"</span> }</code></pre>
+
+  <p>The library name becomes the import namespace prefix:</p>
+
+  <pre><code><span class="kw">import</span> graphics.shapes    <span class="cmt">// imports graphics/src/shapes.nex</span></code></pre>
+
+  <h3>Library Rules</h3>
+  <ul>
+    <li>A library is a Nex project with its own <code>project.toml</code> and <code>src/</code> directory</li>
+    <li>Library sources are compiled alongside the main project and linked into a single executable</li>
+    <li>v1 supports local paths only (no package registry, no git URLs)</li>
+    <li>v1 uses flat resolution &mdash; libraries cannot declare their own <code>[libs]</code> dependencies</li>
+  </ul>
+
+  <h2>Standard Library Imports</h2>
+
+  <p>Standard library modules are imported using the <code>std</code> prefix:</p>
+
+  <pre><code><span class="kw">import</span> std.math
+<span class="kw">import</span> std.io
+<span class="kw">import</span> std.json
+<span class="kw">import</span> std.collections
+<span class="kw">import</span> std.torch          <span class="cmt">// requires --features torch</span></code></pre>
+
+  <p>The <code>std.core</code> module (<code>print</code>, <code>println</code>, <code>Object</code>) is available without import.</p>
+
+  <h2>Project Structure</h2>
+
+  <pre><code>my_project/
+├── project.toml       <span class="cmt">// project configuration</span>
+└── src/
+    ├── main.nex        <span class="cmt">// entry point module</span>
+    ├── models.nex      <span class="cmt">// → models</span>
+    └── net/
+        ├── client.nex  <span class="cmt">// → net.client</span>
+        └── server.nex  <span class="cmt">// → net.server</span></code></pre>
+
+  <div class="page-nav">
+    <a href="interfaces.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Interfaces</span>
+    </a>
+    <a href="error-handling.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Error Handling &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

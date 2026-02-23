@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Structs - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Structs</div>
+
+  <h1>Structs</h1>
+  <p class="page-subtitle">Lightweight value types for grouping related data.</p>
+
+  <h2>Defining a Struct</h2>
+
+  <p>Structs are value types &mdash; they are stored inline on the stack and use copy semantics on assignment:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">struct</span> <span class="typ">Vec2</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+}</code></pre>
+
+  <h2>Creating Struct Instances</h2>
+
+  <pre><code>pos <span class="op">=</span> <span class="typ">Vec2</span>()       <span class="cmt">// defaults: x=0.0, y=0.0</span>
+pos.x <span class="op">=</span> <span class="num">1.5</span>
+pos.y <span class="op">=</span> <span class="num">3.0</span></code></pre>
+
+  <h2>Struct Rules</h2>
+
+  <ul>
+    <li>Value type &mdash; stored inline, not heap-allocated</li>
+    <li><strong>No inheritance</strong> &mdash; structs cannot extend classes or other structs</li>
+    <li><strong>Can implement interfaces</strong></li>
+    <li>May have methods</li>
+    <li>Mutable by default; copy semantics on assignment</li>
+    <li>Default constructor zeroes all fields if no <code>init</code> is defined</li>
+    <li>Do <strong>not</strong> inherit from <code>Object</code></li>
+  </ul>
+
+  <h2>Structs with Methods</h2>
+
+  <pre><code><span class="kw">public</span> <span class="kw">struct</span> <span class="typ">Vec2</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+
+    <span class="kw">def</span> <span class="fn">magnitude</span>() <span class="op">-></span> <span class="typ">Double</span> {
+        <span class="kw">return</span> <span class="fn">sqrt</span>(<span class="kw">self</span>.x <span class="op">*</span> <span class="kw">self</span>.x <span class="op">+</span> <span class="kw">self</span>.y <span class="op">*</span> <span class="kw">self</span>.y)
+    }
+}</code></pre>
+
+  <h2>Implementing Interfaces</h2>
+
+  <pre><code><span class="kw">interface</span> <span class="typ">Printable</span> {
+    <span class="kw">def</span> <span class="fn">to_string</span>() <span class="op">-></span> <span class="typ">String</span>
+}
+
+<span class="kw">struct</span> <span class="typ">Point</span> : <span class="typ">Printable</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+
+    <span class="kw">def</span> <span class="fn">to_string</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"("</span> <span class="op">+</span> <span class="kw">self</span>.x <span class="op">+</span> <span class="str">","</span> <span class="op">+</span> <span class="kw">self</span>.y <span class="op">+</span> <span class="str">")"</span>
+    }
+}</code></pre>
+
+  <h2>Copy Semantics</h2>
+
+  <p>Assignment copies the entire struct value:</p>
+
+  <pre><code>a <span class="op">=</span> <span class="typ">Vec2</span>()
+a.x <span class="op">=</span> <span class="num">1.0</span>
+b <span class="op">=</span> a            <span class="cmt">// b is a copy of a</span>
+b.x <span class="op">=</span> <span class="num">5.0</span>        <span class="cmt">// does NOT affect a</span>
+<span class="fn">println</span>(a.x)     <span class="cmt">// 1.0</span></code></pre>
+
+  <h2>Operator Overloading</h2>
+
+  <p>Structs are ideal candidates for operator overloading:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">struct</span> <span class="typ">Vec2</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">operator+</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-></span> <span class="typ">Vec2</span> {
+        <span class="kw">return</span> <span class="typ">Vec2</span>(a.x <span class="op">+</span> b.x, a.y <span class="op">+</span> b.y)
+    }
+}</code></pre>
+
+  <p>See <a href="operator-overloading.html">Operator Overloading</a> for the full list of overloadable operators.</p>
+
+  <h2>Boxing</h2>
+
+  <p>Structs are boxed (moved to the heap) when converted to <code>Var</code>. Direct boxing to <code>Object</code> is done through <code>Var</code> in v1.</p>
+
+  <h2>Struct vs Class</h2>
+
+  <table>
+    <tr><th>Feature</th><th>Struct</th><th>Class</th></tr>
+    <tr><td>Storage</td><td>Stack (inline)</td><td>Heap (GC-managed)</td></tr>
+    <tr><td>Assignment</td><td>Copies value</td><td>Copies reference</td></tr>
+    <tr><td>Inheritance</td><td>No</td><td>Yes (including multiple)</td></tr>
+    <tr><td>Interfaces</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>Methods</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>Derives from Object</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Default equality</td><td>Fieldwise compare</td><td>Reference equality</td></tr>
+  </table>
+
+  <div class="page-nav">
+    <a href="classes.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Classes &amp; Inheritance</span>
+    </a>
+    <a href="interfaces.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Interfaces &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "module": "examples\\hello\\src\\main.au",
+  "compiler_version": "0.1.0",
+  "signatures": [],
+  "exported_symbols": [],
+  "layout_hashes": {},
+  "dependency_hashes": [],
+  "source_hash": "dd878c2f5e0c8f59",
+  "warnings": 0
+}

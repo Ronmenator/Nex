@@ -1,0 +1,11 @@
+[package]
+name = "nexui_lower"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nexc_diag = { path = "../nexc_diag" }
+nexc_ast  = { path = "../nexc_ast" }
+nexui_parse = { path = "../nexui_parse" }

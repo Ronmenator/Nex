@@ -1,0 +1,34 @@
+[package]
+name = "nex_runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["lib", "staticlib"]
+
+[features]
+default = []
+torch = ["tch"]
+ui = ["winit", "wgpu", "cosmic-text", "taffy", "crossterm", "pollster"]
+engine = ["winit", "wgpu", "pollster"]
+
+[dependencies]
+libc = "0.2"
+rand = "0.8"
+serde_json = "1"
+regex = "1"
+sha2 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+minreq = { version = "2", features = ["https"] }
+tch = { version = "0.17", optional = true, features = ["download-libtorch"] }
+winit = { version = "0.30", optional = true }
+wgpu = { version = "23", optional = true }
+cosmic-text = { version = "0.12", optional = true }
+taffy = { version = "0.5", optional = true }
+crossterm = { version = "0.28", optional = true }
+pollster = { version = "0.4", optional = true }
+

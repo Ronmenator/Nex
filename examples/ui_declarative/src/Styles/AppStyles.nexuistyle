@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="std.ui">
+
+  <!-- Navigation button used in the header bar -->
+  <Style Name="NavButton" TargetType="Button">
+    <Setter Property="BgColor" Value="0x334155FF"/>
+    <Setter Property="FgColor" Value="0xF8FAFFFF"/>
+    <Setter Property="BorderRadius" Value="4"/>
+    <Setter Property="Margin" Value="2"/>
+  </Style>
+
+  <!-- App title text in the header bar -->
+  <Style Name="AppTitle" TargetType="Text">
+    <Setter Property="FontSize" Value="20"/>
+    <Setter Property="FgColor" Value="0xF8FAFFFF"/>
+  </Style>
+
+</ResourceDictionary>

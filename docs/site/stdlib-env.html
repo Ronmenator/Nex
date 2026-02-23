@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.env - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.env</div>
+
+  <h1>std.env</h1>
+  <p class="page-subtitle">Environment variables and command-line arguments.</p>
+
+  <pre><code><span class="kw">import</span> std.env</code></pre>
+
+  <h2>Environment Variables</h2>
+
+  <h4>env_get</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">env_get</span>(name: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the value of the environment variable with the given <code>name</code>. Returns an empty string if the variable is not set.</p>
+
+  <pre><code><span class="kw">import</span> std.env
+
+home <span class="op">=</span> <span class="fn">env_get</span>(<span class="str">"HOME"</span>)
+<span class="fn">println</span>(<span class="str">"Home directory: "</span>)
+<span class="fn">println</span>(home)
+
+path <span class="op">=</span> <span class="fn">env_get</span>(<span class="str">"PATH"</span>)
+<span class="fn">println</span>(<span class="str">"System path: "</span>)
+<span class="fn">println</span>(path)</code></pre>
+
+  <h4>env_set</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">env_set</span>(name: <span class="typ">String</span>, value: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the environment variable <code>name</code> to <code>value</code> for the current process. Changes are not persisted after the process exits.</p>
+
+  <pre><code><span class="kw">import</span> std.env
+
+<span class="fn">env_set</span>(<span class="str">"APP_MODE"</span>, <span class="str">"production"</span>)
+mode <span class="op">=</span> <span class="fn">env_get</span>(<span class="str">"APP_MODE"</span>)
+<span class="fn">println</span>(mode)   <span class="cmt">// production</span></code></pre>
+
+  <h4>env_has</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">env_has</span>(name: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if the environment variable <code>name</code> is set, <code>false</code> otherwise. Useful for checking whether a variable exists before reading it.</p>
+
+  <pre><code><span class="kw">import</span> std.env
+
+<span class="kw">if</span> (<span class="fn">env_has</span>(<span class="str">"DEBUG"</span>)) {
+    <span class="fn">println</span>(<span class="str">"Debug mode enabled"</span>)
+} <span class="kw">else</span> {
+    <span class="fn">println</span>(<span class="str">"Running in normal mode"</span>)
+}</code></pre>
+
+  <h2>Command-Line Arguments</h2>
+
+  <h4>env_args_count</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">env_args_count</span>() <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of command-line arguments passed to the program, including the program name itself.</p>
+
+  <h4>env_args_get</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">env_args_get</span>(index: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the command-line argument at the given <code>index</code>. Index <code>0</code> is the program name. Returns an empty string if <code>index</code> is out of range.</p>
+
+  <pre><code><span class="kw">import</span> std.env
+
+<span class="cmt">// Print all command-line arguments</span>
+count <span class="op">=</span> <span class="fn">env_args_count</span>()
+<span class="fn">print</span>(<span class="str">"Argument count: "</span>)
+<span class="fn">println</span>(count)
+
+i <span class="op">=</span> <span class="num">0</span>
+<span class="kw">while</span> (i <span class="op">&lt;</span> count) {
+    <span class="fn">print</span>(<span class="str">"  arg["</span>)
+    <span class="fn">print</span>(i)
+    <span class="fn">print</span>(<span class="str">"]: "</span>)
+    <span class="fn">println</span>(<span class="fn">env_args_get</span>(i))
+    i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+}</code></pre>
+
+  <h2>Working Directory</h2>
+
+  <h4>env_cwd</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">env_cwd</span>() <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the current working directory of the process as an absolute path string.</p>
+
+  <pre><code><span class="kw">import</span> std.env
+
+cwd <span class="op">=</span> <span class="fn">env_cwd</span>()
+<span class="fn">println</span>(<span class="str">"Working directory: "</span>)
+<span class="fn">println</span>(cwd)   <span class="cmt">// e.g. /home/user/project</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.env
+
+<span class="cmt">// CLI tool that reads configuration from environment</span>
+<span class="kw">def</span> <span class="fn">get_config</span>(key: <span class="typ">String</span>, fallback: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span> {
+    <span class="kw">if</span> (<span class="fn">env_has</span>(key)) {
+        <span class="kw">return</span> <span class="fn">env_get</span>(key)
+    }
+    <span class="kw">return</span> fallback
+}
+
+<span class="cmt">// Read configuration</span>
+host <span class="op">=</span> <span class="fn">get_config</span>(<span class="str">"APP_HOST"</span>, <span class="str">"localhost"</span>)
+port <span class="op">=</span> <span class="fn">get_config</span>(<span class="str">"APP_PORT"</span>, <span class="str">"8080"</span>)
+
+<span class="fn">print</span>(<span class="str">"Server: "</span>)
+<span class="fn">print</span>(host)
+<span class="fn">print</span>(<span class="str">":"</span>)
+<span class="fn">println</span>(port)
+
+<span class="fn">print</span>(<span class="str">"CWD: "</span>)
+<span class="fn">println</span>(<span class="fn">env_cwd</span>())
+
+<span class="cmt">// Process CLI flags</span>
+count <span class="op">=</span> <span class="fn">env_args_count</span>()
+<span class="kw">if</span> (count <span class="op">&gt;</span> <span class="num">1</span>) {
+    flag <span class="op">=</span> <span class="fn">env_args_get</span>(<span class="num">1</span>)
+    <span class="kw">if</span> (flag <span class="op">==</span> <span class="str">"--verbose"</span>) {
+        <span class="fn">env_set</span>(<span class="str">"LOG_LEVEL"</span>, <span class="str">"debug"</span>)
+        <span class="fn">println</span>(<span class="str">"Verbose logging enabled"</span>)
+    }
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-time.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.time</span>
+    </a>
+    <a href="stdlib-path.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.path &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

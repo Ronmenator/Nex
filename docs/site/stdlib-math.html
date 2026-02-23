@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.math - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.math</div>
+
+  <h1>std.math</h1>
+  <p class="page-subtitle">Mathematical functions for integers and floating-point numbers.</p>
+
+  <pre><code><span class="kw">import</span> std.math</code></pre>
+
+  <h2>Absolute Value</h2>
+
+  <h4>abs_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">abs_int</span>(v: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the absolute value of an integer.</p>
+
+  <h4>abs_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">abs_float</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the absolute value of a floating-point number.</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">abs_int</span>(<span class="op">-</span><span class="num">42</span>))      <span class="cmt">// 42</span>
+<span class="fn">println</span>(<span class="fn">abs_float</span>(<span class="op">-</span><span class="num">3.14</span>))  <span class="cmt">// 3.14</span></code></pre>
+
+  <h2>Min / Max</h2>
+
+  <h4>min_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">min_int</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the smaller of two integers.</p>
+
+  <h4>max_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">max_int</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the larger of two integers.</p>
+
+  <h4>min_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">min_float</span>(a: <span class="typ">Double</span>, b: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the smaller of two doubles.</p>
+
+  <h4>max_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">max_float</span>(a: <span class="typ">Double</span>, b: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the larger of two doubles.</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">min_int</span>(<span class="num">10</span>, <span class="num">3</span>))           <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">max_int</span>(<span class="num">10</span>, <span class="num">3</span>))           <span class="cmt">// 10</span>
+<span class="fn">println</span>(<span class="fn">min_float</span>(<span class="num">1.5</span>, <span class="num">2.7</span>))    <span class="cmt">// 1.5</span>
+<span class="fn">println</span>(<span class="fn">max_float</span>(<span class="num">1.5</span>, <span class="num">2.7</span>))    <span class="cmt">// 2.7</span></code></pre>
+
+  <h2>Clamping</h2>
+
+  <h4>clamp_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">clamp_int</span>(v: <span class="typ">Int</span>, lo: <span class="typ">Int</span>, hi: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Clamps an integer to the range [lo, hi].</p>
+
+  <h4>clamp_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">clamp_float</span>(v: <span class="typ">Double</span>, lo: <span class="typ">Double</span>, hi: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Clamps a double to the range [lo, hi].</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">clamp_int</span>(<span class="num">15</span>, <span class="num">0</span>, <span class="num">10</span>))          <span class="cmt">// 10</span>
+<span class="fn">println</span>(<span class="fn">clamp_int</span>(<span class="op">-</span><span class="num">5</span>, <span class="num">0</span>, <span class="num">10</span>))          <span class="cmt">// 0</span>
+<span class="fn">println</span>(<span class="fn">clamp_float</span>(<span class="num">3.7</span>, <span class="num">0.0</span>, <span class="num">1.0</span>))   <span class="cmt">// 1.0</span></code></pre>
+
+  <h2>Rounding</h2>
+
+  <h4>floor</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">floor</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the largest integer value less than or equal to <code>v</code>.</p>
+
+  <h4>ceil</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ceil</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the smallest integer value greater than or equal to <code>v</code>.</p>
+
+  <h4>round</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">round</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the nearest integer value, rounding half away from zero.</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">floor</span>(<span class="num">3.7</span>))    <span class="cmt">// 3.0</span>
+<span class="fn">println</span>(<span class="fn">ceil</span>(<span class="num">3.2</span>))     <span class="cmt">// 4.0</span>
+<span class="fn">println</span>(<span class="fn">round</span>(<span class="num">3.5</span>))    <span class="cmt">// 4.0</span>
+<span class="fn">println</span>(<span class="fn">round</span>(<span class="num">3.4</span>))    <span class="cmt">// 3.0</span></code></pre>
+
+  <h2>Powers &amp; Roots</h2>
+
+  <h4>sqrt</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">sqrt</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the square root of <code>v</code>.</p>
+
+  <h4>pow</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">pow</span>(base: <span class="typ">Double</span>, exp: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns <code>base</code> raised to the power <code>exp</code>.</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">sqrt</span>(<span class="num">16.0</span>))        <span class="cmt">// 4.0</span>
+<span class="fn">println</span>(<span class="fn">pow</span>(<span class="num">2.0</span>, <span class="num">10.0</span>))   <span class="cmt">// 1024.0</span>
+<span class="fn">println</span>(<span class="fn">pow</span>(<span class="num">3.0</span>, <span class="num">0.5</span>))    <span class="cmt">// 1.7320508... (sqrt of 3)</span></code></pre>
+
+  <h2>Trigonometry</h2>
+
+  <h4>sin</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">sin</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the sine of <code>v</code> (in radians).</p>
+
+  <h4>cos</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">cos</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the cosine of <code>v</code> (in radians).</p>
+
+  <h4>tan</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tan</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the tangent of <code>v</code> (in radians).</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">sin</span>(<span class="num">0.0</span>))     <span class="cmt">// 0.0</span>
+<span class="fn">println</span>(<span class="fn">cos</span>(<span class="num">0.0</span>))     <span class="cmt">// 1.0</span>
+<span class="fn">println</span>(<span class="fn">tan</span>(<span class="num">0.0</span>))     <span class="cmt">// 0.0</span></code></pre>
+
+  <h2>Logarithms &amp; Exponentials</h2>
+
+  <h4>log</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the natural logarithm (base <em>e</em>) of <code>v</code>.</p>
+
+  <h4>log2</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log2</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the base-2 logarithm of <code>v</code>.</p>
+
+  <h4>log10</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">log10</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the base-10 logarithm of <code>v</code>.</p>
+
+  <h4>exp</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">exp</span>(v: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns <em>e</em> raised to the power <code>v</code>.</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="fn">println</span>(<span class="fn">log</span>(<span class="num">1.0</span>))       <span class="cmt">// 0.0</span>
+<span class="fn">println</span>(<span class="fn">log2</span>(<span class="num">8.0</span>))      <span class="cmt">// 3.0</span>
+<span class="fn">println</span>(<span class="fn">log10</span>(<span class="num">100.0</span>))   <span class="cmt">// 2.0</span>
+<span class="fn">println</span>(<span class="fn">exp</span>(<span class="num">1.0</span>))       <span class="cmt">// 2.71828...</span></code></pre>
+
+  <h2>Random Numbers</h2>
+
+  <h4>random</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">random</span>() <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns a pseudo-random double in the range [0.0, 1.0).</p>
+
+  <h4>random_range</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">random_range</span>(lo: <span class="typ">Int</span>, hi: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns a pseudo-random integer in the range [lo, hi).</p>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="cmt">// Random double between 0.0 and 1.0</span>
+r <span class="op">=</span> <span class="fn">random</span>()
+<span class="fn">println</span>(r)               <span class="cmt">// e.g. 0.73291...</span>
+
+<span class="cmt">// Random integer: simulating a dice roll (1-6)</span>
+die <span class="op">=</span> <span class="fn">random_range</span>(<span class="num">1</span>, <span class="num">7</span>)
+<span class="fn">println</span>(die)             <span class="cmt">// e.g. 4</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.math
+
+<span class="cmt">// Distance between two points</span>
+<span class="kw">def</span> <span class="fn">distance</span>(x1: <span class="typ">Double</span>, y1: <span class="typ">Double</span>, x2: <span class="typ">Double</span>, y2: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Double</span> {
+    dx <span class="op">=</span> x2 <span class="op">-</span> x1
+    dy <span class="op">=</span> y2 <span class="op">-</span> y1
+    <span class="kw">return</span> <span class="fn">sqrt</span>(dx <span class="op">*</span> dx <span class="op">+</span> dy <span class="op">*</span> dy)
+}
+
+<span class="fn">println</span>(<span class="fn">distance</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">3.0</span>, <span class="num">4.0</span>))  <span class="cmt">// 5.0</span>
+
+<span class="cmt">// Normalize a value to 0-100 range</span>
+raw <span class="op">=</span> <span class="num">127.6</span>
+clamped <span class="op">=</span> <span class="fn">clamp_float</span>(raw, <span class="num">0.0</span>, <span class="num">100.0</span>)
+<span class="fn">println</span>(clamped)                          <span class="cmt">// 100.0</span></code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-core.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.core</span>
+    </a>
+    <a href="stdlib-string.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.string &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

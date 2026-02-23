@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Annotations - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Annotations</div>
+
+  <h1>Annotations</h1>
+  <p class="page-subtitle">Attach compile-time metadata to declarations with the <code>@</code> prefix syntax.</p>
+
+  <h2>Syntax</h2>
+
+  <p>Annotations are placed immediately before a declaration using the <code>@</code> prefix:</p>
+
+  <pre><code><span class="op">@</span><span class="fn">annotation_name</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">some_function</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="cmt">// ...</span>
+}</code></pre>
+
+  <p>Annotations can be applied to functions, fields, classes, structs, and interfaces:</p>
+
+  <pre><code><span class="op">@</span><span class="fn">allow_var_api</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">process</span>(data: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
+    <span class="kw">return</span> data
+}
+
+<span class="op">@</span><span class="fn">allow_var_api</span>
+<span class="kw">public</span> payload: <span class="typ">Var</span></code></pre>
+
+  <h2>Built-in Annotations (v1)</h2>
+
+  <p>Nex v1 ships with one built-in annotation:</p>
+
+  <table>
+    <tr><th>Annotation</th><th>Target</th><th>Effect</th></tr>
+    <tr><td><code>@allow_var_api</code></td><td>Functions, fields</td><td>Suppresses the lint warning when <code>Var</code> appears in a public API</td></tr>
+  </table>
+
+  <h3><code>@allow_var_api</code></h3>
+
+  <p>By default, the linter warns when a <code>public</code> function uses <code>Var</code> as a parameter type, return type, or when a <code>public</code> field is of type <code>Var</code>. This warning exists because <code>Var</code> bypasses compile-time type checking.</p>
+
+  <p>When the use of <code>Var</code> is intentional, annotate the declaration to suppress the warning:</p>
+
+  <pre><code><span class="cmt">// Without annotation: linter emits a warning</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
+    <span class="cmt">// WARNING: public function parameter has type Var</span>
+    <span class="cmt">// WARNING: public function return type is Var</span>
+    <span class="kw">return</span> action
+}
+
+<span class="cmt">// With annotation: no warning</span>
+<span class="op">@</span><span class="fn">allow_var_api</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
+    <span class="kw">return</span> action
+}</code></pre>
+
+  <h2>Compile-Time Only</h2>
+
+  <p>Annotations are <strong>compile-time metadata only</strong>. They influence compiler behavior (such as suppressing warnings or guiding optimizations) but have no effect at runtime. The compiled binary does not contain annotation data.</p>
+
+  <h2>Unknown Annotations</h2>
+
+  <p>If you use an annotation name that the compiler does not recognize, it produces a <strong>compile warning</strong> (not an error):</p>
+
+  <pre><code><span class="op">@</span><span class="fn">deprecated</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">old_function</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="cmt">// WARNING: unknown annotation 'deprecated'</span>
+}</code></pre>
+
+  <p>This means your code still compiles and runs, but you are alerted that the annotation has no effect.</p>
+
+  <h2>v1 Limitations</h2>
+
+  <p>Nex v1 annotations have these limitations:</p>
+
+  <ul>
+    <li><strong>No annotation arguments</strong> &mdash; syntax like <code>@deprecated("use X instead")</code> is not supported in v1</li>
+    <li><strong>No custom annotations</strong> &mdash; you cannot define your own annotation types; only built-in annotations are recognized</li>
+    <li><strong>No runtime retention</strong> &mdash; annotations cannot be inspected at runtime</li>
+  </ul>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+<span class="cmt">// A dynamic event system that intentionally uses Var</span>
+<span class="kw">class</span> <span class="typ">EventBus</span> {
+    listeners: <span class="typ">List</span>[(<span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span>]
+
+    <span class="kw">def</span> <span class="fn">init</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.listeners <span class="op">=</span> <span class="typ">List</span>[(<span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span>]()
+        <span class="kw">return</span>
+    }
+
+    <span class="op">@</span><span class="fn">allow_var_api</span>
+    <span class="kw">public</span> <span class="kw">def</span> <span class="fn">emit</span>(event: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        i <span class="op">=</span> <span class="num">0</span>
+        <span class="kw">while</span> (i <span class="op">&lt;</span> <span class="kw">self</span>.listeners.<span class="fn">length</span>()) {
+            listener <span class="op">=</span> <span class="kw">self</span>.listeners.<span class="fn">get</span>(i)
+            <span class="fn">listener</span>(event)
+            i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+        }
+        <span class="kw">return</span>
+    }
+}
+
+<span class="kw">def</span> <span class="fn">log_event</span>(event: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Event: "</span> <span class="op">+</span> event)
+    <span class="kw">return</span>
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    bus <span class="op">=</span> <span class="typ">EventBus</span>()
+    bus.<span class="fn">emit</span>(<span class="str">"user_login"</span>)
+    bus.<span class="fn">emit</span>(<span class="num">42</span>)
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="function-types.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Function Types</span>
+    </a>
+    <a href="stdlib-overview.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Standard Library Overview &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

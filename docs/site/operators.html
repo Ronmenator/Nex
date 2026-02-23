@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operators &amp; Expressions - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Operators</div>
+
+  <h1>Operators &amp; Expressions</h1>
+  <p class="page-subtitle">Complete reference for Nex's operators, precedence, and expression evaluation.</p>
+
+  <h2>Operator Precedence</h2>
+
+  <p>Operators are listed from lowest to highest precedence:</p>
+
+  <table>
+    <tr><th>Precedence</th><th>Operators</th><th>Associativity</th><th>Description</th></tr>
+    <tr><td>1</td><td><code>= += -= *= /=</code></td><td>Right</td><td>Assignment</td></tr>
+    <tr><td>2</td><td><code>||</code></td><td>Left</td><td>Logical OR</td></tr>
+    <tr><td>3</td><td><code>&amp;&amp;</code></td><td>Left</td><td>Logical AND</td></tr>
+    <tr><td>4</td><td><code>== !=</code></td><td>Left</td><td>Equality</td></tr>
+    <tr><td>5</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Left</td><td>Comparison</td></tr>
+    <tr><td>6</td><td><code>+ -</code></td><td>Left</td><td>Addition, Subtraction</td></tr>
+    <tr><td>7</td><td><code>* / %</code></td><td>Left</td><td>Multiplication, Division, Modulo</td></tr>
+    <tr><td>8</td><td><code>! - +</code> (unary)</td><td>Right</td><td>Negation, Not</td></tr>
+    <tr><td>9</td><td><code>. :: ()</code></td><td>Left</td><td>Member access, Qualified access, Call</td></tr>
+  </table>
+
+  <h2>Arithmetic Operators</h2>
+
+  <pre><code>a <span class="op">=</span> <span class="num">10</span> <span class="op">+</span> <span class="num">3</span>    <span class="cmt">// 13</span>
+b <span class="op">=</span> <span class="num">10</span> <span class="op">-</span> <span class="num">3</span>    <span class="cmt">// 7</span>
+c <span class="op">=</span> <span class="num">10</span> <span class="op">*</span> <span class="num">3</span>    <span class="cmt">// 30</span>
+d <span class="op">=</span> <span class="num">10</span> <span class="op">/</span> <span class="num">3</span>    <span class="cmt">// 3 (integer division)</span>
+e <span class="op">=</span> <span class="num">10</span> <span class="op">%</span> <span class="num">3</span>    <span class="cmt">// 1 (modulo)</span></code></pre>
+
+  <h2>Comparison Operators</h2>
+
+  <pre><code>a <span class="op">==</span> b    <span class="cmt">// equal</span>
+a <span class="op">!=</span> b    <span class="cmt">// not equal</span>
+a <span class="op">&lt;</span> b     <span class="cmt">// less than</span>
+a <span class="op">&lt;=</span> b    <span class="cmt">// less than or equal</span>
+a <span class="op">&gt;</span> b     <span class="cmt">// greater than</span>
+a <span class="op">&gt;=</span> b    <span class="cmt">// greater than or equal</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p>For classes, <code>==</code> checks reference equality by default unless <code>operator==</code> is overloaded. For structs, <code>==</code> does fieldwise comparison by default.</p>
+  </div>
+
+  <h2>Logical Operators</h2>
+
+  <pre><code><span class="kw">if</span> (a <span class="op">&gt;</span> <span class="num">0</span> <span class="op">&amp;&amp;</span> b <span class="op">&gt;</span> <span class="num">0</span>) { <span class="cmt">// AND: both must be true</span>
+    <span class="fn">println</span>(<span class="str">"both positive"</span>)
+}
+
+<span class="kw">if</span> (a <span class="op">==</span> <span class="num">0</span> <span class="op">||</span> b <span class="op">==</span> <span class="num">0</span>) { <span class="cmt">// OR: at least one true</span>
+    <span class="fn">println</span>(<span class="str">"at least one is zero"</span>)
+}
+
+<span class="kw">if</span> (<span class="op">!</span>flag) { <span class="cmt">// NOT: inverts boolean</span>
+    <span class="fn">println</span>(<span class="str">"flag is false"</span>)
+}</code></pre>
+
+  <h2>Assignment Operators</h2>
+
+  <pre><code>x <span class="op">=</span> <span class="num">10</span>      <span class="cmt">// simple assignment</span>
+x <span class="op">+=</span> <span class="num">5</span>     <span class="cmt">// x = x + 5</span>
+x <span class="op">-=</span> <span class="num">3</span>     <span class="cmt">// x = x - 3</span>
+x <span class="op">*=</span> <span class="num">2</span>     <span class="cmt">// x = x * 2</span>
+x <span class="op">/=</span> <span class="num">4</span>     <span class="cmt">// x = x / 4</span></code></pre>
+
+  <h2>String Concatenation</h2>
+
+  <p>The <code>+</code> operator concatenates strings. Non-string values on the right side are automatically converted to strings:</p>
+
+  <pre><code>msg <span class="op">=</span> <span class="str">"count: "</span> <span class="op">+</span> <span class="num">42</span>         <span class="cmt">// "count: 42"</span>
+msg <span class="op">=</span> <span class="str">"pi = "</span> <span class="op">+</span> <span class="num">3.14</span>        <span class="cmt">// "pi = 3.14"</span>
+msg <span class="op">=</span> <span class="str">"flag: "</span> <span class="op">+</span> <span class="kw">true</span>        <span class="cmt">// "flag: true"</span></code></pre>
+
+  <h2>Member Access</h2>
+
+  <h3>Dot Operator <code>.</code></h3>
+  <p>Accesses fields and methods on objects:</p>
+
+  <pre><code>greeter<span class="op">.</span><span class="fn">greet</span>(<span class="str">"World"</span>)
+obj<span class="op">.</span>field_name</code></pre>
+
+  <h3>Qualified Access <code>::</code></h3>
+  <p>Accesses a specific base class member when there is ambiguity from multiple inheritance:</p>
+
+  <pre><code><span class="kw">self</span><span class="op">.</span>B<span class="op">::</span><span class="fn">foo</span>()   <span class="cmt">// call foo() from base class B</span></code></pre>
+
+  <h2>Automatic Semicolon Insertion</h2>
+
+  <p>Nex inserts implicit statement terminators based on context. A newline terminates a statement if the previous token is one that can end a statement:</p>
+
+  <table>
+    <tr><th>Inserts terminator after</th><th>Does NOT insert after</th></tr>
+    <tr><td>Identifiers, literals</td><td>Binary operators (<code>+ - * / %</code>)</td></tr>
+    <tr><td><code>)</code> <code>]</code> <code>}</code></td><td>Assignment operators (<code>= += -=</code>)</td></tr>
+    <tr><td><code>return</code>, <code>break</code>, <code>continue</code></td><td><code>. , : ( [ {</code></td></tr>
+    <tr><td></td><td><code>:: -></code></td></tr>
+  </table>
+
+  <p>Explicit semicolons can be used to place multiple statements on one line:</p>
+
+  <pre><code>a <span class="op">=</span> <span class="num">1</span>; b <span class="op">=</span> <span class="num">2</span>; c <span class="op">=</span> a <span class="op">+</span> b</code></pre>
+
+  <div class="page-nav">
+    <a href="variables-types.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Variables &amp; Types</span>
+    </a>
+    <a href="control-flow.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Control Flow &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

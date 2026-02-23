@@ -1,0 +1,36 @@
+<Widget xmlns="std.ui" Extends="BaseWidget">
+  <!-- Content + popup overlay inside a Stack so the overlay covers the home area. -->
+  <Stack FlexGrow="1">
+
+    <!-- Home content -->
+    <Column Gap="16">
+      <Text Text="Welcome" FontSize="28" />
+      <Text Text="Select a screen from the menu above." FontSize="16" />
+      <Row Gap="8">
+        <Button Label="Show Info"       Click="on_show_info"    />
+        <Button Label="Ask a Question"  Click="on_show_confirm" />
+      </Row>
+      <Text Text="{Binding DialogResultText}" FontSize="14" />
+    </Column>
+
+    <!-- In-app popup overlay (hidden until popup_mode != 0) -->
+    <Column Visible="{Binding PopupVisible}" BgColor="0x00000099" Padding="80" Gap="0">
+      <Column BgColor="0xF8FAFFFF" Padding="32" Gap="16">
+        <Text Text="{Binding PopupTitle}" FontSize="22" />
+        <Text Text="{Binding PopupBody}"  FontSize="15" />
+
+        <!-- OK button — info dialogs -->
+        <Row Visible="{Binding PopupOkVisible}" Gap="8">
+          <Button Label="OK" Click="on_popup_ok" />
+        </Row>
+
+        <!-- Yes / No buttons — confirm dialogs -->
+        <Row Visible="{Binding PopupConfirmVisible}" Gap="8">
+          <Button Label="Yes" Click="on_popup_yes" />
+          <Button Label="No"  Click="on_popup_no"  />
+        </Row>
+      </Column>
+    </Column>
+
+  </Stack>
+</Widget>

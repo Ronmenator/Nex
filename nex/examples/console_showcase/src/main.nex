@@ -1,0 +1,53 @@
+import std.core as core
+from std.io import Console
+
+interface Greeter {
+    def greet(name: String) -> String
+}
+
+class BaseGreeter {
+    prefix: String
+
+    def init(prefix: String) -> Unit {
+        self.prefix = prefix
+        return
+    }
+
+    def format(name: String) -> String {
+        return self.prefix + ", " + name
+    }
+}
+
+class ConsoleGreeter : BaseGreeter, Greeter {
+    def greet(name: String) -> String {
+        return BaseGreeter::format(name)
+    }
+}
+
+def safe_divide(a: Int, b: Int) -> Int {
+    if (b == 0) {
+        return 0
+    } else {
+        return a / b
+    }
+}
+
+def main() -> Unit {
+    var app_name = "Nex"
+    var version = 1
+    var computed = safe_divide(10 + 2 * 3, 2)
+
+    using (resource = open_console()) {
+        try {
+            print("app=" + app_name)
+            print("version=" + version)
+            print("computed=" + computed)
+        } catch (err: Error) {
+            print("failed to print output")
+        } finally {
+            print("shutdown")
+        }
+    }
+
+    return
+}

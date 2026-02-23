@@ -1,0 +1,16 @@
+[package]
+name = "nex_repl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+torch = ["nexc_driver/torch"]
+ui = ["nexc_driver/ui"]
+
+[dependencies]
+nexc_driver = { path = "../nexc_driver" }
+nexc_codegen_llvm_jit = { path = "../nexc_codegen_llvm_jit" }
+

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interfaces - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Interfaces</div>
+
+  <h1>Interfaces</h1>
+  <p class="page-subtitle">Contracts that define method signatures for classes and structs to implement.</p>
+
+  <h2>Declaring an Interface</h2>
+
+  <pre><code><span class="kw">public</span> <span class="kw">interface</span> <span class="typ">Greeter</span> {
+    <span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span>
+}</code></pre>
+
+  <h2>Interface Rules</h2>
+
+  <ul>
+    <li>Declare method signatures only &mdash; no fields, no state</li>
+    <li>Methods are implicitly <code>public</code> and <code>virtual</code></li>
+    <li>Can extend other interfaces: <code>interface A : B { }</code></li>
+    <li>Can have type parameters: <code>interface Comparable[T] { }</code></li>
+    <li>Cannot be instantiated directly</li>
+  </ul>
+
+  <h2>Implementing in a Class</h2>
+
+  <p>Classes implement interfaces by listing them after the <code>:</code> in the class declaration, alongside any base classes:</p>
+
+  <pre><code><span class="kw">interface</span> <span class="typ">Greeter</span> {
+    <span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span>
+}
+
+<span class="kw">class</span> <span class="typ">FriendlyGreeter</span> : <span class="typ">Greeter</span> {
+    <span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hey there, "</span> <span class="op">+</span> name <span class="op">+</span> <span class="str">"!"</span>
+    }
+}</code></pre>
+
+  <h2>Implementing in a Struct</h2>
+
+  <pre><code><span class="kw">interface</span> <span class="typ">Printable</span> {
+    <span class="kw">def</span> <span class="fn">to_string</span>() <span class="op">-></span> <span class="typ">String</span>
+}
+
+<span class="kw">struct</span> <span class="typ">Color</span> : <span class="typ">Printable</span> {
+    r: <span class="typ">Int</span>
+    g: <span class="typ">Int</span>
+    b: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">to_string</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"rgb("</span> <span class="op">+</span> <span class="kw">self</span>.r <span class="op">+</span> <span class="str">","</span> <span class="op">+</span> <span class="kw">self</span>.g <span class="op">+</span> <span class="str">","</span> <span class="op">+</span> <span class="kw">self</span>.b <span class="op">+</span> <span class="str">")"</span>
+    }
+}</code></pre>
+
+  <h2>Class with Base and Interface</h2>
+
+  <pre><code><span class="kw">class</span> <span class="typ">ConsoleGreeter</span> : <span class="typ">BaseGreeter</span>, <span class="typ">Greeter</span> {
+    <span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.Base<span class="op">::</span><span class="fn">format</span>(name)
+    }
+}</code></pre>
+
+  <h2>Interface Inheritance</h2>
+
+  <pre><code><span class="kw">interface</span> <span class="typ">Serializable</span> {
+    <span class="kw">def</span> <span class="fn">serialize</span>() <span class="op">-></span> <span class="typ">String</span>
+}
+
+<span class="kw">interface</span> <span class="typ">Storable</span> : <span class="typ">Serializable</span> {
+    <span class="kw">def</span> <span class="fn">save</span>(path: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span>
+}
+
+<span class="cmt">// Must implement both serialize() and save()</span>
+<span class="kw">class</span> <span class="typ">Document</span> : <span class="typ">Storable</span> {
+    <span class="kw">def</span> <span class="fn">serialize</span>() <span class="op">-></span> <span class="typ">String</span> { <span class="kw">return</span> <span class="str">"{}"</span> }
+    <span class="kw">def</span> <span class="fn">save</span>(path: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> { }
+}</code></pre>
+
+  <h2>Generic Interfaces</h2>
+
+  <pre><code><span class="kw">interface</span> <span class="typ">Comparable</span>[<span class="typ">T</span>] {
+    <span class="kw">def</span> <span class="fn">compare_to</span>(other: <span class="typ">T</span>) <span class="op">-></span> <span class="typ">Int</span>
+}</code></pre>
+
+  <h2>The Disposable Interface</h2>
+
+  <p>The built-in <code>Disposable</code> interface is used for deterministic resource cleanup with <code>using</code> blocks:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">interface</span> <span class="typ">Disposable</span> {
+    <span class="kw">def</span> <span class="fn">dispose</span>() <span class="op">-></span> <span class="typ">Unit</span>
+}</code></pre>
+
+  <p>See <a href="resource-management.html">Resource Management</a> for details on <code>using</code> blocks.</p>
+
+  <div class="page-nav">
+    <a href="structs.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Structs</span>
+    </a>
+    <a href="modules-imports.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Modules &amp; Imports &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

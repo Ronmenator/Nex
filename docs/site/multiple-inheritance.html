@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiple Inheritance - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Multiple Inheritance</div>
+
+  <h1>Multiple Inheritance</h1>
+  <p class="page-subtitle">Inherit from multiple base classes with full control over diamond resolution and memory layout.</p>
+
+  <h2>Multiple Base Classes</h2>
+
+  <p>A class can inherit from more than one base class by listing them after the colon, separated by commas:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Swimmer</span> {
+    <span class="kw">def</span> <span class="fn">swim</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"swimming"</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Flyer</span> {
+    <span class="kw">def</span> <span class="fn">fly</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"flying"</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Duck</span> : <span class="typ">Swimmer</span>, <span class="typ">Flyer</span> {
+    <span class="cmt">// Duck inherits both swim() and fly()</span>
+}
+
+duck <span class="op">=</span> <span class="typ">Duck</span>()
+<span class="fn">println</span>(duck.<span class="fn">swim</span>())  <span class="cmt">// swimming</span>
+<span class="fn">println</span>(duck.<span class="fn">fly</span>())   <span class="cmt">// flying</span></code></pre>
+
+  <h2>The Diamond Problem</h2>
+
+  <p>When two base classes share a common ancestor, a <em>diamond</em> inheritance pattern forms. By default, Nex <strong>duplicates</strong> the common ancestor &mdash; each path through the hierarchy gets its own copy of the shared base:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">A</span> {
+    value: <span class="typ">Int</span>
+}
+
+<span class="kw">class</span> <span class="typ">B</span> : <span class="typ">A</span> { }
+<span class="kw">class</span> <span class="typ">C</span> : <span class="typ">A</span> { }
+
+<span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>, <span class="typ">C</span> { }
+<span class="cmt">// D contains TWO separate A subobjects:</span>
+<span class="cmt">// one from B and one from C</span></code></pre>
+
+  <p>This means <code>D</code> has two independent copies of <code>A</code>'s fields. Accessing <code>A</code>'s members through <code>D</code> is ambiguous and requires qualification.</p>
+
+  <h2>Shared Bases</h2>
+
+  <p>To collapse a common ancestor into a single subobject, declare the base as <code>shared</code>:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">A</span> {
+    value: <span class="typ">Int</span>
+}
+
+<span class="kw">class</span> <span class="typ">B</span> : <span class="kw">shared</span> <span class="typ">A</span> { }
+<span class="kw">class</span> <span class="typ">C</span> : <span class="kw">shared</span> <span class="typ">A</span> { }
+
+<span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>, <span class="typ">C</span> { }
+<span class="cmt">// D contains ONE shared A subobject</span>
+<span class="cmt">// B and C both refer to the same A</span></code></pre>
+
+  <p>With <code>shared</code>, all paths to <code>A</code> resolve to the same subobject. Changes to <code>A</code>'s fields through <code>B</code> are visible through <code>C</code>, and vice versa.</p>
+
+  <div class="callout info">
+    <div class="callout-title">When to use shared</div>
+    <p>Use <code>shared</code> when the common ancestor represents a single logical identity (e.g. a single ID, a single connection). Use the default duplication when each inheritance path should have independent state.</p>
+  </div>
+
+  <h2>Ambiguity Resolution</h2>
+
+  <p>If two base classes provide a member with the same name, accessing it from the derived class is a <strong>compile error</strong>:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">B</span> {
+    <span class="kw">def</span> <span class="fn">foo</span>() <span class="op">-></span> <span class="typ">String</span> { <span class="kw">return</span> <span class="str">"B"</span> }
+}
+
+<span class="kw">class</span> <span class="typ">C</span> {
+    <span class="kw">def</span> <span class="fn">foo</span>() <span class="op">-></span> <span class="typ">String</span> { <span class="kw">return</span> <span class="str">"C"</span> }
+}
+
+<span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>, <span class="typ">C</span> { }
+
+d <span class="op">=</span> <span class="typ">D</span>()
+d.<span class="fn">foo</span>()  <span class="cmt">// COMPILE ERROR: ambiguous member 'foo'</span></code></pre>
+
+  <p>Nex provides three mechanisms to resolve the ambiguity:</p>
+
+  <h3>1. Override in the Derived Class</h3>
+
+  <p>Define a new implementation in the derived class that shadows both bases:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>, <span class="typ">C</span> {
+    <span class="kw">def</span> <span class="fn">foo</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"D"</span>
+    }
+}</code></pre>
+
+  <h3>2. Qualified Base Access</h3>
+
+  <p>Use the <code>Base::method()</code> syntax to call a specific base's version:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>, <span class="typ">C</span> {
+    <span class="kw">def</span> <span class="fn">foo</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="cmt">// Explicitly call B's version</span>
+        <span class="kw">return</span> <span class="kw">self</span>.<span class="typ">B</span><span class="op">::</span><span class="fn">foo</span>()
+    }
+
+    <span class="kw">def</span> <span class="fn">foo_from_c</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.<span class="typ">C</span><span class="op">::</span><span class="fn">foo</span>()
+    }
+}</code></pre>
+
+  <h3>3. Alias</h3>
+
+  <p>Create an alias that maps a new name to a specific base member:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>, <span class="typ">C</span> {
+    <span class="kw">alias</span> fooFromB <span class="op">=</span> <span class="typ">B</span><span class="op">::</span>foo
+    <span class="kw">alias</span> fooFromC <span class="op">=</span> <span class="typ">C</span><span class="op">::</span>foo
+}
+
+d <span class="op">=</span> <span class="typ">D</span>()
+<span class="fn">println</span>(d.<span class="fn">fooFromB</span>())  <span class="cmt">// B</span>
+<span class="fn">println</span>(d.<span class="fn">fooFromC</span>())  <span class="cmt">// C</span></code></pre>
+
+  <p>The same resolution rules apply to conflicting field names.</p>
+
+  <h2>Physical Layout</h2>
+
+  <p>Understanding how multiple inheritance maps to memory helps when reasoning about performance and interop. A derived object with multiple bases is laid out as:</p>
+
+  <pre><code><span class="cmt">// Memory layout of an object with multiple bases:</span>
+<span class="cmt">//</span>
+<span class="cmt">// [ObjHeader | SharedBases... | BaseSubobject(B) | BaseSubobject(C) | DerivedFields...]</span>
+<span class="cmt">//</span>
+<span class="cmt">// - ObjHeader: GC word + Type* pointer</span>
+<span class="cmt">// - SharedBases: appear once, placed first</span>
+<span class="cmt">// - Each base subobject contains its own fields and vptr</span>
+<span class="cmt">// - DerivedFields: fields declared in the derived class</span></code></pre>
+
+  <p>Each base subobject contains its own fields and virtual table pointer. Shared bases appear exactly once at the beginning of the layout, regardless of how many inheritance paths lead to them.</p>
+
+  <h2>Construction Order</h2>
+
+  <p>When an object with multiple bases is created, initialization follows a strict order:</p>
+
+  <ol>
+    <li><strong>Shared bases first</strong> &mdash; in stable topological order</li>
+    <li><strong>Non-shared bases</strong> &mdash; left to right as declared</li>
+    <li><strong>Derived fields</strong> &mdash; initialized to defaults or explicit values</li>
+    <li><strong>Constructor body</strong> &mdash; the derived class <code>init</code> runs last</li>
+  </ol>
+
+  <h2>Base Constructor Arguments</h2>
+
+  <p>When base classes require constructor arguments, provide them in the class declaration:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Engine</span> {
+    horsepower: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(hp: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.horsepower <span class="op">=</span> hp
+        <span class="kw">return</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Interior</span> {
+    material: <span class="typ">String</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(material: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.material <span class="op">=</span> material
+        <span class="kw">return</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Car</span> : <span class="typ">Engine</span>(hp: <span class="num">200</span>), <span class="typ">Interior</span>(material: <span class="str">"leather"</span>) {
+    model: <span class="typ">String</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(model: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.model <span class="op">=</span> model
+        <span class="kw">return</span>
+    }
+}
+
+car <span class="op">=</span> <span class="typ">Car</span>(<span class="str">"Sedan"</span>)
+<span class="fn">println</span>(car.horsepower)  <span class="cmt">// 200</span>
+<span class="fn">println</span>(car.material)    <span class="cmt">// leather</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <p>Here is a full example combining shared bases, ambiguity resolution, and construction:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Named</span> {
+    name: <span class="typ">String</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.name <span class="op">=</span> name
+        <span class="kw">return</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Worker</span> : <span class="kw">shared</span> <span class="typ">Named</span> {
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.name <span class="op">+</span> <span class="str">" (worker)"</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Manager</span> : <span class="kw">shared</span> <span class="typ">Named</span> {
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.name <span class="op">+</span> <span class="str">" (manager)"</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">TeamLead</span> : <span class="typ">Worker</span>, <span class="typ">Manager</span> {
+    <span class="cmt">// Single shared Named subobject</span>
+
+    <span class="cmt">// Resolve ambiguous describe()</span>
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.name <span class="op">+</span> <span class="str">" (team lead)"</span>
+    }
+
+    <span class="kw">alias</span> describeAsWorker <span class="op">=</span> <span class="typ">Worker</span><span class="op">::</span>describe
+    <span class="kw">alias</span> describeAsManager <span class="op">=</span> <span class="typ">Manager</span><span class="op">::</span>describe
+}
+
+lead <span class="op">=</span> <span class="typ">TeamLead</span>(<span class="str">"Alice"</span>)
+<span class="fn">println</span>(lead.<span class="fn">describe</span>())            <span class="cmt">// Alice (team lead)</span>
+<span class="fn">println</span>(lead.<span class="fn">describeAsWorker</span>())   <span class="cmt">// Alice (worker)</span>
+<span class="fn">println</span>(lead.<span class="fn">describeAsManager</span>())  <span class="cmt">// Alice (manager)</span></code></pre>
+
+  <div class="page-nav">
+    <a href="generics.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Generics</span>
+    </a>
+    <a href="operator-overloading.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Operator Overloading &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

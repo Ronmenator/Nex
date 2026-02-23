@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/nexc",
+  "crates/nexc_driver",
+  "crates/nexc_diag",
+  "crates/nexc_lex",
+  "crates/nexc_parse",
+  "crates/nexc_ast",
+  "crates/nexc_resolve",
+  "crates/nexc_type",
+  "crates/nexc_layout",
+  "crates/nexc_ir",
+  "crates/nexc_codegen_llvm",
+  "crates/nexc_codegen_llvm_jit",
+  "crates/nexc_codegen_cranelift",
+  "crates/nexc_meta",
+  "crates/nexc_fmt",
+  "crates/nexc_lint",
+  "crates/nex",
+  "crates/nex_lsp",
+  "crates/nex_repl",
+  "crates/nex_runtime",
+  "crates/nex_std",
+  "crates/nexui_parse",
+  "crates/nexui_lower",
+  "xtask",
+]
+
+[workspace.package]
+version = "0.1.51"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+

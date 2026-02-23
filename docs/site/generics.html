@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generics - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Generics</div>
+
+  <h1>Generics</h1>
+  <p class="page-subtitle">Write type-safe, reusable code with type parameters and monomorphized generics.</p>
+
+  <h2>Type Parameter Syntax</h2>
+
+  <p>Nex uses bracket syntax <code>[T]</code> for type parameters. Type parameters appear after the name of a class, struct, interface, or function:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Box</span>[T] {
+    value: T
+}</code></pre>
+
+  <p>Multiple type parameters are separated by commas:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Pair</span>[A, B] {
+    first: A
+    second: B
+}</code></pre>
+
+  <h2>Generic Classes</h2>
+
+  <p>Generic classes define type parameters that can be used for fields, method parameters, and return types:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">class</span> <span class="typ">List</span>[T] {
+    <span class="kw">def</span> <span class="fn">add</span>(item: T) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="cmt">// append item to internal storage</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">get</span>(index: <span class="typ">Int</span>) <span class="op">-></span> T {
+        <span class="cmt">// return the item at position index</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">length</span>() <span class="op">-></span> <span class="typ">Int</span> {
+        <span class="cmt">// return number of items</span>
+    }
+}</code></pre>
+
+  <p>A more complete example with multiple type parameters:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">class</span> <span class="typ">Map</span>[K, V] {
+    <span class="kw">def</span> <span class="fn">put</span>(key: K, value: V) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="cmt">// store the key-value pair</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">get</span>(key: K) <span class="op">-></span> V {
+        <span class="cmt">// retrieve value by key</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">contains</span>(key: K) <span class="op">-></span> <span class="typ">Bool</span> {
+        <span class="cmt">// check if key exists</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">size</span>() <span class="op">-></span> <span class="typ">Int</span> {
+        <span class="cmt">// return number of entries</span>
+    }
+}</code></pre>
+
+  <h2>Generic Structs</h2>
+
+  <p>Structs can also be parameterized. Since structs are value types, a generic struct is stored inline with its concrete type parameters:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">struct</span> <span class="typ">Point</span>[T] {
+    x: T
+    y: T
+
+    <span class="kw">def</span> <span class="fn">swap</span>() <span class="op">-></span> <span class="typ">Point</span>[T] {
+        <span class="kw">return</span> <span class="typ">Point</span>[T](<span class="kw">self</span>.y, <span class="kw">self</span>.x)
+    }
+}
+
+<span class="cmt">// Usage</span>
+p <span class="op">=</span> <span class="typ">Point</span>[<span class="typ">Float</span>](<span class="num">1.5f</span>, <span class="num">2.5f</span>)
+swapped <span class="op">=</span> p.<span class="fn">swap</span>()  <span class="cmt">// Point[Float](2.5, 1.5)</span></code></pre>
+
+  <h2>Generic Interfaces</h2>
+
+  <p>Interfaces can declare type parameters, which implementors must satisfy:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">interface</span> <span class="typ">Comparable</span>[T] {
+    <span class="kw">def</span> <span class="fn">compare_to</span>(other: T) <span class="op">-></span> <span class="typ">Int</span>
+}
+
+<span class="kw">class</span> <span class="typ">Score</span> : <span class="typ">Comparable</span>[<span class="typ">Score</span>] {
+    value: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">compare_to</span>(other: <span class="typ">Score</span>) <span class="op">-></span> <span class="typ">Int</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.value <span class="op">-</span> other.value
+    }
+}</code></pre>
+
+  <h2>Generic Functions</h2>
+
+  <p>Functions can be generic independently of any enclosing type. Type parameters appear after the function name:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">def</span> <span class="fn">identity</span>[T](value: T) <span class="op">-></span> T {
+    <span class="kw">return</span> value
+}
+
+<span class="cmt">// The compiler infers T from the argument</span>
+result <span class="op">=</span> <span class="fn">identity</span>(<span class="num">42</span>)         <span class="cmt">// T = Int, result: Int</span>
+name <span class="op">=</span> <span class="fn">identity</span>(<span class="str">"Nex"</span>)    <span class="cmt">// T = String, name: String</span></code></pre>
+
+  <p>A practical example that works with any list element type:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">first_or_default</span>[T](list: <span class="typ">List</span>[T], fallback: T) <span class="op">-></span> T {
+    <span class="kw">if</span> (list.<span class="fn">length</span>() <span class="op">></span> <span class="num">0</span>) {
+        <span class="kw">return</span> list.<span class="fn">get</span>(<span class="num">0</span>)
+    }
+    <span class="kw">return</span> fallback
+}</code></pre>
+
+  <h2>Instantiation</h2>
+
+  <p>Generic types are instantiated by providing concrete type arguments in brackets:</p>
+
+  <pre><code><span class="cmt">// Generic class instantiation</span>
+numbers <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+numbers.<span class="fn">add</span>(<span class="num">10</span>)
+numbers.<span class="fn">add</span>(<span class="num">20</span>)
+first <span class="op">=</span> numbers.<span class="fn">get</span>(<span class="num">0</span>)  <span class="cmt">// first: Int = 10</span>
+
+<span class="cmt">// Multiple type parameters</span>
+scores <span class="op">=</span> <span class="typ">Map</span>[<span class="typ">String</span>, <span class="typ">Int</span>]()
+scores.<span class="fn">put</span>(<span class="str">"Alice"</span>, <span class="num">95</span>)
+scores.<span class="fn">put</span>(<span class="str">"Bob"</span>, <span class="num">87</span>)
+
+<span class="cmt">// Nested generics</span>
+grid <span class="op">=</span> <span class="typ">List</span>[<span class="typ">List</span>[<span class="typ">Int</span>]]()</code></pre>
+
+  <h2>Monomorphization</h2>
+
+  <p>Nex implements generics via <strong>monomorphization</strong> &mdash; each unique instantiation of a generic type or function generates a fully specialized copy at compile time.</p>
+
+  <p>For example, when you write:</p>
+
+  <pre><code>ints <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+names <span class="op">=</span> <span class="typ">List</span>[<span class="typ">String</span>]()</code></pre>
+
+  <p>The compiler generates two separate implementations: one for <code>List[Int]</code> and another for <code>List[String]</code>. Each specialized version uses concrete types directly, eliminating the need for boxing or runtime type checks. This means generic code runs at the same speed as hand-written type-specific code.</p>
+
+  <div class="callout info">
+    <div class="callout-title">Performance</div>
+    <p>Monomorphization trades binary size for runtime speed. Each distinct instantiation creates a new copy of the code, but every call is statically dispatched with no indirection overhead.</p>
+  </div>
+
+  <h2>v1 Limitations</h2>
+
+  <p>The following generic features are not available in Nex v1:</p>
+
+  <table>
+    <tr><th>Feature</th><th>Status</th></tr>
+    <tr><td>Variance annotations (<code>in</code>/<code>out</code>)</td><td>Not supported</td></tr>
+    <tr><td>Default type parameters</td><td>Not supported</td></tr>
+    <tr><td>Constraint syntax (<code>where T : Comparable</code>)</td><td>Not supported</td></tr>
+  </table>
+
+  <p>Because there are no type constraints in v1, all operations on generic values must be statically resolvable. You cannot call methods on a value of type <code>T</code> unless the method is known at the call site through concrete instantiation.</p>
+
+  <div class="page-nav">
+    <a href="resource-management.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Resource Management</span>
+    </a>
+    <a href="multiple-inheritance.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Multiple Inheritance &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

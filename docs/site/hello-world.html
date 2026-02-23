@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hello World - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Getting Started<span class="sep">/</span>Hello World</div>
+
+  <h1>Hello World</h1>
+  <p class="page-subtitle">Your first Nex program, step by step.</p>
+
+  <h2>The Simplest Program</h2>
+
+  <p>Create a file called <code>main.nex</code> with the following content:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Hello, World!"</span>)
+}</code></pre>
+
+  <p>Run it:</p>
+  <pre><code>aur main.nex</code></pre>
+
+  <p>Output:</p>
+  <pre><code>Hello, World!</code></pre>
+
+  <h2>Understanding the Code</h2>
+
+  <ul>
+    <li><code>def main() -> Unit</code> &mdash; declares the program entry point. Every Nex application needs a <code>main</code> function that returns <code>Unit</code> (void).</li>
+    <li><code>println("Hello, World!")</code> &mdash; prints a string followed by a newline. <code>println</code> is a built-in function available without imports.</li>
+    <li>No semicolons needed &mdash; Nex uses Automatic Semicolon Insertion (ASI).</li>
+    <li>Braces <code>{ }</code> delimit blocks. Indentation is for readability only.</li>
+  </ul>
+
+  <h2>A More Complete Example</h2>
+
+  <p>Here is a more interesting program demonstrating functions, loops, conditionals, and string operations:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">factorial</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">if</span> (n <span class="op">&lt;=</span> <span class="num">1</span>) {
+        <span class="kw">return</span> <span class="num">1</span>
+    }
+    <span class="kw">return</span> n <span class="op">*</span> <span class="fn">factorial</span>(n <span class="op">-</span> <span class="num">1</span>)
+}
+
+<span class="kw">def</span> <span class="fn">fizzbuzz</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">if</span> (n <span class="op">%</span> <span class="num">15</span> <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="str">"FizzBuzz"</span>
+    } <span class="kw">else</span> <span class="kw">if</span> (n <span class="op">%</span> <span class="num">3</span> <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="str">"Fizz"</span>
+    } <span class="kw">else</span> <span class="kw">if</span> (n <span class="op">%</span> <span class="num">5</span> <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="str">"Buzz"</span>
+    }
+    <span class="kw">return</span> <span class="str">""</span>
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"=== Nex v0.1 ==="</span>)
+
+    <span class="fn">println</span>(<span class="str">"Factorial of 10:"</span>)
+    <span class="fn">println</span>(<span class="fn">factorial</span>(<span class="num">10</span>))
+
+    <span class="fn">println</span>(<span class="str">"FizzBuzz 1-20:"</span>)
+    i <span class="op">=</span> <span class="num">1</span>
+    <span class="kw">while</span> (i <span class="op">&lt;=</span> <span class="num">20</span>) {
+        result <span class="op">=</span> <span class="fn">fizzbuzz</span>(i)
+        <span class="kw">if</span> (result <span class="op">==</span> <span class="str">""</span>) {
+            <span class="fn">println</span>(i)
+        } <span class="kw">else</span> {
+            <span class="fn">println</span>(result)
+        }
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+
+    name <span class="op">=</span> <span class="str">"World"</span>
+    <span class="fn">println</span>(<span class="str">"Hello, "</span> <span class="op">+</span> name <span class="op">+</span> <span class="str">"!"</span>)
+}</code></pre>
+
+  <h2>Key Takeaways</h2>
+
+  <ul>
+    <li>Variables are declared by first assignment: <code>i = 1</code> creates an <code>Int</code> variable.</li>
+    <li>Types are inferred from the assigned value &mdash; no type annotation needed for locals.</li>
+    <li>String concatenation uses the <code>+</code> operator, and non-string values are auto-converted.</li>
+    <li>Functions declare parameter types and return types explicitly.</li>
+    <li>Recursion works as expected.</li>
+  </ul>
+
+  <div class="page-nav">
+    <a href="getting-started.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Installation &amp; Setup</span>
+    </a>
+    <a href="variables-types.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Variables &amp; Types &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

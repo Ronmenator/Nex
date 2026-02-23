@@ -1,0 +1,14 @@
+[package]
+name = "nexc_type"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nexc_ast = { path = "../nexc_ast" }
+nexc_diag = { path = "../nexc_diag" }
+
+[dev-dependencies]
+nexc_lex = { path = "../nexc_lex" }
+nexc_parse = { path = "../nexc_parse" }

@@ -1,0 +1,14 @@
+# Nex project configuration
+# Place this file in your project root as project.toml
+
+[project]
+name = "my_project"
+version = "0.1.0"
+entry = "src/main.nex"
+
+[build]
+output_dir = "build"
+optimization = "release"    # "debug" or "release"
+
+[libs]
+# Add libraries here (e.g. nex3d = { path = "../libs/nex3d" })

@@ -1,0 +1,9 @@
+<Widget xmlns="std.ui" Extends="BaseWidget">
+  <Text Text="About" FontSize="28" />
+  <Text Text="Nex Declarative UI Demo" FontSize="20" />
+  <Text Text="Built with .nexui markup and MVVM data binding." FontSize="14" />
+  <Text Text="Partial-class code-behind keeps logic and layout separate." FontSize="14" />
+  <Text Text="Widget inheritance provides shared base layouts." FontSize="14" />
+  <Text Text="WidgetSwitcher handles multi-screen navigation." FontSize="14" />
+  <Text Text="v0.1.0" FontSize="14" />
+</Widget>

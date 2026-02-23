@@ -1,0 +1,28 @@
+// nex3d.engine — Game engine window and main loop.
+// Requires: cargo build --features engine
+// Wraps nex_engine_* runtime functions for 2D and 3D rendering.
+
+// Engine lifecycle: create window -> run loop -> quit -> destroy
+
+public def engine_create_window(title: String, width: Int64, height: Int64) -> Int64 {
+    return engine_window_create(title, width, height)
+}
+
+public def engine_run(handle: Int64) -> Unit {
+    engine_window_run(handle)
+    return
+}
+
+public def engine_quit(handle: Int64) -> Unit {
+    engine_window_quit(handle)
+    return
+}
+
+public def engine_destroy(handle: Int64) -> Unit {
+    engine_window_destroy(handle)
+    return
+}
+
+public def engine_is_running(handle: Int64) -> Bool {
+    return engine_window_is_running(handle) != 0
+}

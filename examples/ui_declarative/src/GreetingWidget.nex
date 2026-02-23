@@ -1,0 +1,22 @@
+// GreetingWidget code-behind — self-contained greeting with its own state.
+
+import std.ui
+
+public partial class GreetingWidget {
+    name_value = ""
+    greeting = ""
+
+    def GreetingText() -> String {
+        return greeting
+    }
+
+    def on_greet(widget_id: Int64, event_kind: Int64) {
+        if (str_length(name_value) > 0) {
+            greeting = "Hello, " + name_value + "!"
+        } else {
+            greeting = "Please enter a name first."
+        }
+        notify_changed("GreetingText")
+        return
+    }
+}

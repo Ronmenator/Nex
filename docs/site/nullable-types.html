@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nullable Types - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Nullable Types</div>
+
+  <h1>Nullable Types</h1>
+  <p class="page-subtitle">Represent optional values safely with compile-time null checks.</p>
+
+  <h2>The <code>T?</code> Syntax</h2>
+
+  <p>Appending <code>?</code> to any type creates its nullable variant. A nullable type can hold either a value of type <code>T</code> or <code>null</code>:</p>
+
+  <pre><code>name: <span class="typ">String</span>? <span class="op">=</span> <span class="str">"Alice"</span>
+name <span class="op">=</span> <span class="kw">null</span>  <span class="cmt">// ok, String? allows null</span>
+
+age: <span class="typ">Int</span>? <span class="op">=</span> <span class="num">30</span>
+age <span class="op">=</span> <span class="kw">null</span>   <span class="cmt">// ok, Int? allows null</span></code></pre>
+
+  <p>Without the <code>?</code>, assigning <code>null</code> is a compile error:</p>
+
+  <pre><code>name: <span class="typ">String</span> <span class="op">=</span> <span class="kw">null</span>  <span class="cmt">// COMPILE ERROR: String is not nullable</span></code></pre>
+
+  <h2>The <code>null</code> Literal</h2>
+
+  <p>The literal <code>null</code> has the special type <code>Null</code>. It is assignable to any nullable type <code>T?</code> but not to a non-nullable type <code>T</code>.</p>
+
+  <pre><code>a: <span class="typ">String</span>? <span class="op">=</span> <span class="kw">null</span>   <span class="cmt">// ok</span>
+b: <span class="typ">Int</span>? <span class="op">=</span> <span class="kw">null</span>      <span class="cmt">// ok</span>
+c: <span class="typ">String</span> <span class="op">=</span> <span class="kw">null</span>    <span class="cmt">// COMPILE ERROR</span></code></pre>
+
+  <h2>Null Safety</h2>
+
+  <p>Accessing members on a nullable type without first checking for <code>null</code> is a <strong>compile error</strong>:</p>
+
+  <pre><code>name: <span class="typ">String</span>? <span class="op">=</span> <span class="fn">get_name</span>()
+
+<span class="cmt">// COMPILE ERROR: cannot access 'length' on String?</span>
+<span class="cmt">// without a null check</span>
+x <span class="op">=</span> name.<span class="fn">length</span>()</code></pre>
+
+  <p>You must check for <code>null</code> before using the value:</p>
+
+  <pre><code>name: <span class="typ">String</span>? <span class="op">=</span> <span class="fn">get_name</span>()
+
+<span class="kw">if</span> (name <span class="op">!=</span> <span class="kw">null</span>) {
+    <span class="cmt">// inside this block, name is known to be non-null</span>
+    <span class="fn">println</span>(name.<span class="fn">length</span>())
+} <span class="kw">else</span> {
+    <span class="fn">println</span>(<span class="str">"no name provided"</span>)
+}</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Flow narrowing</div>
+    <p>In v1, the null-check pattern <code>if (x != null)</code> narrows the type to <code>T</code> inside the block as an advisory. Full flow typing is planned for a future version.</p>
+  </div>
+
+  <h2>Nullable Fields and Parameters</h2>
+
+  <p>Nullable types can be used for class fields, function parameters, and return types:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">UserProfile</span> {
+    name: <span class="typ">String</span>
+    email: <span class="typ">String</span>?
+    phone: <span class="typ">String</span>?
+
+    <span class="kw">def</span> <span class="fn">init</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.name <span class="op">=</span> name
+        <span class="kw">self</span>.email <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">self</span>.phone <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">display_email</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">if</span> (<span class="kw">self</span>.email <span class="op">!=</span> <span class="kw">null</span>) {
+            <span class="kw">return</span> <span class="kw">self</span>.email
+        }
+        <span class="kw">return</span> <span class="str">"(no email)"</span>
+    }
+}</code></pre>
+
+  <h2>Nullable Return Types</h2>
+
+  <p>Functions that may not have a result to return can use a nullable return type:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">find_user</span>(id: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">UserProfile</span>? {
+    <span class="kw">if</span> (id <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="kw">null</span>
+    }
+    <span class="kw">return</span> <span class="typ">UserProfile</span>(<span class="str">"User"</span>)
+}
+
+user <span class="op">=</span> <span class="fn">find_user</span>(<span class="num">42</span>)
+<span class="kw">if</span> (user <span class="op">!=</span> <span class="kw">null</span>) {
+    <span class="fn">println</span>(user.name)
+}</code></pre>
+
+  <h2>Boxing Interaction</h2>
+
+  <p>Nullable types interact with the memory layout differently depending on whether the underlying type is a value type or a reference type:</p>
+
+  <table>
+    <tr><th>Category</th><th>Non-nullable <code>T</code></th><th>Nullable <code>T?</code></th></tr>
+    <tr><td>Value types (<code>Int</code>, <code>Float</code>, structs)</td><td>Stored inline (stack/field)</td><td>Boxed when non-null; null pointer when null</td></tr>
+    <tr><td>Reference types (classes, <code>String</code>)</td><td>Pointer to heap object</td><td>Same pointer (may be null)</td></tr>
+  </table>
+
+  <p>For value types, making a type nullable introduces a level of indirection &mdash; the value is boxed on the heap when present. For reference types, the nullable variant has the same representation as the non-nullable one since reference types are already pointers.</p>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Config</span> {
+    host: <span class="typ">String</span>
+    port: <span class="typ">Int</span>
+    password: <span class="typ">String</span>?
+
+    <span class="kw">def</span> <span class="fn">init</span>(host: <span class="typ">String</span>, port: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.host <span class="op">=</span> host
+        <span class="kw">self</span>.port <span class="op">=</span> port
+        <span class="kw">self</span>.password <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">connection_string</span>() <span class="op">-></span> <span class="typ">String</span> {
+        base <span class="op">=</span> <span class="kw">self</span>.host <span class="op">+</span> <span class="str">":"</span> <span class="op">+</span> <span class="kw">self</span>.port
+        <span class="kw">if</span> (<span class="kw">self</span>.password <span class="op">!=</span> <span class="kw">null</span>) {
+            <span class="kw">return</span> base <span class="op">+</span> <span class="str">" (auth)"</span>
+        }
+        <span class="kw">return</span> base <span class="op">+</span> <span class="str">" (no auth)"</span>
+    }
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    config <span class="op">=</span> <span class="typ">Config</span>(<span class="str">"localhost"</span>, <span class="num">5432</span>)
+    <span class="fn">println</span>(config.<span class="fn">connection_string</span>())  <span class="cmt">// localhost:5432 (no auth)</span>
+
+    config.password <span class="op">=</span> <span class="str">"secret"</span>
+    <span class="fn">println</span>(config.<span class="fn">connection_string</span>())  <span class="cmt">// localhost:5432 (auth)</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="dynamic-var.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Dynamic Typing (Var)</span>
+    </a>
+    <a href="function-types.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Function Types &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+[package]
+name = "nex_std"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+torch = ["nex_runtime/torch"]
+ui = ["nex_runtime/ui"]
+
+[dependencies]
+nex_runtime = { path = "../nex_runtime" }
+

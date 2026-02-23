@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classes &amp; Inheritance - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Classes</div>
+
+  <h1>Classes &amp; Inheritance</h1>
+  <p class="page-subtitle">Object-oriented programming with classes, fields, methods, constructors, and inheritance.</p>
+
+  <h2>Defining a Class</h2>
+
+  <p>Classes are reference types that can have fields, methods, and constructors:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Person</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(name: <span class="typ">String</span>, age: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.name <span class="op">=</span> name
+        <span class="kw">self</span>.age <span class="op">=</span> age
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">greet</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hi, I'm "</span> <span class="op">+</span> <span class="kw">self</span>.name
+    }
+}</code></pre>
+
+  <h2>Creating Instances</h2>
+
+  <pre><code>person <span class="op">=</span> <span class="typ">Person</span>(<span class="str">"Alice"</span>, <span class="num">30</span>)
+<span class="fn">println</span>(person.<span class="fn">greet</span>())  <span class="cmt">// Hi, I'm Alice</span></code></pre>
+
+  <h2>The <code>self</code> Keyword</h2>
+
+  <p>Inside instance methods, <code>self</code> refers to the current object:</p>
+
+  <ul>
+    <li><code>self.field_name</code> &mdash; access a field</li>
+    <li><code>self.method_name(args)</code> &mdash; call a method</li>
+    <li><code>self.Base::method_name(args)</code> &mdash; call a specific base class method</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="callout-title">Error</div>
+    <p><code>self</code> is not available in <code>static</code> methods. Using it there is a compile error.</p>
+  </div>
+
+  <h2>Constructors (<code>init</code>)</h2>
+
+  <p>The constructor is a method named <code>init</code>. If no <code>init</code> is defined, fields default to their zero value (0 for numbers, <code>false</code> for bools, <code>null</code> for references).</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Config</span> {
+    debug: <span class="typ">Bool</span>
+    max_retries: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(debug: <span class="typ">Bool</span>, retries: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.debug <span class="op">=</span> debug
+        <span class="kw">self</span>.max_retries <span class="op">=</span> retries
+        <span class="kw">return</span>
+    }
+}
+
+config <span class="op">=</span> <span class="typ">Config</span>(<span class="kw">true</span>, <span class="num">3</span>)</code></pre>
+
+  <h2>Inheritance</h2>
+
+  <p>Classes can inherit from one or more base classes using the <code>:</code> syntax:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.name <span class="op">=</span> name
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"..."</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Dog</span> : <span class="typ">Animal</span> {
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.name <span class="op">+</span> <span class="str">" says Woof!"</span>
+    }
+}
+
+dog <span class="op">=</span> <span class="typ">Dog</span>(<span class="str">"Rex"</span>)
+<span class="fn">println</span>(dog.<span class="fn">speak</span>())  <span class="cmt">// Rex says Woof!</span></code></pre>
+
+  <h2>Multiple Inheritance</h2>
+
+  <p>Nex supports real multiple inheritance &mdash; a class can extend two or more base classes, inheriting fields and methods from each:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Swimmer</span> {
+    speed: <span class="typ">Double</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(speed: <span class="typ">Double</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.speed <span class="op">=</span> speed
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">swim</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"swimming at "</span> <span class="op">+</span> <span class="kw">self</span>.speed <span class="op">+</span> <span class="str">" km/h"</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Runner</span> {
+    pace: <span class="typ">Double</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(pace: <span class="typ">Double</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.pace <span class="op">=</span> pace
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">run</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"running at "</span> <span class="op">+</span> <span class="kw">self</span>.pace <span class="op">+</span> <span class="str">" km/h"</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Triathlete</span> : <span class="typ">Swimmer</span>, <span class="typ">Runner</span> {
+    name: <span class="typ">String</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.name <span class="op">=</span> name
+        <span class="kw">self</span>.speed <span class="op">=</span> <span class="num">3.5</span>
+        <span class="kw">self</span>.pace <span class="op">=</span> <span class="num">12.0</span>
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.name <span class="op">+</span> <span class="str">": "</span> <span class="op">+</span> <span class="kw">self</span>.<span class="fn">swim</span>() <span class="op">+</span> <span class="str">", "</span> <span class="op">+</span> <span class="kw">self</span>.<span class="fn">run</span>()
+    }
+}
+
+athlete <span class="op">=</span> <span class="typ">Triathlete</span>(<span class="str">"Ana"</span>)
+<span class="fn">println</span>(athlete.<span class="fn">describe</span>())
+<span class="cmt">// Ana: swimming at 3.5 km/h, running at 12.0 km/h</span></code></pre>
+
+  <h3>Resolving Ambiguity</h3>
+
+  <p>If two base classes define a member with the same name, accessing it directly on the derived class is a <strong>compile error</strong>. Nex provides three ways to resolve the ambiguity:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Logger</span> {
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> { <span class="kw">return</span> <span class="str">"Logger"</span> }
+}
+
+<span class="kw">class</span> <span class="typ">Serializer</span> {
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> { <span class="kw">return</span> <span class="str">"Serializer"</span> }
+}
+
+<span class="kw">class</span> <span class="typ">Service</span> : <span class="typ">Logger</span>, <span class="typ">Serializer</span> {
+
+    <span class="cmt">// Option 1: Override in derived class</span>
+    <span class="kw">def</span> <span class="fn">describe</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Service"</span>
+    }
+
+    <span class="cmt">// Option 2: Qualified base access</span>
+    <span class="kw">def</span> <span class="fn">log_info</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.<span class="typ">Logger</span><span class="op">::</span><span class="fn">describe</span>()
+    }
+
+    <span class="cmt">// Option 3: Alias</span>
+    <span class="kw">alias</span> serialize_info <span class="op">=</span> <span class="typ">Serializer</span><span class="op">::</span>describe
+}</code></pre>
+
+  <h3>The Diamond Problem and <code>shared</code></h3>
+
+  <p>When two bases share a common ancestor, the default behavior duplicates the ancestor. Use <code>shared</code> to keep a single copy:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Vehicle</span> {
+    weight: <span class="typ">Int</span>
+}
+
+<span class="kw">class</span> <span class="typ">Car</span> : <span class="kw">shared</span> <span class="typ">Vehicle</span> { }
+<span class="kw">class</span> <span class="typ">Boat</span> : <span class="kw">shared</span> <span class="typ">Vehicle</span> { }
+
+<span class="cmt">// Amphibian has ONE Vehicle subobject, not two</span>
+<span class="kw">class</span> <span class="typ">Amphibian</span> : <span class="typ">Car</span>, <span class="typ">Boat</span> { }</code></pre>
+
+  <div class="callout tip">
+    <div class="callout-title">Tip</div>
+    <p>For a deep dive into multiple inheritance mechanics &mdash; layout, construction order, shared bases, and vtable resolution &mdash; see the <a href="multiple-inheritance.html">Multiple Inheritance</a> page.</p>
+  </div>
+
+  <h2>Virtual Methods</h2>
+
+  <p>Methods are non-virtual by default. Use <code>virtual</code> to enable dynamic dispatch and <code>override</code> when overriding:</p>
+  <p><code>override</code> methods participate in virtual dispatch automatically; you do not need to also write <code>virtual</code> on the overriding method.</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">Shape</span> {
+    <span class="kw">virtual</span> <span class="kw">def</span> <span class="fn">area</span>() <span class="op">-></span> <span class="typ">Double</span> {
+        <span class="kw">return</span> <span class="num">0.0</span>
+    }
+}
+
+<span class="kw">class</span> <span class="typ">Circle</span> : <span class="typ">Shape</span> {
+    radius: <span class="typ">Double</span>
+
+    <span class="kw">override</span> <span class="kw">def</span> <span class="fn">area</span>() <span class="op">-></span> <span class="typ">Double</span> {
+        <span class="kw">return</span> <span class="num">3.14159</span> <span class="op">*</span> <span class="kw">self</span>.radius <span class="op">*</span> <span class="kw">self</span>.radius
+    }
+}</code></pre>
+
+  <h2>Object Base Class</h2>
+
+  <p>Every class implicitly derives from <code>Object</code> unless it declares explicit bases. <code>Object</code> is the universal base class for all reference types.</p>
+
+  <h2>Visibility</h2>
+
+  <p>Class declarations and members are internal by default. Use <code>public</code> to export:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">class</span> <span class="typ">ApiClient</span> {
+    <span class="kw">public</span> base_url: <span class="typ">String</span>       <span class="cmt">// visible to other modules</span>
+    api_key: <span class="typ">String</span>               <span class="cmt">// internal only</span>
+
+    <span class="kw">public</span> <span class="kw">def</span> <span class="fn">fetch</span>() <span class="op">-></span> <span class="typ">Unit</span> { }  <span class="cmt">// public method</span>
+    <span class="kw">def</span> <span class="fn">validate</span>() <span class="op">-></span> <span class="typ">Unit</span> { }      <span class="cmt">// internal method</span>
+}</code></pre>
+
+  <h2>Base Constructor Arguments</h2>
+
+  <p>When inheriting, pass arguments to base constructors in the class declaration:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">D</span> : <span class="typ">B</span>(a: <span class="num">1</span>), <span class="typ">C</span>(name: <span class="str">"x"</span>) {
+    <span class="cmt">// D's own fields and methods</span>
+}</code></pre>
+
+  <h2>Construction Order</h2>
+
+  <p>When an object is created, initialization follows this order:</p>
+  <ol>
+    <li>Shared bases (stable topological order)</li>
+    <li>Non-shared bases (left to right as declared)</li>
+    <li>Derived class fields</li>
+    <li>Derived constructor body (<code>init</code>)</li>
+  </ol>
+
+  <h2>Real-World Example</h2>
+
+  <pre><code><span class="kw">class</span> <span class="typ">BaseGreeter</span> {
+    prefix: <span class="typ">String</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(prefix: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.prefix <span class="op">=</span> prefix
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">format</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.prefix <span class="op">+</span> <span class="str">", "</span> <span class="op">+</span> name
+    }
+}
+
+<span class="kw">class</span> <span class="typ">ConsoleGreeter</span> : <span class="typ">BaseGreeter</span> {
+    <span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="kw">self</span>.<span class="fn">format</span>(name)
+    }
+}
+
+<span class="cmt">// Usage</span>
+greeter <span class="op">=</span> <span class="typ">ConsoleGreeter</span>(<span class="str">"Hello"</span>)
+<span class="fn">println</span>(greeter.<span class="fn">greet</span>(<span class="str">"World"</span>))  <span class="cmt">// Hello, World</span></code></pre>
+
+  <div class="page-nav">
+    <a href="functions.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Functions</span>
+    </a>
+    <a href="structs.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Structs &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

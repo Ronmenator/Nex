@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build Tool (aur) - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Tooling<span class="sep">/</span>Build Tool (aur)</div>
+
+  <h1>Build Tool (aur)</h1>
+  <p class="page-subtitle">The Nex build tool for compiling, running, and managing projects.</p>
+
+  <p>The <code>aur</code> command is the primary interface for building, running, testing, and managing Nex projects. It handles project scaffolding, JIT execution, AOT compilation, formatting, linting, and more.</p>
+
+  <h2>Commands</h2>
+
+  <h3>aur new</h3>
+  <div class="signature">
+    aur new &lt;name&gt; [--lib]
+  </div>
+  <p>Creates a new Nex project with the given name. Generates a <code>project.toml</code>, a <code>src/</code> directory, and a starter <code>main.nex</code> file. Pass <code>--lib</code> to create a library project instead of an executable.</p>
+
+  <pre><code><span class="cmt"># Create an executable project</span>
+$ aur new my_app
+
+<span class="cmt"># Create a library project</span>
+$ aur new my_lib --lib</code></pre>
+
+  <p>Generated project structure:</p>
+  <pre><code>my_app/
+  project.toml
+  src/
+    main.nex</code></pre>
+
+  <h3>aur build</h3>
+  <div class="signature">
+    aur build [path]
+  </div>
+  <p>Compiles the project (or a single file) to a native executable using Ahead-of-Time (AOT) compilation via LLVM. If no path is specified, the current project is compiled based on <code>project.toml</code>. The output binary is placed in the <code>build/</code> directory.</p>
+
+  <pre><code><span class="cmt"># Build the current project</span>
+$ aur build
+Compiling my_app v0.1.0
+  Finished release target in 1.2s
+  Output: build/my_app
+
+<span class="cmt"># Build a single file</span>
+$ aur build src/main.nex</code></pre>
+
+  <h3>aur run</h3>
+  <div class="signature">
+    aur run [path] [-- args]
+  </div>
+  <p>JIT-compiles and immediately executes the project or a single source file using LLVM ORC. If no path is given, the default entry point is <code>src/main.nex</code>. Arguments after <code>--</code> are passed to the running program.</p>
+
+  <pre><code><span class="cmt"># Run the current project</span>
+$ aur run
+Hello, Nex!
+
+<span class="cmt"># Run with arguments</span>
+$ aur run -- --verbose input.txt
+
+<span class="cmt"># Run a specific file</span>
+$ aur run examples/demo.nex</code></pre>
+
+  <h3>aur &lt;file&gt;.nex</h3>
+  <div class="signature">
+    aur &lt;file&gt;.nex [args]
+  </div>
+  <p>Shorthand for <code>aur run &lt;file&gt;.nex</code>. Directly executes a single Nex source file.</p>
+
+  <pre><code>$ aur hello.nex
+Hello, world!</code></pre>
+
+  <h3>aur fmt</h3>
+  <div class="signature">
+    aur fmt &lt;file&gt;
+  </div>
+  <p>Formats an Nex source file to canonical style. See <a href="tooling-formatter.html">Formatter &amp; Linter</a> for details.</p>
+
+  <pre><code>$ aur fmt src/main.nex</code></pre>
+
+  <h3>aur lint</h3>
+  <div class="signature">
+    aur lint &lt;file&gt;
+  </div>
+  <p>Runs static analysis on an Nex source file. See <a href="tooling-formatter.html">Formatter &amp; Linter</a> for details on lint rules.</p>
+
+  <pre><code>$ aur lint src/main.nex
+src/main.nex:12: warning: unused import 'std.math'
+src/main.nex:24: warning: Var in public API — consider @allow_var_api</code></pre>
+
+  <h3>aur repl</h3>
+  <div class="signature">
+    aur repl
+  </div>
+  <p>Starts the interactive Read-Eval-Print Loop. See <a href="tooling-repl.html">REPL</a> for details.</p>
+
+  <pre><code>$ aur repl
+Nex REPL v0.1.0
+&gt;&gt;&gt; x = 42
+&gt;&gt;&gt; println(x)
+42</code></pre>
+
+  <h3>aur test</h3>
+  <div class="signature">
+    aur test
+  </div>
+  <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.0.)</em></p>
+
+  <h3>aur install</h3>
+  <div class="signature">
+    aur install
+  </div>
+  <p>Builds the project in release mode and installs the resulting binary to <code>aurum/bin/</code> on the system PATH.</p>
+
+  <pre><code>$ aur install
+Compiling my_app v0.1.0 (release)
+  Installed to aurum/bin/my_app</code></pre>
+
+  <h3>aur clean</h3>
+  <div class="signature">
+    aur clean
+  </div>
+  <p>Removes the <code>build/</code> directory and all compiled artifacts.</p>
+
+  <pre><code>$ aur clean
+Removed build/</code></pre>
+
+  <h2>Toolchain Deployment (Developers)</h2>
+  <p>Internal toolchain deployment is handled by <code>cargo xtask deploy</code> from the Nex workspace.</p>
+
+  <div class="signature">
+    cargo xtask deploy [--release] [--major | --minor | --patch]
+  </div>
+  <p>The deploy task discovers the workspace root at runtime (current directory + executable ancestry), reads <code>nex/config/nex.toml</code>, bumps versions, archives the current toolchain snapshot, and copies updated binaries into <code>nex/bin/</code>.</p>
+  <p>Run from the workspace root (or any subdirectory inside it) so root discovery can resolve the repository correctly.</p>
+
+  <h2>JIT vs AOT</h2>
+
+  <p>Nex supports two compilation modes:</p>
+
+  <table>
+    <thead><tr><th>Mode</th><th>Command</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>JIT</strong></td>
+        <td><code>aur run</code></td>
+        <td>Uses LLVM ORC to compile and execute in-memory. Fast iteration during development — no output binary is written to disk.</td>
+      </tr>
+      <tr>
+        <td><strong>AOT</strong></td>
+        <td><code>aur build</code></td>
+        <td>Compiles to a native executable via LLVM. Produces a standalone binary suitable for distribution and deployment.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Use <code>aur run</code> during development for rapid feedback. Use <code>aur build</code> when you need a distributable binary or want to measure production performance.</p>
+
+  <h2>Example Workflow</h2>
+
+  <pre><code><span class="cmt"># Start a new project</span>
+$ aur new calculator
+$ cd calculator
+
+<span class="cmt"># Edit src/main.nex, then run immediately</span>
+$ aur run
+Result: 42
+
+<span class="cmt"># Format and lint before committing</span>
+$ aur fmt src/main.nex
+$ aur lint src/main.nex
+
+<span class="cmt"># Build a release binary</span>
+$ aur build
+  Output: build/calculator
+
+<span class="cmt"># Install globally</span>
+$ aur install</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-torch.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.torch</span>
+    </a>
+    <a href="tooling-project.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Project Configuration &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

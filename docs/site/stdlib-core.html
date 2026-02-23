@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.core - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.core</div>
+
+  <h1>std.core</h1>
+  <p class="page-subtitle">Built-in printing functions and the Object base class. Available without imports.</p>
+
+  <div class="callout info">
+    <div class="callout-title">Auto-imported</div>
+    <p>Everything in <code>std.core</code> is automatically available in Every Nex program. You never need to write <code>import std.core</code>.</p>
+  </div>
+
+  <h2>Functions</h2>
+
+  <h3>print(value) &rarr; Unit</h3>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">print</span>(value: <span class="typ">String</span> | <span class="typ">Int</span> | <span class="typ">Double</span> | <span class="typ">Bool</span> | <span class="typ">Char</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Prints a value to standard output <strong>without</strong> a trailing newline. Accepts <code>String</code>, <code>Int</code>, <code>Double</code>, <code>Bool</code>, and <code>Char</code> values.</p>
+
+  <pre><code><span class="fn">print</span>(<span class="str">"Hello, "</span>)
+<span class="fn">print</span>(<span class="str">"world!"</span>)
+<span class="cmt">// Output: Hello, world!</span></code></pre>
+
+  <pre><code><span class="fn">print</span>(<span class="num">42</span>)
+<span class="fn">print</span>(<span class="str">" is the answer"</span>)
+<span class="cmt">// Output: 42 is the answer</span></code></pre>
+
+  <h3>println(value) &rarr; Unit</h3>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">println</span>(value: <span class="typ">String</span> | <span class="typ">Int</span> | <span class="typ">Double</span> | <span class="typ">Bool</span> | <span class="typ">Char</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Prints a value to standard output followed by a <strong>newline</strong>. Accepts the same types as <code>print</code>.</p>
+
+  <pre><code><span class="fn">println</span>(<span class="str">"Hello, world!"</span>)
+<span class="cmt">// Output: Hello, world!\n</span>
+
+<span class="fn">println</span>(<span class="num">3.14</span>)
+<span class="cmt">// Output: 3.14\n</span>
+
+<span class="fn">println</span>(<span class="kw">true</span>)
+<span class="cmt">// Output: true\n</span></code></pre>
+
+  <h3>Combining print and println</h3>
+
+  <pre><code><span class="fn">print</span>(<span class="str">"Name: "</span>)
+<span class="fn">println</span>(<span class="str">"Nex"</span>)
+<span class="fn">print</span>(<span class="str">"Version: "</span>)
+<span class="fn">println</span>(<span class="num">1</span>)
+
+<span class="cmt">// Output:</span>
+<span class="cmt">// Name: Nex</span>
+<span class="cmt">// Version: 1</span></code></pre>
+
+  <h2>Object</h2>
+
+  <h3>Object &mdash; Universal Base Class</h3>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">class</span> <span class="typ">Object</span> { }
+  </div>
+  <p><code>Object</code> is the universal base class for all class types in Nex. Every class implicitly derives from <code>Object</code> unless it explicitly declares other base classes (which themselves ultimately derive from <code>Object</code>).</p>
+
+  <div class="callout warning">
+    <div class="callout-title">Value Types</div>
+    <p>Value types (<code>Int</code>, <code>Double</code>, <code>Bool</code>, <code>Byte</code>, <code>Char</code>, <code>Float</code>, <code>Int64</code>, and <code>struct</code> types) do <strong>not</strong> inherit from <code>Object</code>. Only class types and <code>String</code> derive from <code>Object</code>.</p>
+  </div>
+
+  <pre><code><span class="cmt">// Every class implicitly derives from Object</span>
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name<span class="op">:</span> <span class="typ">String</span>
+}
+
+<span class="cmt">// Equivalent to:</span>
+<span class="kw">class</span> <span class="typ">Animal</span> <span class="op">:</span> <span class="typ">Object</span> {
+    name<span class="op">:</span> <span class="typ">String</span>
+}
+
+<span class="cmt">// Derived classes form an inheritance chain through Object</span>
+<span class="kw">class</span> <span class="typ">Dog</span> <span class="op">:</span> <span class="typ">Animal</span> {
+    breed<span class="op">:</span> <span class="typ">String</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-overview.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Overview</span>
+    </a>
+    <a href="stdlib-math.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.math &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

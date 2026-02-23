@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.regex - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.regex</div>
+
+  <h1>std.regex</h1>
+  <p class="page-subtitle">Regular expression matching and replacement.</p>
+
+  <pre><code><span class="kw">import</span> std.regex</code></pre>
+
+  <h2>Creating Patterns</h2>
+
+  <h4>regex_new</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">regex_new</span>(pattern: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Compiles a regular expression pattern and returns a handle. The handle must be freed with <code>regex_free</code> when no longer needed. Returns a null handle if the pattern is invalid.</p>
+
+  <pre><code><span class="kw">import</span> std.regex
+
+<span class="kw">var</span> re <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"[0-9]+"</span>)
+<span class="cmt">// ... use the regex ...</span>
+<span class="fn">regex_free</span>(re)</code></pre>
+
+  <h2>Matching</h2>
+
+  <h4>regex_is_match</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">regex_is_match</span>(handle: <span class="typ">Var</span>, s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if the string <code>s</code> contains a match for the pattern.</p>
+
+  <pre><code><span class="kw">import</span> std.regex
+
+<span class="kw">var</span> digits <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"^[0-9]+$"</span>)
+
+<span class="fn">println</span>(<span class="fn">regex_is_match</span>(digits, <span class="str">"12345"</span>))    <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">regex_is_match</span>(digits, <span class="str">"abc"</span>))      <span class="cmt">// false</span>
+<span class="fn">println</span>(<span class="fn">regex_is_match</span>(digits, <span class="str">"123abc"</span>))   <span class="cmt">// false</span>
+
+<span class="fn">regex_free</span>(digits)</code></pre>
+
+  <h4>regex_find</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">regex_find</span>(handle: <span class="typ">Var</span>, s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the first substring in <code>s</code> that matches the pattern. Returns an empty string if no match is found.</p>
+
+  <pre><code><span class="kw">import</span> std.regex
+
+<span class="kw">var</span> re <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"[A-Z][a-z]+"</span>)
+match <span class="op">=</span> <span class="fn">regex_find</span>(re, <span class="str">"hello World from Nex"</span>)
+<span class="fn">println</span>(match)   <span class="cmt">// World</span>
+
+<span class="fn">regex_free</span>(re)</code></pre>
+
+  <h2>Replacement</h2>
+
+  <h4>regex_replace</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">regex_replace</span>(handle: <span class="typ">Var</span>, s: <span class="typ">String</span>, replacement: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Replaces all occurrences of the pattern in <code>s</code> with the <code>replacement</code> string.</p>
+
+  <pre><code><span class="kw">import</span> std.regex
+
+<span class="kw">var</span> spaces <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"\\s+"</span>)
+result <span class="op">=</span> <span class="fn">regex_replace</span>(spaces, <span class="str">"hello   world   foo"</span>, <span class="str">" "</span>)
+<span class="fn">println</span>(result)   <span class="cmt">// hello world foo</span>
+
+<span class="fn">regex_free</span>(spaces)</code></pre>
+
+  <h2>Cleanup</h2>
+
+  <h4>regex_free</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">regex_free</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Frees the compiled regex handle and releases its resources. Always call this when you are done with a regex to avoid memory leaks.</p>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.regex
+
+<span class="cmt">// Email validation</span>
+<span class="kw">def</span> <span class="fn">is_valid_email</span>(email: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> {
+    <span class="kw">var</span> re <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"</span>)
+    valid <span class="op">=</span> <span class="fn">regex_is_match</span>(re, email)
+    <span class="fn">regex_free</span>(re)
+    <span class="kw">return</span> valid
+}
+
+<span class="cmt">// Extract domain from email</span>
+<span class="kw">def</span> <span class="fn">extract_domain</span>(email: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span> {
+    <span class="kw">var</span> re <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"@([a-zA-Z0-9.-]+)"</span>)
+    domain <span class="op">=</span> <span class="fn">regex_find</span>(re, email)
+    <span class="fn">regex_free</span>(re)
+    <span class="kw">return</span> domain
+}
+
+<span class="cmt">// Sanitize user input</span>
+<span class="kw">def</span> <span class="fn">sanitize</span>(input: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span> {
+    <span class="cmt">// Remove non-alphanumeric characters except spaces</span>
+    <span class="kw">var</span> re <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"[^a-zA-Z0-9 ]"</span>)
+    clean <span class="op">=</span> <span class="fn">regex_replace</span>(re, input, <span class="str">""</span>)
+    <span class="fn">regex_free</span>(re)
+
+    <span class="cmt">// Collapse multiple spaces</span>
+    <span class="kw">var</span> spaces <span class="op">=</span> <span class="fn">regex_new</span>(<span class="str">"\\s+"</span>)
+    result <span class="op">=</span> <span class="fn">regex_replace</span>(spaces, clean, <span class="str">" "</span>)
+    <span class="fn">regex_free</span>(spaces)
+
+    <span class="kw">return</span> result
+}
+
+<span class="cmt">// Test email validation</span>
+<span class="fn">println</span>(<span class="fn">is_valid_email</span>(<span class="str">"user@example.com"</span>))   <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">is_valid_email</span>(<span class="str">"not-an-email"</span>))      <span class="cmt">// false</span>
+<span class="fn">println</span>(<span class="fn">is_valid_email</span>(<span class="str">"a@b.co"</span>))             <span class="cmt">// true</span>
+
+<span class="cmt">// Extract domain</span>
+domain <span class="op">=</span> <span class="fn">extract_domain</span>(<span class="str">"alice@aurum-lang.org"</span>)
+<span class="fn">println</span>(domain)   <span class="cmt">// @aurum-lang.org</span>
+
+<span class="cmt">// Sanitize input</span>
+clean <span class="op">=</span> <span class="fn">sanitize</span>(<span class="str">"Hello, &lt;world&gt;! @#$%"</span>)
+<span class="fn">println</span>(clean)   <span class="cmt">// Hello world</span></code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-json.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.json</span>
+    </a>
+    <a href="stdlib-process.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.process &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

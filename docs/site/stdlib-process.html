@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.process - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.process</div>
+
+  <h1>std.process</h1>
+  <p class="page-subtitle">Process execution and management.</p>
+
+  <pre><code><span class="kw">import</span> std.process</code></pre>
+
+  <h2>Synchronous Execution</h2>
+
+  <h4>process_exec</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">process_exec</span>(cmd: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Executes a shell command and waits for it to complete. Returns the exit code of the process (<code>0</code> typically indicates success).</p>
+
+  <pre><code><span class="kw">import</span> std.process
+
+code <span class="op">=</span> <span class="fn">process_exec</span>(<span class="str">"echo Hello from shell"</span>)
+<span class="fn">print</span>(<span class="str">"Exit code: "</span>)
+<span class="fn">println</span>(code)   <span class="cmt">// 0</span></code></pre>
+
+  <h4>process_exec_output</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">process_exec_output</span>(cmd: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Executes a shell command and returns its standard output as a string. Waits for the process to complete before returning.</p>
+
+  <pre><code><span class="kw">import</span> std.process
+
+output <span class="op">=</span> <span class="fn">process_exec_output</span>(<span class="str">"date"</span>)
+<span class="fn">print</span>(<span class="str">"Current date: "</span>)
+<span class="fn">println</span>(output)
+
+files <span class="op">=</span> <span class="fn">process_exec_output</span>(<span class="str">"ls -la"</span>)
+<span class="fn">println</span>(files)</code></pre>
+
+  <h2>Process Control</h2>
+
+  <h4>process_exit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">process_exit</span>(code: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Immediately terminates the current process with the given exit code. This function does not return. Use <code>0</code> for success and non-zero values for error conditions.</p>
+
+  <pre><code><span class="kw">import</span> std.process
+
+<span class="cmt">// Exit with error if condition not met</span>
+<span class="kw">if</span> (error_occurred) {
+    <span class="fn">println</span>(<span class="str">"Fatal error, exiting"</span>)
+    <span class="fn">process_exit</span>(<span class="num">1</span>)
+}</code></pre>
+
+  <h4>process_pid</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">process_pid</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Returns the process ID (PID) of the current process.</p>
+
+  <pre><code><span class="kw">import</span> std.process
+
+pid <span class="op">=</span> <span class="fn">process_pid</span>()
+<span class="fn">print</span>(<span class="str">"My PID: "</span>)
+<span class="fn">println</span>(pid)   <span class="cmt">// e.g. 12345</span></code></pre>
+
+  <h2>Background Processes</h2>
+
+  <h4>process_spawn</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">process_spawn</span>(cmd: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Spawns a command as a background process and returns a handle immediately without waiting. Use <code>process_wait</code> to wait for the process to finish and retrieve its exit code.</p>
+
+  <h4>process_wait</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">process_wait</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Waits for a spawned process to complete and returns its exit code.</p>
+
+  <pre><code><span class="kw">import</span> std.process
+
+<span class="cmt">// Run two commands in parallel</span>
+<span class="kw">var</span> p1 <span class="op">=</span> <span class="fn">process_spawn</span>(<span class="str">"sleep 2"</span>)
+<span class="kw">var</span> p2 <span class="op">=</span> <span class="fn">process_spawn</span>(<span class="str">"sleep 3"</span>)
+
+<span class="fn">println</span>(<span class="str">"Both processes started"</span>)
+
+code1 <span class="op">=</span> <span class="fn">process_wait</span>(p1)
+<span class="fn">print</span>(<span class="str">"Process 1 exited: "</span>)
+<span class="fn">println</span>(code1)
+
+code2 <span class="op">=</span> <span class="fn">process_wait</span>(p2)
+<span class="fn">print</span>(<span class="str">"Process 2 exited: "</span>)
+<span class="fn">println</span>(code2)</code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.process
+<span class="kw">import</span> std.time
+
+<span class="cmt">// Build system: run compilation steps</span>
+<span class="kw">def</span> <span class="fn">run_step</span>(label: <span class="typ">String</span>, cmd: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> {
+    <span class="fn">print</span>(<span class="str">"[BUILD] "</span>)
+    <span class="fn">print</span>(label)
+    <span class="fn">print</span>(<span class="str">"... "</span>)
+
+    start <span class="op">=</span> <span class="fn">now_millis</span>()
+    code <span class="op">=</span> <span class="fn">process_exec</span>(cmd)
+    elapsed <span class="op">=</span> <span class="fn">elapsed_millis</span>(start)
+
+    <span class="kw">if</span> (code <span class="op">==</span> <span class="num">0</span>) {
+        <span class="fn">print</span>(<span class="str">"OK ("</span>)
+        <span class="fn">print</span>(elapsed)
+        <span class="fn">println</span>(<span class="str">" ms)"</span>)
+        <span class="kw">return</span> <span class="kw">true</span>
+    } <span class="kw">else</span> {
+        <span class="fn">print</span>(<span class="str">"FAILED (exit "</span>)
+        <span class="fn">print</span>(code)
+        <span class="fn">println</span>(<span class="str">")"</span>)
+        <span class="kw">return</span> <span class="kw">false</span>
+    }
+}
+
+<span class="fn">print</span>(<span class="str">"Build PID: "</span>)
+<span class="fn">println</span>(<span class="fn">process_pid</span>())
+
+<span class="cmt">// Sequential build steps</span>
+<span class="kw">if</span> (<span class="fn">run_step</span>(<span class="str">"Clean"</span>, <span class="str">"rm -rf build"</span>)) {
+    <span class="kw">if</span> (<span class="fn">run_step</span>(<span class="str">"Compile"</span>, <span class="str">"nex build"</span>)) {
+        <span class="kw">if</span> (<span class="fn">run_step</span>(<span class="str">"Test"</span>, <span class="str">"nex test"</span>)) {
+            <span class="fn">println</span>(<span class="str">"Build succeeded!"</span>)
+
+            <span class="cmt">// Capture version output</span>
+            version <span class="op">=</span> <span class="fn">process_exec_output</span>(<span class="str">"./build/app --version"</span>)
+            <span class="fn">print</span>(<span class="str">"Built version: "</span>)
+            <span class="fn">println</span>(version)
+        }
+    }
+}
+
+<span class="kw">if</span> (<span class="op">!</span><span class="fn">run_step</span>(<span class="str">"Deploy"</span>, <span class="str">"./deploy.sh"</span>)) {
+    <span class="fn">println</span>(<span class="str">"Deploy failed, aborting"</span>)
+    <span class="fn">process_exit</span>(<span class="num">1</span>)
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-regex.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.regex</span>
+    </a>
+    <a href="stdlib-net.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.net &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

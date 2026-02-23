@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REPL - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Tooling<span class="sep">/</span>REPL</div>
+
+  <h1>REPL</h1>
+  <p class="page-subtitle">Interactive Read-Eval-Print Loop for exploratory programming.</p>
+
+  <h2>Starting the REPL</h2>
+
+  <pre><code>$ aur repl
+Nex REPL v0.1.0
+&gt;&gt;&gt;</code></pre>
+
+  <p>The REPL provides an interactive environment for experimenting with Nex code. Each line or block you enter is compiled and executed immediately, with expression results printed automatically.</p>
+
+  <h2>Session Model</h2>
+
+  <p>Each submission is compiled as a separate module named <code>repl$NNNN</code> (where <code>NNNN</code> is an incrementing counter). Statements are wrapped into an entry function <code>repl_entry$NNNN()</code> which is JIT-compiled and called immediately via LLVM ORC.</p>
+
+  <pre><code>&gt;&gt;&gt; x = 10
+&gt;&gt;&gt; y = 20
+&gt;&gt;&gt; x + y
+30</code></pre>
+
+  <p>Expression results are automatically printed. If a submission evaluates to a non-<code>Unit</code> value, the result is displayed without needing an explicit <code>println</code> call.</p>
+
+  <h2>Function Redefinition</h2>
+
+  <p>Functions can be redefined during a REPL session. The REPL uses <strong>indirection cells</strong> — mutable function pointer slots — so that existing references to a function automatically pick up the new definition.</p>
+
+  <pre><code>&gt;&gt;&gt; def greet(name: String) -&gt; Unit {
+...     print("Hello, ")
+...     println(name)
+... }
+&gt;&gt;&gt; greet("world")
+Hello, world
+
+&gt;&gt;&gt; def greet(name: String) -&gt; Unit {
+...     print("Hi there, ")
+...     println(name)
+... }
+&gt;&gt;&gt; greet("world")
+Hi there, world</code></pre>
+
+  <h2>Class Redefinition</h2>
+
+  <div class="callout warning">
+    <div class="callout-title">Limitation</div>
+    <p>Class redefinition that changes the layout (adding, removing, or reordering fields) is <strong>not supported</strong> in v1. You can redefine methods on a class, but structural changes require restarting the REPL session.</p>
+  </div>
+
+  <h2>Imports</h2>
+
+  <p>Standard library modules can be imported in the REPL just like in regular source files:</p>
+
+  <pre><code>&gt;&gt;&gt; import std.math
+&gt;&gt;&gt; println(sqrt(144.0))
+12.0
+
+&gt;&gt;&gt; import std.string
+&gt;&gt;&gt; println(to_upper("hello"))
+HELLO</code></pre>
+
+  <h2>Multi-line Input</h2>
+
+  <p>When the REPL detects an incomplete expression (e.g. an open brace), it switches to multi-line mode indicated by the <code>...</code> continuation prompt:</p>
+
+  <pre><code>&gt;&gt;&gt; def factorial(n: Int) -&gt; Int {
+...     if (n &lt;= 1) {
+...         return 1
+...     }
+...     return n * factorial(n - 1)
+... }
+&gt;&gt;&gt; factorial(10)
+3628800</code></pre>
+
+  <h2>GC and Safepoints</h2>
+
+  <p>The garbage collector operates during REPL sessions. Safepoints are inserted at allocation sites and loop backedges. The v1 REPL uses conservative stack scanning, meaning the GC can safely collect unreachable objects between submissions.</p>
+
+  <h2>Example Session</h2>
+
+  <pre><code>$ aur repl
+Nex REPL v0.1.0
+
+&gt;&gt;&gt; import std.collections
+&gt;&gt;&gt; import std.string
+
+&gt;&gt;&gt; names = List[String]()
+&gt;&gt;&gt; names.add("Alice")
+&gt;&gt;&gt; names.add("Bob")
+&gt;&gt;&gt; names.add("Charlie")
+
+&gt;&gt;&gt; i = 0
+&gt;&gt;&gt; while (i &lt; names.length()) {
+...     println(to_upper(names.get(i)))
+...     i = i + 1
+... }
+ALICE
+BOB
+CHARLIE
+
+&gt;&gt;&gt; names.length()
+3</code></pre>
+
+  <div class="page-nav">
+    <a href="tooling-project.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Project Configuration</span>
+    </a>
+    <a href="tooling-formatter.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Formatter &amp; Linter &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

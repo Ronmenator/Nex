@@ -1,0 +1,55 @@
+from std.io import open_console
+import std.math as math
+
+class BaseGreeter {
+    prefix: String
+
+    def init(prefix: String) -> Unit {
+        self.prefix = prefix
+        return
+    }
+
+    def format(name: String) -> String {
+        return self.prefix + ", " + name
+    }
+}
+
+class ConsoleGreeter : BaseGreeter {
+    def greet(name: String) -> String {
+        return self.format(name)
+    }
+}
+
+def safe_divide(a: Int, b: Int) -> Int {
+    if (b == 0) {
+        return 0
+    } else {
+        return a / b
+    }
+}
+
+def main() -> Unit {
+    app_name = "Nex"
+    version = 1
+    computed = safe_divide(10 + 2 * 3, 2)
+
+    using (resource = open_console()) {
+        greeter = ConsoleGreeter("Hello")
+        try {
+            println("app=" + app_name)
+            println("version=" + version)
+            println("")
+            println("computed=" + computed)
+            println("")
+            println(greeter.greet("World"))
+            println("")
+        } catch (err: Error) {
+            print("failed to print output")
+            print(err)
+        } finally {
+            println("shutdown")
+        }
+    }
+
+    return
+}

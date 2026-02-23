@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.convert - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.convert</div>
+
+  <h1>std.convert</h1>
+  <p class="page-subtitle">Type conversion and parsing functions.</p>
+
+  <pre><code><span class="kw">import</span> std.convert</code></pre>
+
+  <h2>String to Number</h2>
+
+  <h4>parse_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">parse_int</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Parses a string as a 32-bit integer. The string must contain a valid integer literal (optionally prefixed with <code>-</code> for negative values). Returns <code>0</code> if parsing fails.</p>
+
+  <pre><code><span class="kw">import</span> std.convert
+
+n <span class="op">=</span> <span class="fn">parse_int</span>(<span class="str">"42"</span>)
+<span class="fn">println</span>(n)              <span class="cmt">// 42</span>
+
+neg <span class="op">=</span> <span class="fn">parse_int</span>(<span class="str">"-100"</span>)
+<span class="fn">println</span>(neg)            <span class="cmt">// -100</span>
+
+bad <span class="op">=</span> <span class="fn">parse_int</span>(<span class="str">"hello"</span>)
+<span class="fn">println</span>(bad)            <span class="cmt">// 0</span></code></pre>
+
+  <h4>parse_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">parse_float</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Parses a string as a 64-bit floating-point number. Returns <code>0.0</code> if parsing fails.</p>
+
+  <pre><code><span class="kw">import</span> std.convert
+
+pi <span class="op">=</span> <span class="fn">parse_float</span>(<span class="str">"3.14159"</span>)
+<span class="fn">println</span>(pi)             <span class="cmt">// 3.14159</span>
+
+sci <span class="op">=</span> <span class="fn">parse_float</span>(<span class="str">"1.5e3"</span>)
+<span class="fn">println</span>(sci)            <span class="cmt">// 1500.0</span></code></pre>
+
+  <h2>String to Boolean</h2>
+
+  <h4>parse_bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">parse_bool</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Parses a string as a boolean. The following strings are treated as <code>true</code> (case-insensitive): <code>"true"</code>, <code>"1"</code>, <code>"yes"</code>. All other values return <code>false</code>.</p>
+
+  <pre><code><span class="kw">import</span> std.convert
+
+<span class="fn">println</span>(<span class="fn">parse_bool</span>(<span class="str">"true"</span>))    <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">parse_bool</span>(<span class="str">"1"</span>))       <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">parse_bool</span>(<span class="str">"yes"</span>))     <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">parse_bool</span>(<span class="str">"false"</span>))   <span class="cmt">// false</span>
+<span class="fn">println</span>(<span class="fn">parse_bool</span>(<span class="str">"0"</span>))       <span class="cmt">// false</span>
+<span class="fn">println</span>(<span class="fn">parse_bool</span>(<span class="str">"no"</span>))      <span class="cmt">// false</span></code></pre>
+
+  <h2>Character Conversion</h2>
+
+  <h4>char_to_str</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">char_to_str</span>(c: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Converts a character code (integer) to a single-character string.</p>
+
+  <pre><code><span class="kw">import</span> std.convert
+
+letter <span class="op">=</span> <span class="fn">char_to_str</span>(<span class="num">65</span>)
+<span class="fn">println</span>(letter)          <span class="cmt">// "A"</span>
+
+newline <span class="op">=</span> <span class="fn">char_to_str</span>(<span class="num">10</span>)
+<span class="fn">print</span>(<span class="str">"Line 1"</span>)
+<span class="fn">print</span>(newline)
+<span class="fn">print</span>(<span class="str">"Line 2"</span>)</code></pre>
+
+  <h4>str_to_chars</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_to_chars</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Converts a string into an array of character codes (as a <code>Var</code>). Each element is the integer code of the corresponding character.</p>
+
+  <pre><code><span class="kw">import</span> std.convert
+
+<span class="kw">var</span> codes <span class="op">=</span> <span class="fn">str_to_chars</span>(<span class="str">"Hi"</span>)
+<span class="cmt">// codes contains [72, 105]</span>
+<span class="cmt">// 72 = 'H', 105 = 'i'</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.io
+<span class="kw">import</span> std.convert
+
+<span class="cmt">// Interactive calculator</span>
+<span class="fn">print</span>(<span class="str">"Enter first number: "</span>)
+a_str <span class="op">=</span> <span class="fn">read_line</span>()
+
+<span class="fn">print</span>(<span class="str">"Enter second number: "</span>)
+b_str <span class="op">=</span> <span class="fn">read_line</span>()
+
+a <span class="op">=</span> <span class="fn">parse_float</span>(a_str)
+b <span class="op">=</span> <span class="fn">parse_float</span>(b_str)
+
+<span class="fn">print</span>(<span class="str">"Sum: "</span>)
+<span class="fn">println</span>(a <span class="op">+</span> b)
+
+<span class="fn">print</span>(<span class="str">"Product: "</span>)
+<span class="fn">println</span>(a <span class="op">*</span> b)</code></pre>
+
+  <pre><code><span class="kw">import</span> std.convert
+
+<span class="cmt">// Build a string from character codes</span>
+<span class="kw">def</span> <span class="fn">build_alphabet</span>(start: <span class="typ">Int</span>, count: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span> {
+    result <span class="op">=</span> <span class="str">""</span>
+    i <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">while</span> (i <span class="op">&lt;</span> count) {
+        result <span class="op">=</span> result <span class="op">+</span> <span class="fn">char_to_str</span>(start <span class="op">+</span> i)
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+    <span class="kw">return</span> result
+}
+
+<span class="fn">println</span>(<span class="fn">build_alphabet</span>(<span class="num">65</span>, <span class="num">26</span>))
+<span class="cmt">// "ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>
+
+<span class="fn">println</span>(<span class="fn">build_alphabet</span>(<span class="num">97</span>, <span class="num">26</span>))
+<span class="cmt">// "abcdefghijklmnopqrstuvwxyz"</span></code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-io.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.io</span>
+    </a>
+    <a href="stdlib-time.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.time &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nex3d - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="tooling-project.html">Project</a><span class="sep">/</span>nex3d</div>
+
+  <h1>nex3d</h1>
+  <p class="page-subtitle">3D Game Engine library for building 2D and 3D games. Provides math types (Vec2, Vec3, Vec4), engine lifecycle (window, run loop), and GPU-accelerated rendering via WGPU.</p>
+
+  <div class="callout warning">
+    <div class="callout-title">Build Requirement</div>
+    <p>For engine functionality, build the Nex toolchain with <code>cargo build --features engine -p nex</code>. The <code>nex3d.math</code> module works without this feature.</p>
+  </div>
+
+  <h2>Setup</h2>
+  <p>Add nex3d to your <code>project.toml</code>:</p>
+  <pre><code>[libs]
+nex3d = { path = "../libs/nex3d" }</code></pre>
+
+  <h2>Modules</h2>
+
+  <h3>nex3d.math</h3>
+  <p>Pure Nex vector and matrix types using std.math. No runtime engine dependency.</p>
+  <pre><code><span class="kw">import</span> nex3d.math</code></pre>
+
+  <h4>Vec2</h4>
+  <p>2D vector for sprites, UI, and 2D games.</p>
+  <div class="signature"><span class="fn">vec2</span>(x: <span class="typ">Float</span>, y: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Vec2</span></div>
+  <div class="signature"><span class="fn">vec2_add</span>, <span class="fn">vec2_sub</span>, <span class="fn">vec2_mul</span>, <span class="fn">vec2_dot</span>, <span class="fn">vec2_length</span>, <span class="fn">vec2_normalize</span></div>
+
+  <h4>Vec3</h4>
+  <p>3D vector for positions, directions, RGB colors.</p>
+  <div class="signature"><span class="fn">vec3</span>(x, y, z), <span class="fn">vec3_add</span>, <span class="fn">vec3_sub</span>, <span class="fn">vec3_mul</span>, <span class="fn">vec3_dot</span>, <span class="fn">vec3_length</span>, <span class="fn">vec3_normalize</span></div>
+
+  <h4>Vec4</h4>
+  <p>4D vector for homogeneous coordinates and RGBA.</p>
+  <div class="signature"><span class="fn">vec4</span>(x, y, z, w), <span class="fn">vec4_from_vec3</span></div>
+
+  <h3>nex3d.engine</h3>
+  <p>Window creation and game main loop. Requires <code>--features engine</code>.</p>
+  <pre><code><span class="kw">import</span> nex3d.engine</code></pre>
+
+  <h4>engine_create_window</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">engine_create_window</span>(title: <span class="typ">String</span>, width: <span class="typ">Int64</span>, height: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a game window. Returns a handle (or 0 if engine feature is disabled).</p>
+
+  <h4>engine_run</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">engine_run</span>(handle: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Runs the event loop. Blocks until the window is closed.</p>
+
+  <h4>engine_quit / engine_destroy</h4>
+  <p>Signals quit and releases resources.</p>
+
+  <h2>Example</h2>
+  <pre><code><span class="kw">import</span> nex3d.math
+<span class="kw">import</span> nex3d.engine
+
+<span class="kw">def</span> <span class="fn">main</span>() {
+    v = vec2(100.0f, 200.0f)
+    handle = engine_create_window(<span class="str">"My Game"</span>, 800, 600)
+    <span class="kw">if</span> (handle != 0) {
+        engine_run(handle)
+        engine_destroy(handle)
+    }
+    <span class="kw">return</span>
+}</code></pre>
+
+</main>
+<script src="nav.js"></script>
+</body>
+</html>

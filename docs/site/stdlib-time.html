@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.time - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.time</div>
+
+  <h1>std.time</h1>
+  <p class="page-subtitle">Time measurement and delay functions.</p>
+
+  <pre><code><span class="kw">import</span> std.time</code></pre>
+
+  <h2>Current Time</h2>
+
+  <h4>now_millis</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">now_millis</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Returns the current time in milliseconds since the Unix epoch (January 1, 1970 00:00:00 UTC). Useful for timestamps, benchmarking, and elapsed-time calculations.</p>
+
+  <pre><code><span class="kw">import</span> std.time
+
+ts <span class="op">=</span> <span class="fn">now_millis</span>()
+<span class="fn">println</span>(<span class="str">"Current timestamp: "</span>)
+<span class="fn">println</span>(ts)   <span class="cmt">// e.g. 1708617600000</span></code></pre>
+
+  <h4>now_nanos</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">now_nanos</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Returns the current time in nanoseconds since the Unix epoch. Provides higher precision than <code>now_millis</code> for fine-grained timing.</p>
+
+  <pre><code><span class="kw">import</span> std.time
+
+ts <span class="op">=</span> <span class="fn">now_nanos</span>()
+<span class="fn">println</span>(<span class="str">"Nanosecond timestamp: "</span>)
+<span class="fn">println</span>(ts)   <span class="cmt">// e.g. 1708617600000000000</span></code></pre>
+
+  <h2>Sleeping</h2>
+
+  <h4>sleep_millis</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">sleep_millis</span>(ms: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Pauses execution of the current thread for at least the specified number of milliseconds. The actual sleep duration may be slightly longer due to OS scheduling.</p>
+
+  <pre><code><span class="kw">import</span> std.time
+
+<span class="fn">println</span>(<span class="str">"Waiting 2 seconds..."</span>)
+<span class="fn">sleep_millis</span>(<span class="num">2000</span>)
+<span class="fn">println</span>(<span class="str">"Done!"</span>)</code></pre>
+
+  <h2>Elapsed Time</h2>
+
+  <h4>elapsed_millis</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">elapsed_millis</span>(start: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Calculates the number of milliseconds that have elapsed since <code>start</code>. Equivalent to <code>now_millis() - start</code>, but provided as a convenience function.</p>
+
+  <pre><code><span class="kw">import</span> std.time
+
+start <span class="op">=</span> <span class="fn">now_millis</span>()
+<span class="fn">sleep_millis</span>(<span class="num">500</span>)
+elapsed <span class="op">=</span> <span class="fn">elapsed_millis</span>(start)
+<span class="fn">println</span>(<span class="str">"Elapsed: "</span>)
+<span class="fn">println</span>(elapsed)   <span class="cmt">// ~500</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.time
+
+<span class="cmt">// Simple benchmarking utility</span>
+<span class="kw">def</span> <span class="fn">benchmark</span>(label: <span class="typ">String</span>, iterations: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    start <span class="op">=</span> <span class="fn">now_millis</span>()
+
+    <span class="cmt">// Simulate work with a counting loop</span>
+    i <span class="op">=</span> <span class="num">0</span>
+    total <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">while</span> (i <span class="op">&lt;</span> iterations) {
+        total <span class="op">=</span> total <span class="op">+</span> i
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+
+    elapsed <span class="op">=</span> <span class="fn">elapsed_millis</span>(start)
+
+    <span class="fn">print</span>(label)
+    <span class="fn">print</span>(<span class="str">": "</span>)
+    <span class="fn">print</span>(elapsed)
+    <span class="fn">println</span>(<span class="str">" ms"</span>)
+}
+
+<span class="cmt">// Run benchmarks with different sizes</span>
+<span class="fn">benchmark</span>(<span class="str">"Small"</span>, <span class="num">1000</span>)
+<span class="fn">benchmark</span>(<span class="str">"Medium"</span>, <span class="num">100000</span>)
+<span class="fn">benchmark</span>(<span class="str">"Large"</span>, <span class="num">10000000</span>)
+
+<span class="cmt">// Measure high-precision timing</span>
+t1 <span class="op">=</span> <span class="fn">now_nanos</span>()
+<span class="fn">sleep_millis</span>(<span class="num">100</span>)
+t2 <span class="op">=</span> <span class="fn">now_nanos</span>()
+diff <span class="op">=</span> t2 <span class="op">-</span> t1
+<span class="fn">print</span>(<span class="str">"Sleep(100ms) actual: "</span>)
+<span class="fn">print</span>(diff)
+<span class="fn">println</span>(<span class="str">" ns"</span>)</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-convert.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.convert</span>
+    </a>
+    <a href="stdlib-env.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.env &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

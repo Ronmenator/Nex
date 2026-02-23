@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Flow - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Control Flow</div>
+
+  <h1>Control Flow</h1>
+  <p class="page-subtitle">Conditionals, loops, and branching in Nex.</p>
+
+  <h2>If / Else</h2>
+
+  <p>The <code>if</code> statement evaluates a condition inside parentheses. The body is always a block with braces:</p>
+
+  <pre><code><span class="kw">if</span> (temperature <span class="op">&gt;</span> <span class="num">30</span>) {
+    <span class="fn">println</span>(<span class="str">"It's hot!"</span>)
+}</code></pre>
+
+  <h3>If / Else If / Else</h3>
+
+  <pre><code><span class="kw">if</span> (score <span class="op">&gt;=</span> <span class="num">90</span>) {
+    <span class="fn">println</span>(<span class="str">"A"</span>)
+} <span class="kw">else</span> <span class="kw">if</span> (score <span class="op">&gt;=</span> <span class="num">80</span>) {
+    <span class="fn">println</span>(<span class="str">"B"</span>)
+} <span class="kw">else</span> <span class="kw">if</span> (score <span class="op">&gt;=</span> <span class="num">70</span>) {
+    <span class="fn">println</span>(<span class="str">"C"</span>)
+} <span class="kw">else</span> {
+    <span class="fn">println</span>(<span class="str">"F"</span>)
+}</code></pre>
+
+  <h2>While Loop</h2>
+
+  <p>Repeats a block while a condition is true:</p>
+
+  <pre><code>i <span class="op">=</span> <span class="num">0</span>
+<span class="kw">while</span> (i <span class="op">&lt;</span> <span class="num">10</span>) {
+    <span class="fn">println</span>(i)
+    i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+}</code></pre>
+
+  <h2>For Loop</h2>
+
+  <p>C-style <code>for</code> loop with three parts: initialization, condition, and step:</p>
+
+  <pre><code><span class="kw">for</span> (i <span class="op">=</span> <span class="num">0</span>; i <span class="op">&lt;</span> <span class="num">10</span>; i <span class="op">+=</span> <span class="num">1</span>) {
+    <span class="fn">println</span>(i)
+}</code></pre>
+
+  <p>You can also use <code>var</code> in the initializer for dynamic variables:</p>
+
+  <pre><code><span class="kw">for</span> (<span class="kw">var</span> i <span class="op">=</span> <span class="num">0</span>; i <span class="op">&lt;</span> <span class="num">5</span>; i <span class="op">+=</span> <span class="num">1</span>) {
+    <span class="fn">println</span>(i)
+}</code></pre>
+
+  <h2>Break and Continue</h2>
+
+  <p><code>break</code> exits the innermost loop. <code>continue</code> skips to the next iteration:</p>
+
+  <pre><code>i <span class="op">=</span> <span class="num">0</span>
+<span class="kw">while</span> (i <span class="op">&lt;</span> <span class="num">100</span>) {
+    i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+
+    <span class="kw">if</span> (i <span class="op">%</span> <span class="num">2</span> <span class="op">==</span> <span class="num">0</span>) {
+        <span class="kw">continue</span>  <span class="cmt">// skip even numbers</span>
+    }
+
+    <span class="kw">if</span> (i <span class="op">&gt;</span> <span class="num">20</span>) {
+        <span class="kw">break</span>     <span class="cmt">// stop after 20</span>
+    }
+
+    <span class="fn">println</span>(i)
+}</code></pre>
+
+  <h2>Return</h2>
+
+  <p><code>return</code> exits the current function, optionally with a value:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">abs</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">if</span> (n <span class="op">&lt;</span> <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="op">-</span>n
+    }
+    <span class="kw">return</span> n
+}
+
+<span class="kw">def</span> <span class="fn">greet</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Hello!"</span>)
+    <span class="kw">return</span>  <span class="cmt">// explicit return for Unit functions</span>
+}</code></pre>
+
+  <h2>Comments</h2>
+
+  <pre><code><span class="cmt">// This is a single-line comment</span>
+
+<span class="cmt">/* This is a
+   multi-line comment */</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p>Block comments <code>/* ... */</code> do not nest in v1.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="operators.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Operators &amp; Expressions</span>
+    </a>
+    <a href="functions.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Functions &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

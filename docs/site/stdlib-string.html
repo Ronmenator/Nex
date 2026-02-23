@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.string - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.string</div>
+
+  <h1>std.string</h1>
+  <p class="page-subtitle">String manipulation functions.</p>
+
+  <pre><code><span class="kw">import</span> std.string</code></pre>
+
+  <h2>Core</h2>
+
+  <h4>str_length</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_length</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of characters in <code>s</code>.</p>
+
+  <h4>str_substring</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_substring</span>(s: <span class="typ">String</span>, start: <span class="typ">Int</span>, length: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns a substring starting at <code>start</code> with the given <code>length</code>.</p>
+
+  <h2>Trimming</h2>
+
+  <h4>str_trim</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_trim</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Removes leading and trailing whitespace from <code>s</code>.</p>
+
+  <h4>str_trim_start</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_trim_start</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Removes leading whitespace from <code>s</code>.</p>
+
+  <h4>str_trim_end</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_trim_end</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Removes trailing whitespace from <code>s</code>.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+text <span class="op">=</span> <span class="str">"  hello world  "</span>
+<span class="fn">println</span>(<span class="fn">str_trim</span>(text))        <span class="cmt">// "hello world"</span>
+<span class="fn">println</span>(<span class="fn">str_trim_start</span>(text))  <span class="cmt">// "hello world  "</span>
+<span class="fn">println</span>(<span class="fn">str_trim_end</span>(text))    <span class="cmt">// "  hello world"</span></code></pre>
+
+  <h2>Searching</h2>
+
+  <h4>starts_with</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">starts_with</span>(s: <span class="typ">String</span>, prefix: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if <code>s</code> begins with <code>prefix</code>.</p>
+
+  <h4>ends_with</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ends_with</span>(s: <span class="typ">String</span>, suffix: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if <code>s</code> ends with <code>suffix</code>.</p>
+
+  <h4>contains</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">contains</span>(s: <span class="typ">String</span>, needle: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if <code>s</code> contains <code>needle</code> as a substring.</p>
+
+  <h4>index_of</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">index_of</span>(s: <span class="typ">String</span>, needle: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the index of the first occurrence of <code>needle</code> in <code>s</code>, or <code>-1</code> if not found.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+path <span class="op">=</span> <span class="str">"src/main.nex"</span>
+<span class="fn">println</span>(<span class="fn">starts_with</span>(path, <span class="str">"src"</span>))   <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">ends_with</span>(path, <span class="str">".nex"</span>))     <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">contains</span>(path, <span class="str">"main"</span>))     <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">index_of</span>(path, <span class="str">"main"</span>))     <span class="cmt">// 4</span>
+<span class="fn">println</span>(<span class="fn">index_of</span>(path, <span class="str">"test"</span>))     <span class="cmt">// -1</span></code></pre>
+
+  <h2>Replacement</h2>
+
+  <h4>str_replace</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_replace</span>(s: <span class="typ">String</span>, old: <span class="typ">String</span>, new: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns a new string with all occurrences of <code>old</code> replaced by <code>new</code>.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+msg <span class="op">=</span> <span class="str">"Hello World"</span>
+<span class="fn">println</span>(<span class="fn">str_replace</span>(msg, <span class="str">"World"</span>, <span class="str">"Nex"</span>))  <span class="cmt">// "Hello Nex"</span></code></pre>
+
+  <h2>Case Conversion</h2>
+
+  <h4>to_upper</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">to_upper</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns <code>s</code> with all characters converted to uppercase.</p>
+
+  <h4>to_lower</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">to_lower</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns <code>s</code> with all characters converted to lowercase.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+<span class="fn">println</span>(<span class="fn">to_upper</span>(<span class="str">"hello"</span>))  <span class="cmt">// "HELLO"</span>
+<span class="fn">println</span>(<span class="fn">to_lower</span>(<span class="str">"WORLD"</span>))  <span class="cmt">// "world"</span></code></pre>
+
+  <h2>Repetition</h2>
+
+  <h4>str_repeat</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_repeat</span>(s: <span class="typ">String</span>, count: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns <code>s</code> repeated <code>count</code> times.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+<span class="fn">println</span>(<span class="fn">str_repeat</span>(<span class="str">"=-"</span>, <span class="num">20</span>))
+<span class="cmt">// "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"</span>
+
+<span class="fn">println</span>(<span class="fn">str_repeat</span>(<span class="str">"abc"</span>, <span class="num">3</span>))
+<span class="cmt">// "abcabcabc"</span></code></pre>
+
+  <h2>Character Access</h2>
+
+  <h4>char_at</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">char_at</span>(s: <span class="typ">String</span>, index: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the character code at the given <code>index</code>, or <code>-1</code> if the index is out of bounds.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+code <span class="op">=</span> <span class="fn">char_at</span>(<span class="str">"Hello"</span>, <span class="num">0</span>)
+<span class="fn">println</span>(code)               <span class="cmt">// 72 (ASCII for 'H')</span>
+
+invalid <span class="op">=</span> <span class="fn">char_at</span>(<span class="str">"Hi"</span>, <span class="num">99</span>)
+<span class="fn">println</span>(invalid)            <span class="cmt">// -1</span></code></pre>
+
+  <h2>Reverse</h2>
+
+  <h4>str_reverse</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_reverse</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns a new string with the characters of <code>s</code> in reverse order.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+<span class="fn">println</span>(<span class="fn">str_reverse</span>(<span class="str">"Nex"</span>))  <span class="cmt">// "xeN"</span>
+<span class="fn">println</span>(<span class="fn">str_reverse</span>(<span class="str">"racecar"</span>))  <span class="cmt">// "racecar" (palindrome)</span></code></pre>
+
+  <h2>Splitting</h2>
+
+  <h4>str_split</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_split</span>(s: <span class="typ">String</span>, delimiter: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Splits <code>s</code> by <code>delimiter</code> and returns a single string with results separated by newlines. Use with line-based processing.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+csv <span class="op">=</span> <span class="str">"apple,banana,cherry"</span>
+parts <span class="op">=</span> <span class="fn">str_split</span>(csv, <span class="str">","</span>)
+<span class="fn">println</span>(parts)
+<span class="cmt">// apple</span>
+<span class="cmt">// banana</span>
+<span class="cmt">// cherry</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.string
+
+<span class="cmt">// Clean and validate user input</span>
+<span class="kw">def</span> <span class="fn">normalize_email</span>(input: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span> {
+    trimmed <span class="op">=</span> <span class="fn">str_trim</span>(input)
+    <span class="kw">return</span> <span class="fn">to_lower</span>(trimmed)
+}
+
+<span class="kw">def</span> <span class="fn">is_valid_email</span>(email: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> {
+    <span class="kw">return</span> <span class="fn">contains</span>(email, <span class="str">"@"</span>)
+}
+
+raw <span class="op">=</span> <span class="str">"  User@Example.COM  "</span>
+email <span class="op">=</span> <span class="fn">normalize_email</span>(raw)
+<span class="fn">println</span>(email)                    <span class="cmt">// "user@example.com"</span>
+<span class="fn">println</span>(<span class="fn">is_valid_email</span>(email))    <span class="cmt">// true</span>
+
+<span class="cmt">// Parse a PATH-like variable</span>
+path_var <span class="op">=</span> <span class="str">"/usr/bin:/usr/local/bin:/home/user/bin"</span>
+dirs <span class="op">=</span> <span class="fn">str_split</span>(path_var, <span class="str">":"</span>)
+<span class="fn">println</span>(dirs)
+<span class="cmt">// /usr/bin</span>
+<span class="cmt">// /usr/local/bin</span>
+<span class="cmt">// /home/user/bin</span></code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-math.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.math</span>
+    </a>
+    <a href="stdlib-collections.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.collections &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

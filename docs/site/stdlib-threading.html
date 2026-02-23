@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.threading - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.threading</div>
+
+  <h1>std.threading</h1>
+  <p class="page-subtitle">Thread creation, synchronization, and mutex operations.</p>
+
+  <pre><code><span class="kw">import</span> std.threading</code></pre>
+
+  <h2>Thread Functions</h2>
+
+  <h4>thread_spawn</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">thread_spawn</span>(func: <span class="typ">Function</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Spawns a new OS thread that begins executing <code>func</code>. Returns a thread handle that can be passed to <code>thread_join</code> to wait for completion.</p>
+
+  <h4>thread_join</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">thread_join</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Blocks the calling thread until the thread identified by <code>handle</code> finishes execution. Returns <code>0</code> on success.</p>
+
+  <h4>thread_sleep</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">thread_sleep</span>(ms: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Pauses the current thread for at least the specified number of milliseconds. The actual sleep duration may be slightly longer due to OS scheduling.</p>
+
+  <h4>thread_current_id</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">thread_current_id</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Returns the unique identifier of the currently executing thread. Useful for logging and debugging multi-threaded code.</p>
+
+  <h2>Mutex Functions</h2>
+
+  <h4>mutex_new</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">mutex_new</span>() <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a new mutex and returns a handle to it. The mutex starts in an unlocked state.</p>
+
+  <h4>mutex_lock</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">mutex_lock</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Acquires the mutex. If the mutex is already locked by another thread, the calling thread blocks until the mutex becomes available.</p>
+
+  <h4>mutex_unlock</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">mutex_unlock</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Releases the mutex, allowing other threads that are waiting on it to proceed.</p>
+
+  <h4>mutex_free</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">mutex_free</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Destroys the mutex and frees its resources. The mutex must not be locked when this function is called.</p>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.threading
+<span class="kw">import</span> std.time
+
+<span class="cmt">// Shared counter protected by a mutex</span>
+<span class="kw">var</span> counter <span class="op">=</span> <span class="num">0</span>
+mtx <span class="op">=</span> <span class="fn">mutex_new</span>()
+
+<span class="kw">def</span> <span class="fn">increment_worker</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    i <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">while</span> (i <span class="op">&lt;</span> <span class="num">1000</span>) {
+        <span class="fn">mutex_lock</span>(mtx)
+        counter <span class="op">=</span> counter <span class="op">+</span> <span class="num">1</span>
+        <span class="fn">mutex_unlock</span>(mtx)
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+}
+
+<span class="cmt">// Spawn two threads that increment concurrently</span>
+t1 <span class="op">=</span> <span class="fn">thread_spawn</span>(increment_worker)
+t2 <span class="op">=</span> <span class="fn">thread_spawn</span>(increment_worker)
+
+<span class="cmt">// Wait for both threads to finish</span>
+<span class="fn">thread_join</span>(t1)
+<span class="fn">thread_join</span>(t2)
+
+<span class="fn">println</span>(<span class="str">"Final counter: "</span>)
+<span class="fn">println</span>(counter)   <span class="cmt">// 2000</span>
+
+<span class="cmt">// Clean up the mutex</span>
+<span class="fn">mutex_free</span>(mtx)
+
+<span class="cmt">// Display current thread info</span>
+tid <span class="op">=</span> <span class="fn">thread_current_id</span>()
+<span class="fn">print</span>(<span class="str">"Main thread ID: "</span>)
+<span class="fn">println</span>(tid)</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-http.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.http</span>
+    </a>
+    <a href="stdlib-crypto.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.crypto &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

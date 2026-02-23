@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VS Code Extension - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Tooling<span class="sep">/</span>VS Code Extension</div>
+
+  <h1>VS Code Extension</h1>
+  <p class="page-subtitle">Syntax highlighting, LSP integration, and build commands for VS Code.</p>
+
+  <p>The Nex VS Code extension provides a first-class editing experience for <code>.nex</code> files, including syntax highlighting, real-time diagnostics, code navigation, and integrated build commands.</p>
+
+  <h2>Features</h2>
+
+  <h3>Language Registration</h3>
+  <p>The extension registers <code>.nex</code> files as the Nex language in VS Code. This enables language-specific features like bracket matching, comment toggling (<code>Ctrl+/</code>), and auto-indentation.</p>
+
+  <h3>Syntax Highlighting</h3>
+  <p>A TextMate grammar provides syntax highlighting for all Nex language constructs:</p>
+  <ul>
+    <li><strong>Keywords</strong> — <code>def</code>, <code>class</code>, <code>struct</code>, <code>interface</code>, <code>import</code>, <code>from</code>, <code>as</code>, <code>public</code>, <code>virtual</code>, <code>override</code>, <code>static</code>, <code>if</code>, <code>else</code>, <code>while</code>, <code>for</code>, <code>return</code>, <code>break</code>, <code>continue</code>, <code>try</code>, <code>catch</code>, <code>finally</code>, <code>throw</code>, <code>using</code>, <code>var</code>, <code>alias</code>, <code>shared</code>, <code>self</code>, <code>null</code>, <code>true</code>, <code>false</code></li>
+    <li><strong>Types</strong> — <code>Int</code>, <code>Int64</code>, <code>Float</code>, <code>Double</code>, <code>Bool</code>, <code>Byte</code>, <code>Char</code>, <code>String</code>, <code>Unit</code>, <code>Var</code>, <code>Object</code></li>
+    <li><strong>Strings</strong> — Double-quoted string literals with escape highlighting</li>
+    <li><strong>Characters</strong> — Single-quoted character literals</li>
+    <li><strong>Numbers</strong> — Integer and floating-point literals with suffix recognition (<code>b</code>, <code>i</code>, <code>i64</code>, <code>f</code>, <code>d</code>)</li>
+    <li><strong>Comments</strong> — Line (<code>//</code>) and block (<code>/* */</code>) comments</li>
+    <li><strong>Operators</strong> — Arithmetic, comparison, logical, and assignment operators</li>
+    <li><strong>Annotations</strong> — <code>@allow_var_api</code> and other <code>@</code>-prefixed annotations</li>
+  </ul>
+
+  <h3>LSP Integration</h3>
+  <p>The extension launches the Nex language Server (<code>aur-lsp</code>) as a subprocess and communicates via the Language Server Protocol. Capabilities include:</p>
+
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Diagnostics</strong></td>
+        <td>Real-time error and warning underlines as you type. Errors from the compiler pipeline and lint warnings are both shown.</td>
+      </tr>
+      <tr>
+        <td><strong>Go to Definition</strong></td>
+        <td><code>F12</code> or <code>Ctrl+Click</code> to jump to the definition of functions, classes, fields, and imports.</td>
+      </tr>
+      <tr>
+        <td><strong>Hover Types</strong></td>
+        <td>Hover over any identifier to see its inferred or declared type and documentation.</td>
+      </tr>
+      <tr>
+        <td><strong>Find References</strong></td>
+        <td><code>Shift+F12</code> to find all references to a symbol across the project.</td>
+      </tr>
+      <tr>
+        <td><strong>Rename Symbol</strong></td>
+        <td><code>F2</code> to rename a function, variable, class, or field across all files.</td>
+      </tr>
+      <tr>
+        <td><strong>Code Actions</strong></td>
+        <td>Quick fixes and refactoring suggestions:
+          <ul>
+            <li>Add <code>public</code> modifier</li>
+            <li>Qualify ambiguous base call (<code>self.Base::method()</code>)</li>
+            <li>Introduce <code>alias</code> for disambiguated members</li>
+            <li>Add <code>@allow_var_api</code> annotation</li>
+          </ul>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Build Commands</h3>
+  <p>The extension provides VS Code commands accessible via the Command Palette (<code>Ctrl+Shift+P</code>):</p>
+
+  <table>
+    <thead><tr><th>Command</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>Nex: Build</code></td><td>Runs <code>aur build</code> on the current project.</td></tr>
+      <tr><td><code>Nex: Run</code></td><td>Runs <code>aur run</code> on the current project.</td></tr>
+      <tr><td><code>Nex: Test</code></td><td>Runs <code>aur test</code> on the current project.</td></tr>
+      <tr><td><code>Nex: Format File</code></td><td>Runs <code>aur fmt</code> on the active file.</td></tr>
+    </tbody>
+  </table>
+
+  <p>Build output is directed to a dedicated VS Code terminal panel. Diagnostics from the build are also reflected in the Problems panel.</p>
+
+  <h2>Installation</h2>
+
+  <h3>From VSIX</h3>
+  <ol>
+    <li>Download the <code>.vsix</code> file from the Nex releases page.</li>
+    <li>Open VS Code and go to Extensions (<code>Ctrl+Shift+X</code>).</li>
+    <li>Click the <code>...</code> menu at the top of the Extensions panel and select <strong>Install from VSIX...</strong></li>
+    <li>Select the downloaded <code>.vsix</code> file.</li>
+    <li>Reload VS Code when prompted.</li>
+  </ol>
+
+  <h3>From Source</h3>
+  <ol>
+    <li>Clone the Nex repository.</li>
+    <li>Navigate to the <code>editors/vscode/</code> directory.</li>
+    <li>Run <code>npm install</code> to install dependencies.</li>
+    <li>Run <code>npm run package</code> to build the <code>.vsix</code> file.</li>
+    <li>Install the generated <code>.vsix</code> via the steps above.</li>
+  </ol>
+
+  <h3>Local Workspace Symlink (Windows)</h3>
+  <p>For local development, you can enable the extension directly from the workspace by creating a symlink in your VS Code extensions directory:</p>
+  <pre><code>New-Item -ItemType SymbolicLink `
+  -Path "$env:USERPROFILE\.vscode\extensions\nex.nex-language" `
+  -Target "D:\Development\Personal\Nex\vscode-extension"</code></pre>
+  <p>After creating the link, run <strong>Developer: Reload Window</strong> in VS Code.</p>
+
+  <h3>LSP Server</h3>
+  <p>The extension expects the <code>aur-lsp</code> binary to be on your system PATH. Build it from the Nex repository:</p>
+
+  <pre><code>$ cargo build --release -p aur_lsp
+$ cp target/release/aur-lsp ~/.local/bin/</code></pre>
+
+  <p>Alternatively, the extension will search for the binary at the path configured in VS Code settings:</p>
+
+  <pre><code>{
+  "aurum.lsp.path": "/path/to/aur-lsp"
+}</code></pre>
+
+  <h2>Configuration</h2>
+
+  <p>Available VS Code settings for the Nex extension:</p>
+
+  <table>
+    <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>aurum.lsp.path</code></td>
+        <td><code>"aur-lsp"</code></td>
+        <td>Path to the Nex LSP server binary.</td>
+      </tr>
+      <tr>
+        <td><code>aurum.formatOnSave</code></td>
+        <td><code>false</code></td>
+        <td>Automatically run <code>aur fmt</code> when saving <code>.nex</code> files.</td>
+      </tr>
+      <tr>
+        <td><code>aurum.lintOnSave</code></td>
+        <td><code>true</code></td>
+        <td>Run linter diagnostics when saving <code>.nex</code> files.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Workspace Explorer Filter</h3>
+  <p>The repository includes a workspace-level VS Code settings file that hides compiler metadata files from Explorer:</p>
+  <pre><code>{
+  "files.exclude": {
+    "**/*.nexmeta": true
+  }
+}</code></pre>
+  <p>This keeps generated <code>.nexmeta</code> files out of the file tree while still preserving them on disk for incremental builds.</p>
+
+  <div class="page-nav">
+    <a href="tooling-formatter.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Formatter &amp; Linter</span>
+    </a>
+    <a href="grammar.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Grammar (EBNF) &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

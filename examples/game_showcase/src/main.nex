@@ -1,0 +1,29 @@
+// Game Showcase — nex3d library demonstration
+//
+// Uses the nex3d library for 2D/3D game development:
+//   - nex3d.math: Vec2, Vec3, Vec4 and math helpers
+//   - nex3d.engine: Window and main loop
+//
+// Requires: cargo build --features engine -p nex
+// Run:      nex run   (from this directory)
+
+import nex3d.math
+import nex3d.engine
+
+def main() {
+    println("=== nex3d Game Showcase ===")
+
+    // Use math types (Vec2, Vec3)
+    v = vec2(100.0f, 200.0f)
+    len = vec2_length(v)
+    println("Vec2(100, 200) length computed")
+
+    // Create game window and run
+    handle = engine_create_window("nex3d Game", 800, 600)
+    if (handle != 0) {
+        engine_run(handle)
+        engine_destroy(handle)
+    }
+    println("Done.")
+    return
+}

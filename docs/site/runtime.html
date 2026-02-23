@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Runtime &amp; GC - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Reference<span class="sep">/</span>Runtime &amp; GC</div>
+
+  <h1>Runtime &amp; Garbage Collector</h1>
+  <p class="page-subtitle">How Nex manages memory, object layout, type information, and the Var runtime.</p>
+
+  <h2>Garbage Collection</h2>
+
+  <p>Nex uses a <strong>tracing garbage collector</strong> to manage heap-allocated objects. There is no reference counting.</p>
+
+  <h3>GC Policy (v1)</h3>
+  <ul>
+    <li><strong>Stop-the-world</strong> tracing with mark-sweep algorithm</li>
+    <li>Conservative stack scanning (treats potential pointers on the stack as roots)</li>
+    <li>Precise heap scanning using type pointer maps</li>
+    <li>Safepoints inserted at allocation sites and loop back-edges</li>
+  </ul>
+
+  <div class="callout info">
+    <div class="callout-title">Future Plans</div>
+    <p>A generational GC is planned for v2. The write barrier ABI is already defined but currently a no-op.</p>
+  </div>
+
+  <h3>Manual GC Trigger</h3>
+
+  <p>You can manually trigger garbage collection (useful for testing or benchmarking):</p>
+
+  <pre><code><span class="kw">import</span> std.runtime
+
+<span class="fn">gc_collect</span>()</code></pre>
+
+  <h2>Object Layout</h2>
+
+  <p>Every heap-allocated object starts with a header:</p>
+
+  <pre><code><span class="cmt">// Object memory layout</span>
+[GC word(s)] [Type* pointer] [optional sync word] [fields...]</code></pre>
+
+  <table>
+    <tr><th>Component</th><th>Description</th></tr>
+    <tr><td>GC word(s)</td><td>Mark bits and metadata for the garbage collector</td></tr>
+    <tr><td>Type* pointer</td><td>Pointer to the type descriptor (RTTI)</td></tr>
+    <tr><td>Sync word</td><td>Optional synchronization data (v1: may be omitted)</td></tr>
+    <tr><td>Fields</td><td>Object's data fields in declaration order</td></tr>
+  </table>
+
+  <h2>Multiple Inheritance Layout</h2>
+
+  <p>For classes with multiple inheritance, the object contains subobjects for each base class:</p>
+
+  <pre><code><span class="cmt">// class D : B, C { fields... }</span>
+[ObjHeader | SharedBases... | BaseSubobject(B) | BaseSubobject(C) | DerivedFields...]</code></pre>
+
+  <ul>
+    <li>Each base subobject contains its own fields and vtable pointer</li>
+    <li>Shared bases appear only once (when declared with <code>shared</code>)</li>
+    <li>Casting between base types adjusts the pointer to the correct subobject</li>
+  </ul>
+
+  <h2>RTTI Type Descriptors</h2>
+
+  <p>Each type has a runtime descriptor that includes:</p>
+
+  <table>
+    <tr><th>Field</th><th>Purpose</th></tr>
+    <tr><td>Size &amp; alignment</td><td>Memory layout information</td></tr>
+    <tr><td>Pointer map</td><td>Which fields are GC-traceable pointers</td></tr>
+    <tr><td>Base offsets</td><td>Offsets for MI pointer adjustment</td></tr>
+    <tr><td>Vtable pointers</td><td>Per-view virtual method tables</td></tr>
+    <tr><td>Debug info</td><td>Type name and source information</td></tr>
+  </table>
+
+  <h2>Virtual Dispatch</h2>
+
+  <p>Virtual method calls go through vtable indirection:</p>
+
+  <ol>
+    <li>Adjust <code>this</code> pointer to the correct base subobject</li>
+    <li>Load the vtable pointer from the subobject</li>
+    <li>Call the function at the method's slot index</li>
+  </ol>
+
+  <h2>The Var Runtime</h2>
+
+  <p>The <code>Var</code> type is a special GC-managed object that supports dynamic typing:</p>
+
+  <ul>
+    <li>Holds a <strong>type tag</strong> identifying the stored value's type</li>
+    <li>Contains a <strong>boxed payload</strong> (the actual value)</li>
+    <li>Supports runtime operator dispatch (<code>+</code>, <code>==</code>, etc.)</li>
+    <li>Supports runtime member invocation</li>
+  </ul>
+
+  <h3>Boxing Rules</h3>
+
+  <p>Value types are boxed when stored in a <code>Var</code>:</p>
+
+  <table>
+    <tr><th>Original Type</th><th>Boxed Form</th></tr>
+    <tr><td><code>Int</code>, <code>Int64</code></td><td>64-bit integer payload</td></tr>
+    <tr><td><code>Float</code>, <code>Double</code></td><td>64-bit float payload</td></tr>
+    <tr><td><code>Bool</code></td><td>Integer payload (0 or 1)</td></tr>
+    <tr><td><code>String</code></td><td>Object pointer (already a reference)</td></tr>
+    <tr><td><code>struct</code></td><td>Heap-allocated copy</td></tr>
+    <tr><td><code>class</code></td><td>Object pointer (already a reference)</td></tr>
+  </table>
+
+  <h2>Runtime ABI Functions</h2>
+
+  <p>The runtime is implemented as a set of C ABI functions. Key categories:</p>
+
+  <h3>Allocation &amp; GC</h3>
+  <pre><code>aur_gc_alloc(type, size) <span class="op">-></span> Object    <span class="cmt">// allocate GC-managed object</span>
+aur_gc_collect()                       <span class="cmt">// trigger collection</span>
+aur_gc_safepoint()                     <span class="cmt">// GC safepoint check</span>
+aur_gc_write_barrier(obj)              <span class="cmt">// write barrier (v1: no-op)</span></code></pre>
+
+  <h3>Exceptions</h3>
+  <pre><code>aur_throw(exception)                   <span class="cmt">// throw exception (noreturn)</span>
+aur_new_exception(message) <span class="op">-></span> Object   <span class="cmt">// create exception object</span></code></pre>
+
+  <h3>Var Operations</h3>
+  <pre><code>aur_var_from_i64(value) <span class="op">-></span> Var         <span class="cmt">// box integer</span>
+aur_var_from_f64(value) <span class="op">-></span> Var         <span class="cmt">// box float</span>
+aur_var_from_obj(obj) <span class="op">-></span> Var           <span class="cmt">// wrap object reference</span>
+aur_var_add(a, b) <span class="op">-></span> Var               <span class="cmt">// runtime addition</span>
+aur_var_eq(a, b) <span class="op">-></span> Var                <span class="cmt">// runtime equality check</span>
+aur_var_typeof(v) <span class="op">-></span> Type              <span class="cmt">// get type descriptor</span></code></pre>
+
+  <h2>Compiler Pipeline</h2>
+
+  <p>For reference, the compilation pipeline follows these stages:</p>
+
+  <ol>
+    <li>Lex + ASI normalize</li>
+    <li>Parse AST</li>
+    <li>Build module graph</li>
+    <li>Resolve symbols + enforce <code>public</code></li>
+    <li>Declare types (class/struct headers, signatures)</li>
+    <li>Validate inheritance DAG</li>
+    <li>Compute layout + vtables</li>
+    <li>Typecheck bodies</li>
+    <li>Lower to IR</li>
+    <li>Codegen (Cranelift or LLVM) + link</li>
+  </ol>
+
+  <p>No pipeline stage panics on user code. All errors flow through the diagnostic system.</p>
+
+  <div class="page-nav">
+    <a href="keywords.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Keywords &amp; Operators</span>
+    </a>
+    <span></span>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

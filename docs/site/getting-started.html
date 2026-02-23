@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Installation &amp; Setup - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Getting Started</div>
+
+  <h1>Installation &amp; Setup</h1>
+  <p class="page-subtitle">Get the Nex toolchain running on your machine in under five minutes.</p>
+
+  <h2>Prerequisites</h2>
+
+  <p>Nex's <strong>JIT mode</strong> requires no external dependencies. For <strong>AOT compilation</strong> (producing standalone executables), you need a system linker:</p>
+
+  <table>
+    <tr><th>Platform</th><th>Linker</th></tr>
+    <tr><td>Windows</td><td>MSVC Build Tools (<code>link.exe</code>), GCC (MinGW), or Clang</td></tr>
+    <tr><td>Linux</td><td>GCC or Clang (usually pre-installed)</td></tr>
+    <tr><td>macOS</td><td>Xcode Command Line Tools (GCC/Clang)</td></tr>
+  </table>
+
+  <h2>Directory Layout</h2>
+
+  <p>After building, the toolchain is installed under the <code>aurum/</code> directory:</p>
+
+  <pre><code>aurum/
+├── bin/
+│   ├── aur.exe          <span class="cmt">// Main CLI (build, run, fmt, lint, repl)</span>
+│   ├── aurc.exe         <span class="cmt">// Standalone compiler frontend</span>
+│   └── aur-lsp.exe      <span class="cmt">// Language server (LSP)</span>
+├── config/
+│   ├── aurum.toml       <span class="cmt">// Toolchain configuration</span>
+│   └── project.toml     <span class="cmt">// Template for new projects</span>
+└── examples/
+    ├── hello/
+    └── console_showcase/</code></pre>
+
+  <h2>Add to PATH</h2>
+
+  <h3>Windows (PowerShell)</h3>
+  <pre><code><span class="cmt"># Current session only</span>
+$env:PATH += <span class="str">";C:\path\to\aurum\bin"</span>
+
+<span class="cmt"># Permanent: add via System Environment Variables dialog</span></code></pre>
+
+  <h3>Linux / macOS</h3>
+  <pre><code><span class="cmt"># Add to ~/.bashrc or ~/.zshrc</span>
+export PATH=<span class="str">"$PATH:/path/to/aurum/bin"</span></code></pre>
+
+  <h2>Verify Installation</h2>
+
+  <pre><code>aur --help</code></pre>
+
+  <p>You should see the available commands:</p>
+
+  <pre><code>Nex compiler toolchain
+
+Usage: aur &lt;command&gt; [args]
+
+Commands:
+  new &lt;name&gt; [--lib]    Create a new project
+  build [path]          Compile to a native executable (AOT)
+  run [path] [-- args]  JIT compile and execute
+  &lt;file&gt;.nex [args]      Shorthand for: aur run &lt;file&gt;.nex
+  install               Build release binaries
+  fmt &lt;file&gt;            Format source code
+  lint &lt;file&gt;           Run linter
+  repl                  Interactive REPL
+  clean                 Remove build artifacts</code></pre>
+
+  <h2>Create Your First Project</h2>
+
+  <pre><code>aur new my_project
+cd my_project</code></pre>
+
+  <p>This creates a project with the following structure:</p>
+
+  <pre><code>my_project/
+├── project.toml
+└── src/
+    └── main.nex</code></pre>
+
+  <h2>Build &amp; Run</h2>
+
+  <div class="callout tip">
+    <div class="callout-title">Tip</div>
+    <p>Use <code>aur run</code> for fast iteration (JIT) and <code>aur build</code> when you need a standalone binary.</p>
+  </div>
+
+  <pre><code><span class="cmt"># JIT compile and execute immediately</span>
+aur run
+
+<span class="cmt"># Or use the shorthand for a single file</span>
+aur src/main.nex
+
+<span class="cmt"># Compile to native executable</span>
+aur build</code></pre>
+
+  <h2>Execution Modes</h2>
+
+  <h3>JIT Mode (default)</h3>
+  <p>Compiles in memory using Cranelift JIT and executes immediately. No intermediate files, no external tools needed. Feels like running a script.</p>
+
+  <h3>AOT Mode</h3>
+  <p>Compiles to a native object file via Cranelift, then links with the system linker to produce a standalone executable. Use this for production deployments.</p>
+
+  <div class="page-nav">
+    <a href="index.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Introduction</span>
+    </a>
+    <a href="hello-world.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Hello World &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

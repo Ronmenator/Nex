@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standard Library Overview - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>Overview</div>
+
+  <h1>Standard Library Overview</h1>
+  <p class="page-subtitle">Nex ships with 21 standard library modules covering everything from math and string manipulation to networking, cryptography, machine learning, and cross-platform UI.</p>
+
+  <h2>Importing Modules</h2>
+
+  <p>All standard library modules live under the <code>std</code> namespace. Import an entire module or pick individual functions:</p>
+
+  <pre><code><span class="cmt">// Import the whole module</span>
+<span class="kw">import</span> std.math
+
+<span class="cmt">// Import specific functions</span>
+<span class="kw">from</span> std.math <span class="kw">import</span> sqrt, pow
+
+<span class="cmt">// Alias a module</span>
+<span class="kw">import</span> std.collections <span class="kw">as</span> col</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p><code>std.core</code> is automatically imported in Every Nex program. You never need to explicitly import <code>print</code>, <code>println</code>, or <code>Object</code>.</p>
+  </div>
+
+  <h2>Module Index</h2>
+
+  <div class="feature-grid">
+
+    <div class="feature-card">
+      <h4><a href="stdlib-core.html">std.core</a></h4>
+      <p><code>print</code>, <code>println</code>, <code>Object</code> &mdash; always available without imports.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-runtime.html">std.runtime</a></h4>
+      <p><code>Disposable</code>, <code>gc_collect</code> &mdash; runtime interfaces and garbage collection control.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-math.html">std.math</a></h4>
+      <p><code>abs</code>, <code>sin</code>, <code>cos</code>, <code>sqrt</code>, <code>pow</code>, <code>random</code>, <code>floor</code>, <code>ceil</code>, <code>round</code>, <code>log</code>, <code>exp</code>, <code>min</code>, <code>max</code>, <code>clamp</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-string.html">std.string</a></h4>
+      <p><code>trim</code>, <code>split</code>, <code>replace</code>, <code>upper</code>/<code>lower</code>, <code>starts_with</code>, <code>ends_with</code>, <code>contains</code>, <code>index_of</code>, <code>reverse</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-convert.html">std.convert</a></h4>
+      <p><code>parse_int</code>, <code>parse_float</code>, <code>parse_bool</code>, <code>char_to_str</code> &mdash; type conversion and parsing.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-collections.html">std.collections</a></h4>
+      <p><code>List</code>, <code>Map</code>, <code>Set</code> with <code>sort</code>, <code>reverse</code>, <code>clear</code>, <code>contains</code> &mdash; generic collections.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-io.html">std.io</a></h4>
+      <p><code>File</code>, <code>read_line</code>, <code>file_exists</code>, <code>file_delete</code>, <code>file_copy</code>, <code>mkdir</code>, <code>list_dir</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-env.html">std.env</a></h4>
+      <p><code>env_get</code>, <code>env_set</code>, <code>env_has</code>, <code>args</code>, <code>cwd</code> &mdash; environment variables and process info.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-time.html">std.time</a></h4>
+      <p><code>now_millis</code>, <code>now_nanos</code>, <code>sleep_millis</code>, <code>elapsed_millis</code> &mdash; time measurement and delays.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-path.html">std.path</a></h4>
+      <p><code>join</code>, <code>parent</code>, <code>file_name</code>, <code>extension</code>, <code>stem</code>, <code>is_absolute</code>, <code>normalize</code>, <code>separator</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-json.html">std.json</a></h4>
+      <p><code>parse</code>, <code>stringify</code>, <code>get_string</code>, <code>get_int</code>, <code>get_float</code>, <code>get_bool</code> &mdash; JSON handling.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-regex.html">std.regex</a></h4>
+      <p><code>new</code>, <code>is_match</code>, <code>find</code>, <code>replace</code>, <code>free</code> &mdash; regular expression support.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-process.html">std.process</a></h4>
+      <p><code>exec</code>, <code>exec_output</code>, <code>exit</code>, <code>pid</code>, <code>spawn</code>, <code>wait</code> &mdash; process management.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-net.html">std.net</a></h4>
+      <p>TCP: <code>connect</code>, <code>listen</code>, <code>accept</code>, <code>send</code>, <code>recv</code>, <code>close</code><br>UDP: <code>bind</code>, <code>send</code>, <code>recv</code>, <code>close</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-http.html">std.http</a></h4>
+      <p><code>get</code>, <code>post</code>, <code>response_status</code>, <code>response_body</code>, <code>response_header</code>, <code>response_free</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-threading.html">std.threading</a></h4>
+      <p><code>spawn</code>, <code>join</code>, <code>sleep</code>, <code>current_id</code>, mutex: <code>new</code>, <code>lock</code>, <code>unlock</code>, <code>free</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-crypto.html">std.crypto</a></h4>
+      <p><code>sha256</code>, <code>sha512</code>, <code>md5</code>, <code>hmac_sha256</code>, <code>base64_encode</code>, <code>base64_decode</code>, <code>random_bytes</code></p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-logging.html">std.logging</a></h4>
+      <p><code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>, <code>set_level</code>, <code>with_tag</code> &mdash; structured logging.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-testing.html">std.testing</a></h4>
+      <p><code>assert</code>, <code>assert_eq</code>, <code>assert_ne</code>, <code>assert_true</code> &mdash; unit test assertions.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-torch.html">std.torch</a> <span class="badge">Optional</span></h4>
+      <p>Tensor ops, neural network layers, optimizers. Requires <code>--features torch</code> at build time.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-ui.html">std.ui</a> <span class="badge">Optional</span></h4>
+      <p>Cross-platform UI: desktop windows (WGPU), terminal TUI, widgets, flexbox layout, canvas drawing. Requires <code>--features ui</code>.</p>
+    </div>
+
+  </div>
+
+  <div class="page-nav">
+    <a href="annotations.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Annotations</span>
+    </a>
+    <a href="stdlib-core.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.core &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

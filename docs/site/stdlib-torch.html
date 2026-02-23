@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.torch - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.torch</div>
+
+  <h1>std.torch</h1>
+  <p class="page-subtitle">PyTorch integration for tensor operations, neural networks, and deep learning.</p>
+
+  <div class="callout warning">
+    <div class="callout-title">Build Requirement</div>
+    <p>This module is optional and requires the <code>torch</code> feature flag. Build the Nex runtime with <code>cargo build --features torch</code> to enable it. The feature auto-downloads libtorch via <code>download-libtorch</code>.</p>
+  </div>
+
+  <pre><code><span class="kw">import</span> std.torch</code></pre>
+
+  <h2>Tensor Creation</h2>
+
+  <h4>tensor_zeros</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_zeros</span>(shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a tensor filled with zeros. <code>shape</code> is an array of dimension sizes and <code>ndims</code> is the number of dimensions.</p>
+
+  <h4>tensor_ones</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_ones</span>(shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a tensor filled with ones.</p>
+
+  <h4>tensor_rand</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_rand</span>(shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a tensor filled with random values drawn uniformly from <code>[0, 1)</code>.</p>
+
+  <h4>tensor_randn</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_randn</span>(shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a tensor filled with random values from a standard normal distribution (mean 0, std 1).</p>
+
+  <h4>tensor_from_float_data</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_from_float_data</span>(data: <span class="typ">Var</span>, shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a tensor from a flat array of float data, reshaped according to <code>shape</code>.</p>
+
+  <h4>tensor_arange</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_arange</span>(start: <span class="typ">Double</span>, end: <span class="typ">Double</span>, step: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a 1-D tensor with values from <code>start</code> to <code>end</code> (exclusive) with the given <code>step</code> size.</p>
+
+  <h4>tensor_eye</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_eye</span>(n: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates an <code>n &times; n</code> identity matrix tensor.</p>
+
+  <h4>tensor_free</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_free</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Releases the memory held by tensor <code>t</code>.</p>
+
+  <h2>Tensor Operations</h2>
+
+  <h4>tensor_add</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_add</span>(a: <span class="typ">Var</span>, b: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise addition. Supports broadcasting.</p>
+
+  <h4>tensor_sub</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_sub</span>(a: <span class="typ">Var</span>, b: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise subtraction.</p>
+
+  <h4>tensor_mul</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_mul</span>(a: <span class="typ">Var</span>, b: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise multiplication (Hadamard product).</p>
+
+  <h4>tensor_div</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_div</span>(a: <span class="typ">Var</span>, b: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise division.</p>
+
+  <h4>tensor_matmul</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_matmul</span>(a: <span class="typ">Var</span>, b: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Matrix multiplication. For 2-D tensors this is standard matrix multiply; for higher dimensions, batch matrix multiply rules apply.</p>
+
+  <h4>tensor_neg</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_neg</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise negation.</p>
+
+  <h4>tensor_exp</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_exp</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise exponential (e<sup>x</sup>).</p>
+
+  <h4>tensor_log</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_log</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise natural logarithm.</p>
+
+  <h4>tensor_sum</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_sum</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns a scalar tensor containing the sum of all elements.</p>
+
+  <h4>tensor_mean</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_mean</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns a scalar tensor containing the mean of all elements.</p>
+
+  <h4>tensor_reshape</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_reshape</span>(t: <span class="typ">Var</span>, shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns a tensor with the same data but a new shape. The total number of elements must remain the same.</p>
+
+  <h4>tensor_transpose</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_transpose</span>(t: <span class="typ">Var</span>, dim0: <span class="typ">Int</span>, dim1: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Transposes dimensions <code>dim0</code> and <code>dim1</code>.</p>
+
+  <h4>tensor_squeeze</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_squeeze</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Removes all dimensions of size 1.</p>
+
+  <h4>tensor_unsqueeze</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_unsqueeze</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Inserts a dimension of size 1 at position <code>dim</code>.</p>
+
+  <h2>Tensor Info</h2>
+
+  <h4>tensor_print</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_print</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Prints the tensor contents, shape, and dtype to standard output.</p>
+
+  <h4>tensor_shape_dim</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_shape_dim</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the size of the tensor along dimension <code>dim</code>.</p>
+
+  <h4>tensor_get_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_get_float</span>(t: <span class="typ">Var</span>, index: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Returns the float value at flat <code>index</code> in the tensor.</p>
+
+  <h4>tensor_item_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_item_float</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+  </div>
+  <p>Extracts the scalar value from a single-element tensor as a <code>Double</code>.</p>
+
+  <h4>tensor_ndim</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_ndim</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of dimensions (rank) of the tensor.</p>
+
+  <h4>tensor_numel</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_numel</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the total number of elements in the tensor.</p>
+
+  <h2>Device Management</h2>
+
+  <h4>cuda_is_available</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">cuda_is_available</span>() <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if CUDA-capable GPUs are detected on the system.</p>
+
+  <h4>cuda_device_count</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">cuda_device_count</span>() <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of available CUDA devices.</p>
+
+  <h4>tensor_to_device</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_to_device</span>(t: <span class="typ">Var</span>, device: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Moves a tensor to the specified device. Common values: <code>"cpu"</code>, <code>"cuda:0"</code>.</p>
+
+  <h4>set_num_threads</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set_num_threads</span>(n: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the number of threads used for intra-op parallelism on CPU.</p>
+
+  <h2>Autograd</h2>
+
+  <h4>tensor_requires_grad</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_requires_grad</span>(t: <span class="typ">Var</span>, flag: <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns a tensor with gradient tracking enabled or disabled based on <code>flag</code>.</p>
+
+  <h4>tensor_backward</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_backward</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Computes gradients by backpropagating from tensor <code>t</code>. Typically called on a scalar loss tensor.</p>
+
+  <h4>tensor_grad</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_grad</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns the accumulated gradient for tensor <code>t</code> after a backward pass.</p>
+
+  <h4>torch_no_grad</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">torch_no_grad</span>(flag: <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>When <code>flag</code> is <code>true</code>, disables gradient computation globally. Call with <code>false</code> to re-enable. Useful during inference to reduce memory usage.</p>
+
+  <h2>Neural Network Layers</h2>
+
+  <h4>nn_sequential_new</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_sequential_new</span>() <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a new empty sequential module. Layers are added by calling layer functions with this module handle.</p>
+
+  <h4>nn_linear</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_linear</span>(module: <span class="typ">Var</span>, in_features: <span class="typ">Int</span>, out_features: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a fully connected (linear) layer with <code>in_features</code> inputs and <code>out_features</code> outputs.</p>
+
+  <h4>nn_conv2d</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_conv2d</span>(module: <span class="typ">Var</span>, in_channels: <span class="typ">Int</span>, out_channels: <span class="typ">Int</span>, kernel_size: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a 2-D convolutional layer.</p>
+
+  <h4>nn_relu</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_relu</span>(module: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a ReLU activation layer.</p>
+
+  <h4>nn_sigmoid</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_sigmoid</span>(module: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a sigmoid activation layer.</p>
+
+  <h4>nn_tanh</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_tanh</span>(module: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a tanh activation layer.</p>
+
+  <h4>nn_softmax</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_softmax</span>(module: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a softmax layer that normalizes along dimension <code>dim</code>.</p>
+
+  <h4>nn_dropout</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_dropout</span>(module: <span class="typ">Var</span>, p: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a dropout layer with probability <code>p</code> of zeroing each element during training.</p>
+
+  <h4>nn_batch_norm</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_batch_norm</span>(module: <span class="typ">Var</span>, features: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a batch normalization layer with <code>features</code> channels.</p>
+
+  <h4>nn_forward</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_forward</span>(module: <span class="typ">Var</span>, input: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Runs a forward pass through the sequential module with the given input tensor.</p>
+
+  <h4>nn_free</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_free</span>(module: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Frees the memory for the neural network module.</p>
+
+  <h2>Loss Functions</h2>
+
+  <h4>loss_mse</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">loss_mse</span>(pred: <span class="typ">Var</span>, target: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Computes mean squared error loss between predictions and targets.</p>
+
+  <h4>loss_cross_entropy</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">loss_cross_entropy</span>(pred: <span class="typ">Var</span>, target: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Computes cross-entropy loss. <code>pred</code> should be raw logits (unnormalized scores) and <code>target</code> should be class indices.</p>
+
+  <h4>loss_bce</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">loss_bce</span>(pred: <span class="typ">Var</span>, target: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Computes binary cross-entropy loss. <code>pred</code> should be probabilities in <code>[0, 1]</code>.</p>
+
+  <h2>Optimizers</h2>
+
+  <h4>optim_sgd</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">optim_sgd</span>(module: <span class="typ">Var</span>, lr: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a Stochastic Gradient Descent optimizer for the parameters in <code>module</code> with learning rate <code>lr</code>.</p>
+
+  <h4>optim_adam</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">optim_adam</span>(module: <span class="typ">Var</span>, lr: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates an Adam optimizer for the parameters in <code>module</code> with learning rate <code>lr</code>.</p>
+
+  <h4>optim_step</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">optim_step</span>(opt: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Performs a single optimization step, updating parameters based on accumulated gradients.</p>
+
+  <h4>optim_zero_grad</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">optim_zero_grad</span>(opt: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Zeros all parameter gradients. Should be called before each forward pass in a training loop.</p>
+
+  <h4>optim_free</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">optim_free</span>(opt: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Frees the optimizer resources.</p>
+
+  <h2>Model I/O</h2>
+
+  <h4>model_save</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">model_save</span>(module: <span class="typ">Var</span>, path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Saves the module weights to the file at <code>path</code>.</p>
+
+  <h4>model_load</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">model_load</span>(module: <span class="typ">Var</span>, path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Loads weights from the file at <code>path</code> into the existing <code>module</code>.</p>
+
+  <h4>jit_load</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">jit_load</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Loads a TorchScript model from <code>path</code> and returns a module handle.</p>
+
+  <h4>jit_forward</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">jit_forward</span>(module: <span class="typ">Var</span>, input: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Runs inference on a TorchScript module with the given input tensor.</p>
+
+  <h2>Utility</h2>
+
+  <h4>torch_manual_seed</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">torch_manual_seed</span>(seed: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the random seed for reproducible results.</p>
+
+  <h4>torch_version</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">torch_version</span>() <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the libtorch version string.</p>
+
+  <h4>tensor_to_string</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_to_string</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns a string representation of the tensor including its values, shape, and dtype.</p>
+
+  <h2>Complete Training Example</h2>
+
+  <pre><code><span class="kw">import</span> std.torch
+
+<span class="cmt">// Seed for reproducibility</span>
+<span class="fn">torch_manual_seed</span>(<span class="num">42</span>)
+
+<span class="cmt">// Print libtorch version</span>
+<span class="fn">print</span>(<span class="str">"PyTorch version: "</span>)
+<span class="fn">println</span>(<span class="fn">torch_version</span>())
+
+<span class="cmt">// Check for GPU</span>
+<span class="kw">if</span> (<span class="fn">cuda_is_available</span>()) {
+    <span class="fn">print</span>(<span class="str">"CUDA devices: "</span>)
+    <span class="fn">println</span>(<span class="fn">cuda_device_count</span>())
+} <span class="kw">else</span> {
+    <span class="fn">println</span>(<span class="str">"Training on CPU"</span>)
+}
+
+<span class="cmt">// Generate synthetic training data: y = 3x + 1 with noise</span>
+<span class="kw">var</span> x_shape <span class="op">=</span> <span class="num">0</span>   <span class="cmt">// placeholder for shape arrays</span>
+x_train <span class="op">=</span> <span class="fn">tensor_rand</span>(x_shape, <span class="num">2</span>)   <span class="cmt">// [100, 1]</span>
+y_train <span class="op">=</span> <span class="fn">tensor_add</span>(<span class="fn">tensor_mul</span>(x_train, <span class="fn">tensor_ones</span>(x_shape, <span class="num">2</span>)), <span class="fn">tensor_ones</span>(x_shape, <span class="num">2</span>))
+
+<span class="cmt">// Build a simple neural network: Linear(1, 16) -> ReLU -> Linear(16, 1)</span>
+model <span class="op">=</span> <span class="fn">nn_sequential_new</span>()
+<span class="fn">nn_linear</span>(model, <span class="num">1</span>, <span class="num">16</span>)
+<span class="fn">nn_relu</span>(model)
+<span class="fn">nn_linear</span>(model, <span class="num">16</span>, <span class="num">1</span>)
+
+<span class="cmt">// Create Adam optimizer</span>
+opt <span class="op">=</span> <span class="fn">optim_adam</span>(model, <span class="num">0.01</span>)
+
+<span class="cmt">// Training loop</span>
+epoch <span class="op">=</span> <span class="num">0</span>
+<span class="kw">while</span> (epoch <span class="op">&lt;</span> <span class="num">200</span>) {
+    <span class="cmt">// Zero gradients</span>
+    <span class="fn">optim_zero_grad</span>(opt)
+
+    <span class="cmt">// Forward pass</span>
+    pred <span class="op">=</span> <span class="fn">nn_forward</span>(model, x_train)
+
+    <span class="cmt">// Compute MSE loss</span>
+    loss <span class="op">=</span> <span class="fn">loss_mse</span>(pred, y_train)
+
+    <span class="cmt">// Backward pass</span>
+    <span class="fn">tensor_backward</span>(loss)
+
+    <span class="cmt">// Update weights</span>
+    <span class="fn">optim_step</span>(opt)
+
+    <span class="cmt">// Print loss every 50 epochs</span>
+    <span class="kw">if</span> (epoch <span class="op">%</span> <span class="num">50</span> <span class="op">==</span> <span class="num">0</span>) {
+        <span class="fn">print</span>(<span class="str">"Epoch "</span>)
+        <span class="fn">print</span>(epoch)
+        <span class="fn">print</span>(<span class="str">", Loss: "</span>)
+        <span class="fn">println</span>(<span class="fn">tensor_item_float</span>(loss))
+    }
+
+    <span class="fn">tensor_free</span>(pred)
+    <span class="fn">tensor_free</span>(loss)
+    epoch <span class="op">=</span> epoch <span class="op">+</span> <span class="num">1</span>
+}
+
+<span class="cmt">// Save trained model</span>
+<span class="fn">model_save</span>(model, <span class="str">"linear_model.pt"</span>)
+<span class="fn">println</span>(<span class="str">"Model saved."</span>)
+
+<span class="cmt">// Inference with no_grad</span>
+<span class="fn">torch_no_grad</span>(<span class="kw">true</span>)
+test_input <span class="op">=</span> <span class="fn">tensor_ones</span>(x_shape, <span class="num">2</span>)   <span class="cmt">// [1, 1]</span>
+result <span class="op">=</span> <span class="fn">nn_forward</span>(model, test_input)
+<span class="fn">print</span>(<span class="str">"Prediction for x=1: "</span>)
+<span class="fn">println</span>(<span class="fn">tensor_item_float</span>(result))   <span class="cmt">// ~4.0 (3*1 + 1)</span>
+<span class="fn">torch_no_grad</span>(<span class="kw">false</span>)
+
+<span class="cmt">// Clean up</span>
+<span class="fn">tensor_free</span>(x_train)
+<span class="fn">tensor_free</span>(y_train)
+<span class="fn">tensor_free</span>(test_input)
+<span class="fn">tensor_free</span>(result)
+<span class="fn">optim_free</span>(opt)
+<span class="fn">nn_free</span>(model)</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-testing.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.testing</span>
+    </a>
+    <a href="stdlib-ui.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.ui &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+[package]
+name = "nexc_ast"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nexc_diag = { path = "../nexc_diag" }
+

@@ -1,0 +1,6 @@
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+
+
+cargo build --release --features nexc_codegen_cranelift/torch
+cargo build --release --features nexc_codegen_cranelift/ui

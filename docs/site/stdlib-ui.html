@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.ui - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.ui</div>
+
+  <h1>std.ui</h1>
+  <p class="page-subtitle">Cross-platform UI framework with GPU-accelerated desktop rendering (WGPU) and a terminal (TUI) backend. Build desktop apps, terminal interfaces, and custom-drawn canvases from a single API.</p>
+
+  <div class="callout warning">
+    <div class="callout-title">Build Requirement</div>
+    <p>This module is optional and requires the <code>ui</code> feature flag. Build the Nex toolchain with <code>cargo build --features ui</code> to enable it. The feature pulls in <code>winit</code>, <code>wgpu</code>, <code>cosmic-text</code>, <code>taffy</code>, and <code>crossterm</code>.</p>
+  </div>
+
+  <pre><code><span class="kw">import</span> std.ui</code></pre>
+
+  <h2>Architecture</h2>
+
+  <p>The UI module is organized in four layers:</p>
+
+  <table>
+    <tr><th>Layer</th><th>Responsibility</th><th>Key concepts</th></tr>
+    <tr><td>Platform</td><td>Windowing, input events, lifecycle</td><td><code>ui_app_create</code>, <code>ui_app_run</code>, event loop</td></tr>
+    <tr><td>Rendering</td><td>Drawing primitives to screen</td><td>WGPU backend (0), Terminal backend (1)</td></tr>
+    <tr><td>Layout</td><td>Flexbox-style positioning</td><td>Row, Column, Grid containers, padding, margin, gap</td></tr>
+    <tr><td>Widgets</td><td>Interactive components</td><td>Text, Button, TextInput, Checkbox, Slider, Canvas</td></tr>
+  </table>
+
+  <div class="callout info">
+    <div class="callout-title">Rendering Backends</div>
+    <p>Backend <code>0</code> (default) uses WGPU for GPU-accelerated desktop rendering with full color, text shaping via <code>cosmic-text</code>, and pixel-perfect output. Backend <code>1</code> renders to the terminal using <code>crossterm</code> with box-drawing characters and ANSI colors &mdash; ideal for CLI tools and SSH sessions.</p>
+  </div>
+
+  <h2>Application Lifecycle</h2>
+
+  <h4>ui_app_create</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_create</span>(title: <span class="typ">String</span>, width: <span class="typ">Int</span>, height: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a new application with the given window title and dimensions in logical pixels. Returns an application handle used by all subsequent <code>ui_app_*</code> calls. Only one application may exist at a time.</p>
+
+  <h4>ui_app_set_backend</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_set_backend</span>(app: <span class="typ">Int64</span>, backend: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the rendering backend before calling <code>ui_app_run</code>. Pass <code>0</code> for WGPU (default) or <code>1</code> for Terminal.</p>
+
+  <h4>ui_app_set_root</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_set_root</span>(app: <span class="typ">Int64</span>, root: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the root widget of the application. The widget tree is rendered starting from this root. Call before <code>ui_app_run</code>.</p>
+
+  <h4>ui_app_run</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_run</span>(app: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Starts the event loop and opens the window (WGPU) or enters raw mode (Terminal). This call <strong>blocks</strong> until the user closes the window or calls <code>ui_app_quit</code>. Events are dispatched to registered callbacks while the loop runs.</p>
+
+  <h4>ui_app_quit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_quit</span>(app: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Signals the event loop to stop. The window closes and <code>ui_app_run</code> returns.</p>
+
+  <h4>ui_app_destroy</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_destroy</span>(app: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Releases all resources (widgets, renderer, window). Call after <code>ui_app_run</code> returns.</p>
+
+  <h4>ui_is_running</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_is_running</span>(app: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> while the application has not been closed or quit.</p>
+
+  <h4>ui_app_render</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_app_render</span>(app: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Triggers an immediate render of the widget tree. Typically called automatically by the event loop; only needed when using the polling model.</p>
+
+  <h2>Event Handling</h2>
+
+  <p>The UI module supports two complementary models for handling user interaction.</p>
+
+  <h3>Callback Model (Recommended)</h3>
+
+  <p>Register function references as event handlers, then call <code>ui_app_run</code> to block and dispatch:</p>
+
+  <h4>ui_on_click</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_on_click</span>(widget: <span class="typ">Int64</span>, callback: <span class="typ">(Int64, Int64) -&gt; Unit</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Registers a click handler. The callback receives <code>(widget_id, event_kind)</code>.</p>
+
+  <h4>ui_on_change</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_on_change</span>(widget: <span class="typ">Int64</span>, callback: <span class="typ">(Int64, Int64) -&gt; Unit</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Registers a value-change handler. Fires when TextInput content changes, Checkbox is toggled, or Slider is moved.</p>
+
+  <h4>ui_on_hover</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_on_hover</span>(widget: <span class="typ">Int64</span>, callback: <span class="typ">(Int64, Int64) -&gt; Unit</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Registers a mouse-enter handler.</p>
+
+  <h4>ui_on_key</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_on_key</span>(widget: <span class="typ">Int64</span>, callback: <span class="typ">(Int64, Int64) -&gt; Unit</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Registers a key-press handler.</p>
+
+  <h3>Polling Model</h3>
+
+  <p>For more control, poll events manually between render calls:</p>
+
+  <h4>ui_poll_event</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_poll_event</span>(app: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Dequeues the next pending event and returns its type as an integer. Returns <code>0</code> (None) when the queue is empty.</p>
+
+  <h4>Event Types</h4>
+  <table>
+    <tr><th>Value</th><th>Name</th><th>Description</th></tr>
+    <tr><td><code>0</code></td><td>None</td><td>No event pending</td></tr>
+    <tr><td><code>1</code></td><td>Click</td><td>Mouse click on a widget</td></tr>
+    <tr><td><code>2</code></td><td>Hover</td><td>Mouse entered a widget</td></tr>
+    <tr><td><code>3</code></td><td>HoverEnd</td><td>Mouse left a widget</td></tr>
+    <tr><td><code>4</code></td><td>KeyPress</td><td>Keyboard key pressed</td></tr>
+    <tr><td><code>5</code></td><td>KeyRelease</td><td>Keyboard key released</td></tr>
+    <tr><td><code>6</code></td><td>TextInput</td><td>Character typed into a TextInput</td></tr>
+    <tr><td><code>7</code></td><td>ValueChange</td><td>Widget value changed (checkbox, slider)</td></tr>
+    <tr><td><code>10</code></td><td>WindowClose</td><td>User closed the window</td></tr>
+    <tr><td><code>11</code></td><td>WindowResize</td><td>Window was resized</td></tr>
+  </table>
+
+  <h4>ui_event_type</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_event_type</span>(event: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the type code of a polled event.</p>
+
+  <h4>ui_event_widget</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_event_widget</span>(event: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Returns the widget handle that originated the event, or <code>-1</code> for non-widget events.</p>
+
+  <h2>Widget Creation</h2>
+
+  <p>Every widget function returns an <code>Int64</code> handle. Use handles to build the widget tree, set styles, and register callbacks.</p>
+
+  <h4>ui_text</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_text</span>(text: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a static text label.</p>
+
+  <h4>ui_button</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_button</span>(label: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a clickable button with the given label. Default style: blue background, white text, rounded corners.</p>
+
+  <h4>ui_text_input</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_text_input</span>(placeholder: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates an editable text field with placeholder text. Click to focus, then type. Backspace deletes characters.</p>
+
+  <h4>ui_image</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_image</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates an image widget from a file path. Supports PNG, JPEG, and other common formats.</p>
+
+  <h4>ui_checkbox</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_checkbox</span>(label: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a toggleable checkbox with an adjacent label. Click to toggle. Use <code>ui_get_value_float</code> to read the state (<code>1.0</code> = checked).</p>
+
+  <h4>ui_slider</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_slider</span>(min: <span class="typ">Double</span>, max: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a horizontal slider with the given range. The initial value is <code>min</code>. Use <code>ui_get_value_float</code> / <code>ui_set_value_float</code> to read/write the position.</p>
+
+  <h3>Container Widgets</h3>
+
+  <p>Containers arrange child widgets using flexbox layout powered by the <code>taffy</code> engine.</p>
+
+  <h4>ui_row</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_row</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a horizontal flex container. Children are laid out left-to-right.</p>
+
+  <h4>ui_column</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_column</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a vertical flex container. Children are laid out top-to-bottom.</p>
+
+  <h4>ui_stack</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_stack</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a stacking container where children overlap.</p>
+
+  <h4>ui_scroll</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_scroll</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a scrollable vertical container.</p>
+
+  <h4>ui_grid</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_grid</span>(cols: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a CSS-grid container with the given number of equal-width columns.</p>
+
+  <h4>ui_canvas</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas</span>(width: <span class="typ">Int</span>, height: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Creates a fixed-size drawing surface for custom 2D rendering. Use the <code>ui_canvas_*</code> functions to draw shapes and text.</p>
+
+  <h2>Widget Tree</h2>
+
+  <h4>ui_add_child</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_add_child</span>(parent: <span class="typ">Int64</span>, child: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Appends <code>child</code> to <code>parent</code>'s children list. The child will be laid out and rendered within the parent.</p>
+
+  <h4>ui_remove_child</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_remove_child</span>(parent: <span class="typ">Int64</span>, child: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Removes <code>child</code> from <code>parent</code>.</p>
+
+  <h4>ui_set_id / ui_get_id</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_id</span>(widget: <span class="typ">Int64</span>, id: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_get_id</span>(widget: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Assigns or reads a string identifier for a widget. Useful for debugging or lookup.</p>
+
+  <h2>Widget Properties</h2>
+
+  <h4>ui_set_text / ui_get_text</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_text</span>(widget: <span class="typ">Int64</span>, text: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_get_text</span>(widget: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Sets or reads the text content of a Text, Button, TextInput, or Checkbox widget.</p>
+
+  <h4>ui_set_visible</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_visible</span>(widget: <span class="typ">Int64</span>, visible: <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Shows or hides a widget. Hidden widgets do not participate in layout.</p>
+
+  <h4>ui_set_enabled</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_enabled</span>(widget: <span class="typ">Int64</span>, enabled: <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Enables or disables a widget. Disabled widgets do not respond to clicks.</p>
+
+  <h4>ui_get_value_float / ui_set_value_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_get_value_float</span>(widget: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Double</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_value_float</span>(widget: <span class="typ">Int64</span>, value: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Reads or writes the numeric value of a Slider (position) or Checkbox (<code>0.0</code> = unchecked, <code>1.0</code> = checked).</p>
+
+  <h2>Styling</h2>
+
+  <p>All styling functions take a widget handle as the first argument. Changes trigger automatic re-layout.</p>
+
+  <h4>Dimensions</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_width</span>(widget: <span class="typ">Int64</span>, width: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_height</span>(widget: <span class="typ">Int64</span>, height: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_min_width</span>(widget: <span class="typ">Int64</span>, value: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_min_height</span>(widget: <span class="typ">Int64</span>, value: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets explicit dimensions in logical pixels. Widgets without explicit sizes auto-size to their content.</p>
+
+  <h4>Spacing</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_padding</span>(widget: <span class="typ">Int64</span>, packed: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_margin</span>(widget: <span class="typ">Int64</span>, packed: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_gap</span>(widget: <span class="typ">Int64</span>, gap: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Padding and margin are packed as four <code>Int16</code> values (top, right, bottom, left) into a single <code>Int64</code>. Gap sets the spacing between children in a container.</p>
+
+  <h4>Colors</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_bg_color</span>(widget: <span class="typ">Int64</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_fg_color</span>(widget: <span class="typ">Int64</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Colors are packed as RGBA into a single <code>Int64</code>: <code>(R &lt;&lt; 24) | (G &lt;&lt; 16) | (B &lt;&lt; 8) | A</code>. For example, solid red is <code>0xFF0000FF</code>.</p>
+
+  <h4>Typography</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_font_size</span>(widget: <span class="typ">Int64</span>, size: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the font size in logical pixels. Default is <code>16.0</code>.</p>
+
+  <h4>Borders</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_border</span>(widget: <span class="typ">Int64</span>, width: <span class="typ">Double</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_border_radius</span>(widget: <span class="typ">Int64</span>, radius: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets the border width, color, and corner radius. Focused TextInput widgets automatically show a blue border.</p>
+
+  <h4>Flex Layout</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_set_flex_grow</span>(widget: <span class="typ">Int64</span>, grow: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_align_items</span>(widget: <span class="typ">Int64</span>, align: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_justify_content</span>(widget: <span class="typ">Int64</span>, justify: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <br><span class="kw">def</span> <span class="fn">ui_set_align_self</span>(widget: <span class="typ">Int64</span>, align: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+
+  <table>
+    <tr><th>Alignment</th><th>Value</th></tr>
+    <tr><td>Start</td><td><code>0</code></td></tr>
+    <tr><td>Center</td><td><code>1</code></td></tr>
+    <tr><td>End</td><td><code>2</code></td></tr>
+    <tr><td>Stretch</td><td><code>3</code></td></tr>
+  </table>
+
+  <table>
+    <tr><th>Justification</th><th>Value</th></tr>
+    <tr><td>Start</td><td><code>0</code></td></tr>
+    <tr><td>Center</td><td><code>1</code></td></tr>
+    <tr><td>End</td><td><code>2</code></td></tr>
+    <tr><td>SpaceBetween</td><td><code>3</code></td></tr>
+    <tr><td>SpaceAround</td><td><code>4</code></td></tr>
+    <tr><td>SpaceEvenly</td><td><code>5</code></td></tr>
+  </table>
+
+  <h2>Canvas Drawing</h2>
+
+  <p>The canvas widget provides a retained-mode drawing API. Commands are recorded and replayed each frame.</p>
+
+  <h4>ui_canvas_fill_rect</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas_fill_rect</span>(canvas: <span class="typ">Int64</span>, x: <span class="typ">Double</span>, y: <span class="typ">Double</span>, w: <span class="typ">Double</span>, h: <span class="typ">Double</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Draws a filled rectangle at <code>(x, y)</code> with size <code>(w, h)</code>. Coordinates are relative to the canvas top-left.</p>
+
+  <h4>ui_canvas_stroke_rect</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas_stroke_rect</span>(canvas: <span class="typ">Int64</span>, x: <span class="typ">Double</span>, y: <span class="typ">Double</span>, w: <span class="typ">Double</span>, h: <span class="typ">Double</span>, line_width: <span class="typ">Double</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Draws a rectangle outline.</p>
+
+  <h4>ui_canvas_fill_circle</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas_fill_circle</span>(canvas: <span class="typ">Int64</span>, cx: <span class="typ">Double</span>, cy: <span class="typ">Double</span>, radius: <span class="typ">Double</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Draws a filled circle centered at <code>(cx, cy)</code>.</p>
+
+  <h4>ui_canvas_draw_line</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas_draw_line</span>(canvas: <span class="typ">Int64</span>, x1: <span class="typ">Double</span>, y1: <span class="typ">Double</span>, x2: <span class="typ">Double</span>, y2: <span class="typ">Double</span>, line_width: <span class="typ">Double</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Draws a line from <code>(x1, y1)</code> to <code>(x2, y2)</code>.</p>
+
+  <h4>ui_canvas_draw_text</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas_draw_text</span>(canvas: <span class="typ">Int64</span>, text: <span class="typ">String</span>, x: <span class="typ">Double</span>, y: <span class="typ">Double</span>, size: <span class="typ">Double</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Draws text at <code>(x, y)</code> with the given font size.</p>
+
+  <h4>ui_canvas_clear</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_canvas_clear</span>(canvas: <span class="typ">Int64</span>, rgba: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Clears all drawing commands and fills the canvas with the given color.</p>
+
+  <h2>Dialogs</h2>
+
+  <div class="callout warning">
+    <div class="callout-title">Stub Implementation</div>
+    <p><code>ui_dialog_message</code> and <code>ui_dialog_confirm</code> are currently stub implementations. They print to <code>stderr</code> and do not open a native dialog window. <code>ui_dialog_confirm</code> always returns <code>true</code>. Use an in-app overlay built with <code>Stack</code> for modal dialogs that actually appear in the UI.</p>
+  </div>
+
+  <h4>ui_dialog_message</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_dialog_message</span>(title: <span class="typ">String</span>, message: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Shows a modal message dialog. <strong>Currently a stub</strong> — prints to <code>stderr</code> only.</p>
+
+  <h4>ui_dialog_confirm</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_dialog_confirm</span>(title: <span class="typ">String</span>, message: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Shows a confirmation dialog. Returns <code>true</code> if the user clicked OK. <strong>Currently a stub</strong> — always returns <code>true</code>.</p>
+
+  <h4>ui_dialog_open_file / ui_dialog_save_file</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">ui_dialog_open_file</span>(title: <span class="typ">String</span>, filter: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+    <br><span class="kw">def</span> <span class="fn">ui_dialog_save_file</span>(title: <span class="typ">String</span>, filter: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Shows a native file picker. Returns the selected path or an empty string if cancelled.</p>
+
+  <h2>Complete Example: Desktop App</h2>
+
+  <pre><code><span class="kw">import</span> std.ui
+
+<span class="cmt">// ---- Build the widget tree ----</span>
+app <span class="op">=</span> <span class="fn">ui_app_create</span>(<span class="str">"Todo App"</span>, <span class="num">480</span>, <span class="num">640</span>)
+
+root <span class="op">=</span> <span class="fn">ui_column</span>()
+<span class="fn">ui_set_gap</span>(root, <span class="num">12.0</span>)
+
+<span class="cmt">// Header</span>
+title <span class="op">=</span> <span class="fn">ui_text</span>(<span class="str">"My Todos"</span>)
+<span class="fn">ui_set_font_size</span>(title, <span class="num">24.0</span>)
+<span class="fn">ui_set_fg_color</span>(title, <span class="num">0xFFFFFFFF</span>)
+<span class="fn">ui_add_child</span>(root, title)
+
+<span class="cmt">// Input row</span>
+input_row <span class="op">=</span> <span class="fn">ui_row</span>()
+<span class="fn">ui_set_gap</span>(input_row, <span class="num">8.0</span>)
+input <span class="op">=</span> <span class="fn">ui_text_input</span>(<span class="str">"What needs to be done?"</span>)
+<span class="fn">ui_set_flex_grow</span>(input, <span class="num">1.0</span>)
+add_btn <span class="op">=</span> <span class="fn">ui_button</span>(<span class="str">"Add"</span>)
+<span class="fn">ui_add_child</span>(input_row, input)
+<span class="fn">ui_add_child</span>(input_row, add_btn)
+<span class="fn">ui_add_child</span>(root, input_row)
+
+<span class="cmt">// Todo list</span>
+list <span class="op">=</span> <span class="fn">ui_column</span>()
+<span class="fn">ui_set_gap</span>(list, <span class="num">4.0</span>)
+<span class="fn">ui_add_child</span>(root, list)
+
+<span class="cmt">// Status bar</span>
+status <span class="op">=</span> <span class="fn">ui_text</span>(<span class="str">"0 items"</span>)
+<span class="fn">ui_set_fg_color</span>(status, <span class="num">0x999999FF</span>)
+<span class="fn">ui_add_child</span>(root, status)
+
+<span class="cmt">// ---- Register event handler ----</span>
+<span class="kw">def</span> <span class="fn">on_add_clicked</span>(widget_id: <span class="typ">Int64</span>, event_kind: <span class="typ">Int64</span>) {
+    text <span class="op">=</span> <span class="fn">ui_get_text</span>(input)
+    <span class="kw">if</span> (<span class="fn">str_length</span>(text) <span class="op">&gt;</span> <span class="num">0</span>) {
+        item <span class="op">=</span> <span class="fn">ui_checkbox</span>(text)
+        <span class="fn">ui_add_child</span>(list, item)
+        <span class="fn">ui_set_text</span>(input, <span class="str">""</span>)
+    }
+}
+<span class="fn">ui_on_click</span>(add_btn, on_add_clicked)
+
+<span class="cmt">// ---- Set root and run ----</span>
+<span class="fn">ui_app_set_root</span>(app, root)
+<span class="fn">ui_app_run</span>(app)
+<span class="fn">ui_app_destroy</span>(app)</code></pre>
+
+  <h2>Complete Example: Terminal App</h2>
+
+  <pre><code><span class="kw">import</span> std.ui
+
+app <span class="op">=</span> <span class="fn">ui_app_create</span>(<span class="str">"TUI Demo"</span>, <span class="num">80</span>, <span class="num">24</span>)
+<span class="fn">ui_app_set_backend</span>(app, <span class="num">1</span>)  <span class="cmt">// Terminal backend</span>
+
+root <span class="op">=</span> <span class="fn">ui_column</span>()
+<span class="fn">ui_add_child</span>(root, <span class="fn">ui_text</span>(<span class="str">"Press ESC to quit"</span>))
+<span class="fn">ui_add_child</span>(root, <span class="fn">ui_button</span>(<span class="str">"Click Me"</span>))
+<span class="fn">ui_add_child</span>(root, <span class="fn">ui_checkbox</span>(<span class="str">"Dark Mode"</span>))
+
+<span class="fn">ui_app_set_root</span>(app, root)
+<span class="fn">ui_app_run</span>(app)
+<span class="fn">ui_app_destroy</span>(app)</code></pre>
+
+  <h2>Complete Example: Canvas Drawing</h2>
+
+  <pre><code><span class="kw">import</span> std.ui
+
+app <span class="op">=</span> <span class="fn">ui_app_create</span>(<span class="str">"Canvas"</span>, <span class="num">600</span>, <span class="num">400</span>)
+root <span class="op">=</span> <span class="fn">ui_column</span>()
+
+<span class="fn">ui_add_child</span>(root, <span class="fn">ui_text</span>(<span class="str">"Custom Drawing"</span>))
+
+canvas <span class="op">=</span> <span class="fn">ui_canvas</span>(<span class="num">500</span>, <span class="num">300</span>)
+<span class="fn">ui_canvas_clear</span>(canvas, <span class="num">0x1E1E2EFF</span>)
+<span class="fn">ui_canvas_fill_rect</span>(canvas, <span class="num">20.0</span>, <span class="num">20.0</span>, <span class="num">100.0</span>, <span class="num">80.0</span>, <span class="num">0xFF5370FF</span>)
+<span class="fn">ui_canvas_fill_circle</span>(canvas, <span class="num">250.0</span>, <span class="num">150.0</span>, <span class="num">60.0</span>, <span class="num">0x82AAFFFF</span>)
+<span class="fn">ui_canvas_draw_line</span>(canvas, <span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">500.0</span>, <span class="num">300.0</span>, <span class="num">2.0</span>, <span class="num">0xC3E88DFF</span>)
+<span class="fn">ui_canvas_draw_text</span>(canvas, <span class="str">"Hello Canvas"</span>, <span class="num">150.0</span>, <span class="num">260.0</span>, <span class="num">20.0</span>, <span class="num">0xFFFFFFFF</span>)
+<span class="fn">ui_add_child</span>(root, canvas)
+
+<span class="fn">ui_app_set_root</span>(app, root)
+<span class="fn">ui_app_run</span>(app)
+<span class="fn">ui_app_destroy</span>(app)</code></pre>
+
+  <h2>Debug Logging</h2>
+  <p>For runtime UI diagnostics (text input flow and callback dispatch), set <code>NEX_UI_DEBUG_LOG</code> before launch. If not set, logs go to <code>debug-ui.log</code> in the current working directory.</p>
+  <pre><code># PowerShell
+$env:NEX_UI_DEBUG_LOG = "D:\temp\nex-ui-debug.log"
+aur run
+</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-torch.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.torch</span>
+    </a>
+    <a href="tooling-aur.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Build Tool (aur) &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

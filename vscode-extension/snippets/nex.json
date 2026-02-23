@@ -1,0 +1,211 @@
+{
+  "UI App Scaffold": {
+    "prefix": "uiapp",
+    "body": [
+      "import std.ui",
+      "",
+      "app = ui_app_create(\"${1:My App}\", ${2:800}, ${3:600})",
+      "",
+      "root = ui_column()",
+      "ui_set_gap(root, ${4:12.0})",
+      "",
+      "${5:// Add widgets here}",
+      "ui_add_child(root, ui_text(\"${6:Hello World}\"))",
+      "",
+      "ui_app_set_root(app, root)",
+      "ui_app_run(app)",
+      "ui_app_destroy(app)"
+    ],
+    "description": "Scaffold a new std.ui desktop application"
+  },
+  "UI Terminal App": {
+    "prefix": "uitui",
+    "body": [
+      "import std.ui",
+      "",
+      "app = ui_app_create(\"${1:TUI App}\", 80, 24)",
+      "ui_app_set_backend(app, 1)",
+      "",
+      "root = ui_column()",
+      "ui_add_child(root, ui_text(\"${2:Press ESC to quit}\"))",
+      "${3}",
+      "",
+      "ui_app_set_root(app, root)",
+      "ui_app_run(app)",
+      "ui_app_destroy(app)"
+    ],
+    "description": "Scaffold a terminal UI application"
+  },
+  "UI Button with Handler": {
+    "prefix": "uibtn",
+    "body": [
+      "${1:btn} = ui_button(\"${2:Click Me}\")",
+      "",
+      "def ${3:on_btn_click}(widget_id: Int64, event_kind: Int64) {",
+      "    ${4:println(\"Clicked!\")}",
+      "}",
+      "ui_on_click(${1}, ${3})"
+    ],
+    "description": "Create a button with a click handler"
+  },
+  "UI Row Layout": {
+    "prefix": "uirow",
+    "body": [
+      "${1:row} = ui_row()",
+      "ui_set_gap(${1}, ${2:8.0})",
+      "ui_add_child(${1}, ${3:child1})",
+      "ui_add_child(${1}, ${4:child2})"
+    ],
+    "description": "Create a horizontal row container"
+  },
+  "UI Column Layout": {
+    "prefix": "uicol",
+    "body": [
+      "${1:col} = ui_column()",
+      "ui_set_gap(${1}, ${2:8.0})",
+      "ui_add_child(${1}, ${3:child1})",
+      "ui_add_child(${1}, ${4:child2})"
+    ],
+    "description": "Create a vertical column container"
+  },
+  "UI Text Input": {
+    "prefix": "uiinput",
+    "body": [
+      "${1:input} = ui_text_input(\"${2:Enter text...}\")",
+      "ui_set_flex_grow(${1}, 1.0)"
+    ],
+    "description": "Create a text input with flex grow"
+  },
+  "UI Canvas Drawing": {
+    "prefix": "uicanvas",
+    "body": [
+      "${1:canvas} = ui_canvas(${2:400}, ${3:300})",
+      "ui_canvas_clear(${1}, ${4:0x1E1E2EFF})",
+      "ui_canvas_fill_rect(${1}, ${5:10.0}, ${6:10.0}, ${7:100.0}, ${8:50.0}, ${9:0xFF5370FF})",
+      "${10}"
+    ],
+    "description": "Create a canvas with initial drawing"
+  },
+  "UI Checkbox": {
+    "prefix": "uicheck",
+    "body": [
+      "${1:cb} = ui_checkbox(\"${2:Enable option}\")"
+    ],
+    "description": "Create a checkbox widget"
+  },
+  "UI Slider": {
+    "prefix": "uislider",
+    "body": [
+      "${1:slider} = ui_slider(${2:0.0}, ${3:100.0})"
+    ],
+    "description": "Create a slider widget"
+  },
+  "UI Grid Layout": {
+    "prefix": "uigrid",
+    "body": [
+      "${1:grid} = ui_grid(${2:3})",
+      "ui_set_gap(${1}, ${3:8.0})",
+      "${4}"
+    ],
+    "description": "Create a grid container"
+  },
+  "Class Definition": {
+    "prefix": "class",
+    "body": [
+      "public class ${1:ClassName} {",
+      "    ${2:field}: ${3:Int}",
+      "",
+      "    def init(${2}: ${3}) {",
+      "        self.${2} = ${2}",
+      "    }",
+      "",
+      "    ${4}",
+      "}"
+    ],
+    "description": "Define a new class"
+  },
+  "Struct Definition": {
+    "prefix": "struct",
+    "body": [
+      "public struct ${1:Name} {",
+      "    ${2:x}: ${3:Float}",
+      "    ${4:y}: ${5:Float}",
+      "}"
+    ],
+    "description": "Define a new struct"
+  },
+  "Interface Definition": {
+    "prefix": "interface",
+    "body": [
+      "public interface ${1:Name} {",
+      "    def ${2:method}(${3:param}: ${4:Type}) -> ${5:Unit}",
+      "}"
+    ],
+    "description": "Define a new interface"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": [
+      "for (${1:i} = ${2:0}; ${1} < ${3:10}; ${1} = ${1} + 1) {",
+      "    ${4}",
+      "}"
+    ],
+    "description": "C-style for loop"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition}) {",
+      "    ${2}",
+      "}"
+    ],
+    "description": "While loop"
+  },
+  "Try Catch": {
+    "prefix": "try",
+    "body": [
+      "try {",
+      "    ${1}",
+      "} catch (${2:e}: ${3:Exception}) {",
+      "    ${4}",
+      "}"
+    ],
+    "description": "Try/catch block"
+  },
+  "Using Block": {
+    "prefix": "using",
+    "body": [
+      "using (${1:resource} = ${2:expr}) {",
+      "    ${3}",
+      "}"
+    ],
+    "description": "Using block for disposable resources"
+  },
+  "Function Definition": {
+    "prefix": "def",
+    "body": [
+      "def ${1:name}(${2:param}: ${3:Type}) -> ${4:Unit} {",
+      "    ${5}",
+      "}"
+    ],
+    "description": "Define a function"
+  },
+  "Public Function": {
+    "prefix": "pdef",
+    "body": [
+      "public def ${1:name}(${2:param}: ${3:Type}) -> ${4:Unit} {",
+      "    ${5}",
+      "}"
+    ],
+    "description": "Define a public function"
+  },
+  "Main Function": {
+    "prefix": "main",
+    "body": [
+      "def main() {",
+      "    ${1:println(\"Hello, World!\")}",
+      "}"
+    ],
+    "description": "Main entry point function"
+  }
+}

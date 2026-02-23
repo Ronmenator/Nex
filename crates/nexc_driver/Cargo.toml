@@ -1,0 +1,31 @@
+[package]
+name = "nexc_driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+torch = ["nexc_codegen_cranelift/torch"]
+ui = ["nexc_codegen_cranelift/ui"]
+engine = ["nexc_codegen_cranelift/engine"]
+
+[dependencies]
+nexc_ast = { path = "../nexc_ast" }
+nexc_diag = { path = "../nexc_diag" }
+nexc_lex = { path = "../nexc_lex" }
+nexc_parse = { path = "../nexc_parse" }
+nexc_resolve = { path = "../nexc_resolve" }
+nexc_layout = { path = "../nexc_layout" }
+nexc_type = { path = "../nexc_type" }
+nexc_ir = { path = "../nexc_ir" }
+nexc_codegen_cranelift = { path = "../nexc_codegen_cranelift" }
+nexc_meta = { path = "../nexc_meta" }
+nexui_parse = { path = "../nexui_parse" }
+nexui_lower = { path = "../nexui_lower" }
+
+[dev-dependencies]
+nexc_diag = { path = "../nexc_diag" }
+nexc_ir = { path = "../nexc_ir" }
+

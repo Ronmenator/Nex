@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formatter &amp; Linter - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Tooling<span class="sep">/</span>Formatter &amp; Linter</div>
+
+  <h1>Formatter &amp; Linter</h1>
+  <p class="page-subtitle">Code formatting and static analysis tools.</p>
+
+  <h2>Formatter</h2>
+
+  <h3>Usage</h3>
+  <div class="signature">
+    aur fmt &lt;file&gt;
+  </div>
+
+  <p>The formatter parses an Nex source file and reprints it in canonical format. It normalizes whitespace, indentation, brace placement, and line breaks while preserving ASI (Automatic Semicolon Insertion) semantics.</p>
+
+  <pre><code><span class="cmt"># Format a single file</span>
+$ aur fmt src/main.nex
+
+<span class="cmt"># Format a utility module</span>
+$ aur fmt src/utils.nex</code></pre>
+
+  <h3>What the Formatter Does</h3>
+
+  <ul>
+    <li><strong>Indentation</strong> — Normalizes to 4 spaces per level.</li>
+    <li><strong>Brace placement</strong> — Opening braces on the same line as the declaration.</li>
+    <li><strong>Whitespace</strong> — Consistent spacing around operators, after commas, and between declarations.</li>
+    <li><strong>Blank lines</strong> — Single blank line between top-level declarations; no trailing blank lines.</li>
+    <li><strong>ASI preservation</strong> — The formatted output compiles identically to the input. Semicolons are not added or removed in a way that changes program behavior.</li>
+  </ul>
+
+  <h3>Before &amp; After</h3>
+
+  <p>Before formatting:</p>
+  <pre><code><span class="kw">def</span> <span class="fn">add</span>(  a:<span class="typ">Int</span> ,b:<span class="typ">Int</span>)<span class="op">-&gt;</span><span class="typ">Int</span>{
+<span class="kw">return</span> a<span class="op">+</span>b
+}
+<span class="kw">def</span>   <span class="fn">main</span>()<span class="op">-&gt;</span><span class="typ">Unit</span> {
+  result<span class="op">=</span><span class="fn">add</span>( <span class="num">1</span>,<span class="num">2</span>)
+<span class="fn">println</span>(result)
+}</code></pre>
+
+  <p>After <code>aur fmt</code>:</p>
+  <pre><code><span class="kw">def</span> <span class="fn">add</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span> {
+    <span class="kw">return</span> a <span class="op">+</span> b
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    result <span class="op">=</span> <span class="fn">add</span>(<span class="num">1</span>, <span class="num">2</span>)
+    <span class="fn">println</span>(result)
+}</code></pre>
+
+  <h2>Linter</h2>
+
+  <h3>Usage</h3>
+  <div class="signature">
+    aur lint &lt;file&gt;
+  </div>
+
+  <p>The linter performs static analysis on Nex source files and reports warnings for common issues. It does not modify the source code.</p>
+
+  <pre><code>$ aur lint src/main.nex
+src/main.nex:5: warning: unused import 'std.time'
+src/main.nex:18: warning: Var in public API parameter 'data' — add @allow_var_api to suppress
+src/main.nex:30: warning: unreachable code after return statement</code></pre>
+
+  <h3>Lint Rules (v1)</h3>
+
+  <table>
+    <thead><tr><th>Rule</th><th>Severity</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Var in public API</strong></td>
+        <td>Warning</td>
+        <td>Warns when a <code>public</code> function parameter, return type, or <code>public</code> field uses <code>Var</code>. Suppress with the <code>@allow_var_api</code> annotation.</td>
+      </tr>
+      <tr>
+        <td><strong>Unused imports</strong></td>
+        <td>Warning</td>
+        <td>Warns when an imported module is not referenced in the file.</td>
+      </tr>
+      <tr>
+        <td><strong>Unreachable code</strong></td>
+        <td>Warning</td>
+        <td>Warns about statements that can never be executed (e.g. code after a <code>return</code>, <code>break</code>, or <code>continue</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>Ambiguous member access</strong></td>
+        <td>Warning</td>
+        <td>When multiple inheritance introduces ambiguous member names, the linter suggests qualified access (<code>self.Base::method()</code>) or an <code>alias</code> declaration.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Suppressing Var Warnings</h3>
+
+  <p>Use the <code>@allow_var_api</code> annotation to suppress the Var-in-public-API warning when dynamic typing is intentional:</p>
+
+  <pre><code><span class="cmt">// Without annotation — produces a warning</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span> {
+    <span class="cmt">// ...</span>
+}
+
+<span class="cmt">// With annotation — warning suppressed</span>
+@allow_var_api
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span> {
+    <span class="cmt">// ...</span>
+}</code></pre>
+
+  <h3>Example Lint Output</h3>
+
+  <pre><code>$ aur lint src/server.nex
+src/server.nex:3: warning: unused import 'std.json'
+src/server.nex:15: warning: Var in public API return type — add @allow_var_api to suppress
+src/server.nex:28: warning: ambiguous member 'start' — consider self.TcpServer::start() or alias
+src/server.nex:42: warning: unreachable code after return</code></pre>
+
+  <div class="page-nav">
+    <a href="tooling-repl.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; REPL</span>
+    </a>
+    <a href="tooling-vscode.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">VS Code Extension &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

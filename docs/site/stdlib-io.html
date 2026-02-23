@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.io - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.io</div>
+
+  <h1>std.io</h1>
+  <p class="page-subtitle">File I/O, console input, and filesystem operations.</p>
+
+  <pre><code><span class="kw">import</span> std.io</code></pre>
+
+  <h2>Console Input</h2>
+
+  <h4>read_line</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">read_line</span>() <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Reads a line of text from standard input (stdin). Blocks until the user presses Enter. The returned string does not include the trailing newline.</p>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="fn">print</span>(<span class="str">"Enter your name: "</span>)
+name <span class="op">=</span> <span class="fn">read_line</span>()
+<span class="fn">println</span>(<span class="str">"Hello, "</span> <span class="op">+</span> name <span class="op">+</span> <span class="str">"!"</span>)</code></pre>
+
+  <h2>File Existence &amp; Info</h2>
+
+  <h4>file_exists</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">file_exists</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if a file or directory exists at <code>path</code>.</p>
+
+  <h4>file_size</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">file_size</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
+  </div>
+  <p>Returns the size of the file in bytes, or <code>-1</code> on error.</p>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="kw">if</span> (<span class="fn">file_exists</span>(<span class="str">"data.txt"</span>)) {
+    size <span class="op">=</span> <span class="fn">file_size</span>(<span class="str">"data.txt"</span>)
+    <span class="fn">println</span>(<span class="str">"File size: "</span>)
+    <span class="fn">println</span>(size)
+} <span class="kw">else</span> {
+    <span class="fn">println</span>(<span class="str">"File not found"</span>)
+}</code></pre>
+
+  <h2>File Operations</h2>
+
+  <h4>file_delete</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">file_delete</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Deletes the file at <code>path</code>. Returns <code>true</code> on success.</p>
+
+  <h4>file_rename</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">file_rename</span>(from: <span class="typ">String</span>, to: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Renames (or moves) a file from one path to another. Returns <code>true</code> on success.</p>
+
+  <h4>file_copy</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">file_copy</span>(from: <span class="typ">String</span>, to: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Copies a file from one path to another. Returns <code>true</code> on success.</p>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="cmt">// Copy a file and verify</span>
+<span class="kw">if</span> (<span class="fn">file_copy</span>(<span class="str">"config.toml"</span>, <span class="str">"config.backup.toml"</span>)) {
+    <span class="fn">println</span>(<span class="str">"Backup created"</span>)
+}
+
+<span class="cmt">// Rename a file</span>
+<span class="fn">file_rename</span>(<span class="str">"old_name.txt"</span>, <span class="str">"new_name.txt"</span>)
+
+<span class="cmt">// Delete a temporary file</span>
+<span class="fn">file_delete</span>(<span class="str">"temp.log"</span>)</code></pre>
+
+  <h2>Directory Operations</h2>
+
+  <h4>mkdir</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">mkdir</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Creates directories recursively (like <code>mkdir -p</code>). Returns <code>true</code> on success.</p>
+
+  <h4>list_dir</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">list_dir</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the entries in a directory as a single string with entries separated by newlines.</p>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="cmt">// Create nested directories</span>
+<span class="fn">mkdir</span>(<span class="str">"output/reports/2025"</span>)
+
+<span class="cmt">// List directory contents</span>
+entries <span class="op">=</span> <span class="fn">list_dir</span>(<span class="str">"src"</span>)
+<span class="fn">println</span>(entries)
+<span class="cmt">// main.nex</span>
+<span class="cmt">// utils.nex</span>
+<span class="cmt">// models/</span></code></pre>
+
+  <h2>Console Resource</h2>
+
+  <h4>open_console</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">open_console</span>() <span class="op">-&gt;</span> <span class="typ">Disposable</span>
+  </div>
+  <p>Opens a console resource that can be used with <code>using</code> blocks. The console is disposed automatically when the block exits.</p>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="kw">using</span> (console <span class="op">=</span> <span class="fn">open_console</span>()) {
+    <span class="fn">print</span>(<span class="str">"What is your age? "</span>)
+    age <span class="op">=</span> <span class="fn">read_line</span>()
+    <span class="fn">println</span>(<span class="str">"You are "</span> <span class="op">+</span> age <span class="op">+</span> <span class="str">" years old."</span>)
+}</code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="cmt">// Simple file manager</span>
+<span class="kw">def</span> <span class="fn">backup_file</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> {
+    <span class="kw">if</span> (<span class="op">!</span><span class="fn">file_exists</span>(path)) {
+        <span class="fn">println</span>(<span class="str">"Source file not found"</span>)
+        <span class="kw">return</span> <span class="kw">false</span>
+    }
+
+    <span class="cmt">// Create backup directory</span>
+    <span class="fn">mkdir</span>(<span class="str">"backups"</span>)
+
+    <span class="cmt">// Copy file to backup directory</span>
+    backup_path <span class="op">=</span> <span class="str">"backups/"</span> <span class="op">+</span> path
+    <span class="kw">if</span> (<span class="fn">file_copy</span>(path, backup_path)) {
+        size <span class="op">=</span> <span class="fn">file_size</span>(backup_path)
+        <span class="fn">print</span>(<span class="str">"Backed up "</span>)
+        <span class="fn">print</span>(path)
+        <span class="fn">print</span>(<span class="str">" ("</span>)
+        <span class="fn">print</span>(size)
+        <span class="fn">println</span>(<span class="str">" bytes)"</span>)
+        <span class="kw">return</span> <span class="kw">true</span>
+    }
+    <span class="kw">return</span> <span class="kw">false</span>
+}
+
+<span class="fn">backup_file</span>(<span class="str">"project.toml"</span>)
+
+<span class="cmt">// Interactive prompt</span>
+<span class="fn">print</span>(<span class="str">"Enter filename to check: "</span>)
+fname <span class="op">=</span> <span class="fn">read_line</span>()
+<span class="kw">if</span> (<span class="fn">file_exists</span>(fname)) {
+    <span class="fn">println</span>(<span class="str">"File exists"</span>)
+} <span class="kw">else</span> {
+    <span class="fn">println</span>(<span class="str">"File not found"</span>)
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-collections.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.collections</span>
+    </a>
+    <a href="stdlib-convert.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.convert &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

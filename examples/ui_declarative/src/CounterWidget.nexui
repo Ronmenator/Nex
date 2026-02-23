@@ -1,0 +1,10 @@
+<Widget xmlns="std.ui" Extends="BaseWidget">
+  <Text Text="Counter" FontSize="28" />
+  <Text Text="{Binding StatusText}" FontSize="14" />
+  <Text Text="{Binding CounterText}" FontSize="22" />
+  <Row Gap="8">
+    <Button Label="+"     Click="on_increment" />
+    <Button Label="-"     Click="on_decrement" />
+    <Button Label="Reset" Click="on_reset"     />
+  </Row>
+</Widget>

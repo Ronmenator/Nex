@@ -1,0 +1,93 @@
+{
+  "name": "nex-language",
+  "displayName": "Nex Language",
+  "description": "Language support for Nex (.nex): syntax highlighting, LSP, and build commands.",
+  "version": "0.1.51",
+  "publisher": "nex",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "nex",
+        "aliases": ["Nex", "nex"],
+        "extensions": [".nex"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "nexui",
+        "aliases": ["NexUI", "nexui"],
+        "extensions": [".nexui"],
+        "configuration": "./language-configuration-nexui.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nex",
+        "scopeName": "source.nex",
+        "path": "./syntaxes/nex.tmLanguage.json"
+      },
+      {
+        "language": "nexui",
+        "scopeName": "text.xml.nexui",
+        "path": "./syntaxes/nexui.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "nex",
+        "path": "./snippets/nex.json"
+      }
+    ],
+    "configuration": {
+      "title": "Nex",
+      "properties": {
+        "nex.enableLsp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Nex Language Server (nex-lsp)."
+        },
+        "nex.lspPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to nex-lsp executable. If empty, resolves from workspace binaries or PATH."
+        },
+        "nex.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace level for the language server client."
+        }
+      }
+    },
+    "commands": [
+      { "command": "nex.build", "title": "Nex: Build", "category": "Nex" },
+      { "command": "nex.run", "title": "Nex: Run", "category": "Nex" },
+      { "command": "nex.test", "title": "Nex: Test", "category": "Nex" },
+      { "command": "nex.format", "title": "Nex: Format", "category": "Nex" },
+      { "command": "nex.newProject", "title": "Nex: New Project", "category": "Nex" },
+      { "command": "nex.newLibrary", "title": "Nex: New Library", "category": "Nex" }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "package": "vsce package",
+    "lint": "eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

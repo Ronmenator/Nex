@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.collections - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.collections</div>
+
+  <h1>std.collections</h1>
+  <p class="page-subtitle">Generic collection types: List, Map, and Set.</p>
+
+  <pre><code><span class="kw">import</span> std.collections</code></pre>
+
+  <h2>List[T]</h2>
+
+  <p>A dynamically-sized, ordered collection of elements. Lists are generic and support any element type via monomorphization.</p>
+
+  <h3>Creating a List</h3>
+
+  <div class="signature">
+    <span class="kw">class</span> <span class="typ">List</span>[T] {<br>
+    &nbsp;&nbsp;<span class="kw">def</span> <span class="fn">init</span>()<br>
+    }
+  </div>
+  <p>Creates an empty list. The element type is inferred from the first <code>add</code> call or from the type annotation.</p>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+<span class="cmt">// Create an empty list of integers</span>
+nums <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+<span class="fn">nums.add</span>(<span class="num">10</span>)
+<span class="fn">nums.add</span>(<span class="num">20</span>)
+<span class="fn">nums.add</span>(<span class="num">30</span>)
+<span class="fn">println</span>(<span class="fn">nums.length</span>())  <span class="cmt">// 3</span></code></pre>
+
+  <h3>Methods</h3>
+
+  <h4>add(item: T) &rarr; Unit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">add</span>(item: T) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Appends <code>item</code> to the end of the list.</p>
+
+  <h4>get(index: Int) &rarr; T</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">get</span>(index: <span class="typ">Int</span>) <span class="op">-&gt;</span> T
+  </div>
+  <p>Returns the element at the given <code>index</code>. Index is zero-based.</p>
+
+  <h4>set(index: Int, value: T) &rarr; Unit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set</span>(index: <span class="typ">Int</span>, value: T) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Replaces the element at <code>index</code> with <code>value</code>.</p>
+
+  <h4>length() &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">length</span>() <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of elements in the list.</p>
+
+  <h4>sort()</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">sort</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sorts the list in ascending order. Available for <code>List[Int]</code>.</p>
+
+  <h4>reverse()</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">reverse</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Reverses the order of elements in place.</p>
+
+  <h4>clear()</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">clear</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Removes all elements from the list.</p>
+
+  <h4>contains(value: T) &rarr; Bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">contains</span>(value: T) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if the list contains <code>value</code>. Available for <code>List[Int]</code>.</p>
+
+  <h4>index_of(value: T) &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">index_of</span>(value: T) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the index of the first occurrence of <code>value</code>, or <code>-1</code> if not found. Available for <code>List[Int]</code>.</p>
+
+  <h3>List Example</h3>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+scores <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+<span class="fn">scores.add</span>(<span class="num">85</span>)
+<span class="fn">scores.add</span>(<span class="num">92</span>)
+<span class="fn">scores.add</span>(<span class="num">78</span>)
+<span class="fn">scores.add</span>(<span class="num">95</span>)
+<span class="fn">scores.add</span>(<span class="num">88</span>)
+
+<span class="fn">println</span>(<span class="fn">scores.length</span>())          <span class="cmt">// 5</span>
+<span class="fn">println</span>(<span class="fn">scores.get</span>(<span class="num">0</span>))             <span class="cmt">// 85</span>
+<span class="fn">println</span>(<span class="fn">scores.contains</span>(<span class="num">92</span>))      <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">scores.index_of</span>(<span class="num">78</span>))      <span class="cmt">// 2</span>
+
+<span class="fn">scores.sort</span>()
+<span class="fn">println</span>(<span class="fn">scores.get</span>(<span class="num">0</span>))             <span class="cmt">// 78 (smallest after sort)</span>
+
+<span class="fn">scores.set</span>(<span class="num">0</span>, <span class="num">100</span>)
+<span class="fn">println</span>(<span class="fn">scores.get</span>(<span class="num">0</span>))             <span class="cmt">// 100</span>
+
+<span class="fn">scores.reverse</span>()
+<span class="fn">println</span>(<span class="fn">scores.get</span>(<span class="num">0</span>))             <span class="cmt">// last element is now first</span>
+
+<span class="fn">scores.clear</span>()
+<span class="fn">println</span>(<span class="fn">scores.length</span>())          <span class="cmt">// 0</span></code></pre>
+
+  <h2>Map[K, V]</h2>
+
+  <p>A key-value collection with hash-based lookup. Keys use built-in hashing for primitives and virtual <code>hash_code</code> + <code>equals</code> for class types.</p>
+
+  <h3>Creating a Map</h3>
+
+  <div class="signature">
+    <span class="kw">class</span> <span class="typ">Map</span>[K, V] {<br>
+    &nbsp;&nbsp;<span class="kw">def</span> <span class="fn">init</span>()<br>
+    }
+  </div>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+ages <span class="op">=</span> <span class="typ">Map</span>[<span class="typ">String</span>, <span class="typ">Int</span>]()
+<span class="fn">ages.put</span>(<span class="str">"Alice"</span>, <span class="num">30</span>)
+<span class="fn">ages.put</span>(<span class="str">"Bob"</span>, <span class="num">25</span>)</code></pre>
+
+  <h3>Methods</h3>
+
+  <h4>put(key: K, value: V) &rarr; Unit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">put</span>(key: K, value: V) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Inserts or updates the value associated with <code>key</code>.</p>
+
+  <h4>get(key: K) &rarr; V</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">get</span>(key: K) <span class="op">-&gt;</span> V
+  </div>
+  <p>Returns the value associated with <code>key</code>. Behavior is undefined if the key does not exist; use <code>try_get</code> or <code>contains</code> first.</p>
+
+  <h4>try_get(key: K) &rarr; (Bool, V)</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">try_get</span>(key: K) <span class="op">-&gt;</span> (<span class="typ">Bool</span>, V)
+  </div>
+  <p>Returns a pair: <code>true</code> and the value if the key exists, or <code>false</code> and a default value if not.</p>
+
+  <h4>contains(key: K) &rarr; Bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">contains</span>(key: K) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if the map contains the given <code>key</code>.</p>
+
+  <h4>remove(key: K) &rarr; Unit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">remove</span>(key: K) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Removes the entry for <code>key</code> if it exists.</p>
+
+  <h4>size() &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">size</span>() <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of key-value pairs in the map.</p>
+
+  <h3>Map Example</h3>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+config <span class="op">=</span> <span class="typ">Map</span>[<span class="typ">String</span>, <span class="typ">String</span>]()
+<span class="fn">config.put</span>(<span class="str">"host"</span>, <span class="str">"localhost"</span>)
+<span class="fn">config.put</span>(<span class="str">"port"</span>, <span class="str">"8080"</span>)
+<span class="fn">config.put</span>(<span class="str">"debug"</span>, <span class="str">"true"</span>)
+
+<span class="fn">println</span>(<span class="fn">config.size</span>())                <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">config.get</span>(<span class="str">"host"</span>))           <span class="cmt">// "localhost"</span>
+<span class="fn">println</span>(<span class="fn">config.contains</span>(<span class="str">"port"</span>))      <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">config.contains</span>(<span class="str">"timeout"</span>))   <span class="cmt">// false</span>
+
+<span class="fn">config.remove</span>(<span class="str">"debug"</span>)
+<span class="fn">println</span>(<span class="fn">config.size</span>())                <span class="cmt">// 2</span></code></pre>
+
+  <h2>Set (Int)</h2>
+
+  <p>An unordered collection of unique integer values. Sets are implemented as free functions operating on an opaque handle.</p>
+
+  <h3>Functions</h3>
+
+  <h4>set_new() &rarr; Set</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set_new</span>() <span class="op">-&gt;</span> Set
+  </div>
+  <p>Creates a new empty set.</p>
+
+  <h4>set_add(value: Int)</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set_add</span>(s: Set, value: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds <code>value</code> to the set. Has no effect if the value already exists.</p>
+
+  <h4>set_contains(value: Int) &rarr; Bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set_contains</span>(s: Set, value: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if the set contains <code>value</code>.</p>
+
+  <h4>set_remove(value: Int)</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set_remove</span>(s: Set, value: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Removes <code>value</code> from the set.</p>
+
+  <h4>set_size() &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">set_size</span>(s: Set) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of elements in the set.</p>
+
+  <h3>Set Example</h3>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+<span class="cmt">// Track unique visitor IDs</span>
+visitors <span class="op">=</span> <span class="fn">set_new</span>()
+<span class="fn">set_add</span>(visitors, <span class="num">101</span>)
+<span class="fn">set_add</span>(visitors, <span class="num">205</span>)
+<span class="fn">set_add</span>(visitors, <span class="num">101</span>)   <span class="cmt">// duplicate, no effect</span>
+<span class="fn">set_add</span>(visitors, <span class="num">309</span>)
+
+<span class="fn">println</span>(<span class="fn">set_size</span>(visitors))            <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">set_contains</span>(visitors, <span class="num">205</span>))   <span class="cmt">// true</span>
+<span class="fn">println</span>(<span class="fn">set_contains</span>(visitors, <span class="num">999</span>))   <span class="cmt">// false</span>
+
+<span class="fn">set_remove</span>(visitors, <span class="num">205</span>)
+<span class="fn">println</span>(<span class="fn">set_size</span>(visitors))            <span class="cmt">// 2</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+<span class="cmt">// Word frequency counter</span>
+words <span class="op">=</span> <span class="typ">List</span>[<span class="typ">String</span>]()
+<span class="fn">words.add</span>(<span class="str">"apple"</span>)
+<span class="fn">words.add</span>(<span class="str">"banana"</span>)
+<span class="fn">words.add</span>(<span class="str">"apple"</span>)
+<span class="fn">words.add</span>(<span class="str">"cherry"</span>)
+<span class="fn">words.add</span>(<span class="str">"banana"</span>)
+<span class="fn">words.add</span>(<span class="str">"apple"</span>)
+
+counts <span class="op">=</span> <span class="typ">Map</span>[<span class="typ">String</span>, <span class="typ">Int</span>]()
+
+i <span class="op">=</span> <span class="num">0</span>
+<span class="kw">while</span> (i <span class="op">&lt;</span> <span class="fn">words.length</span>()) {
+    word <span class="op">=</span> <span class="fn">words.get</span>(i)
+    <span class="kw">if</span> (<span class="fn">counts.contains</span>(word)) {
+        <span class="fn">counts.put</span>(word, <span class="fn">counts.get</span>(word) <span class="op">+</span> <span class="num">1</span>)
+    } <span class="kw">else</span> {
+        <span class="fn">counts.put</span>(word, <span class="num">1</span>)
+    }
+    i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+}
+
+<span class="fn">println</span>(<span class="fn">counts.get</span>(<span class="str">"apple"</span>))    <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">counts.get</span>(<span class="str">"banana"</span>))   <span class="cmt">// 2</span>
+<span class="fn">println</span>(<span class="fn">counts.get</span>(<span class="str">"cherry"</span>))   <span class="cmt">// 1</span></code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-string.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.string</span>
+    </a>
+    <a href="stdlib-io.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.io &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

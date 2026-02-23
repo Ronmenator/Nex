@@ -1,0 +1,95 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "NexUI",
+  "scopeName": "text.xml.nexui",
+  "fileTypes": ["nexui","nexuistyle"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#tag" }
+  ],
+  "repository": {
+    "comment": {
+      "begin": "<!--",
+      "end": "-->",
+      "name": "comment.block.nexui"
+    },
+    "tag": {
+      "patterns": [
+        { "include": "#self-closing-tag" },
+        { "include": "#open-tag" },
+        { "include": "#close-tag" }
+      ]
+    },
+    "self-closing-tag": {
+      "begin": "(<)(\\w+)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.nexui" },
+        "2": { "name": "entity.name.tag.nexui" }
+      },
+      "end": "(/>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.nexui" }
+      },
+      "patterns": [
+        { "include": "#attributes" }
+      ]
+    },
+    "open-tag": {
+      "begin": "(<)(\\w+)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.nexui" },
+        "2": { "name": "entity.name.tag.nexui" }
+      },
+      "end": "(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.nexui" }
+      },
+      "patterns": [
+        { "include": "#attributes" }
+      ]
+    },
+    "close-tag": {
+      "match": "(</)(\\w+)(>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.nexui" },
+        "2": { "name": "entity.name.tag.nexui" },
+        "3": { "name": "punctuation.definition.tag.end.nexui" }
+      }
+    },
+    "attributes": {
+      "patterns": [
+        { "include": "#binding-attribute" },
+        { "include": "#event-attribute" },
+        { "include": "#normal-attribute" }
+      ]
+    },
+    "binding-attribute": {
+      "match": "(\\w+)(=)(\")(\\{Binding\\s+[^}]+\\})(\")",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.nexui" },
+        "2": { "name": "punctuation.separator.key-value.nexui" },
+        "3": { "name": "punctuation.definition.string.begin.nexui" },
+        "4": { "name": "meta.binding.nexui markup.italic" },
+        "5": { "name": "punctuation.definition.string.end.nexui" }
+      }
+    },
+    "event-attribute": {
+      "match": "(Click|Change|Hover|Key)(=)(\")(\\w+)(\")",
+      "captures": {
+        "1": { "name": "support.type.event.nexui" },
+        "2": { "name": "punctuation.separator.key-value.nexui" },
+        "3": { "name": "punctuation.definition.string.begin.nexui" },
+        "4": { "name": "entity.name.function.nexui" },
+        "5": { "name": "punctuation.definition.string.end.nexui" }
+      }
+    },
+    "normal-attribute": {
+      "match": "(\\w+)(=)(\"[^\"]*\")",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.nexui" },
+        "2": { "name": "punctuation.separator.key-value.nexui" },
+        "3": { "name": "string.quoted.double.nexui" }
+      }
+    }
+  }
+}

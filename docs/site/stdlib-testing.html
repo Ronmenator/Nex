@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>std.testing - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.testing</div>
+
+  <h1>std.testing</h1>
+  <p class="page-subtitle">Assertion functions for unit testing.</p>
+
+  <pre><code><span class="kw">import</span> std.testing</code></pre>
+
+  <h2>General Assertions</h2>
+
+  <h4>assert</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert</span>(condition: <span class="typ">Bool</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that <code>condition</code> is <code>true</code>. If the condition is <code>false</code>, the program terminates with <code>msg</code> as the error message.</p>
+
+  <h4>assert_true</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_true</span>(condition: <span class="typ">Bool</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Alias for <code>assert</code>. Asserts that <code>condition</code> evaluates to <code>true</code>.</p>
+
+  <h2>Equality Assertions</h2>
+
+  <h4>assert_eq_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_eq_int</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that two integers are equal. If <code>a != b</code>, the program terminates with <code>msg</code>.</p>
+
+  <h4>assert_eq_str</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_eq_str</span>(a: <span class="typ">String</span>, b: <span class="typ">String</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that two strings are equal. Comparison is case-sensitive.</p>
+
+  <h4>assert_eq_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_eq_float</span>(a: <span class="typ">Double</span>, b: <span class="typ">Double</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that two floating-point values are equal. Due to floating-point precision, consider rounding or using a tolerance check for computed values.</p>
+
+  <h4>assert_eq_bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_eq_bool</span>(a: <span class="typ">Bool</span>, b: <span class="typ">Bool</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that two boolean values are equal.</p>
+
+  <h2>Inequality Assertions</h2>
+
+  <h4>assert_ne_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_ne_int</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that two integers are <em>not</em> equal. If <code>a == b</code>, the program terminates with <code>msg</code>.</p>
+
+  <h4>assert_ne_str</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">assert_ne_str</span>(a: <span class="typ">String</span>, b: <span class="typ">String</span>, msg: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Asserts that two strings are <em>not</em> equal.</p>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">import</span> std.testing
+<span class="kw">import</span> std.math
+<span class="kw">import</span> std.string
+
+<span class="cmt">// Test basic arithmetic</span>
+<span class="kw">def</span> <span class="fn">test_arithmetic</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    <span class="fn">assert_eq_int</span>(<span class="num">2</span> <span class="op">+</span> <span class="num">3</span>, <span class="num">5</span>, <span class="str">"addition failed"</span>)
+    <span class="fn">assert_eq_int</span>(<span class="num">10</span> <span class="op">-</span> <span class="num">4</span>, <span class="num">6</span>, <span class="str">"subtraction failed"</span>)
+    <span class="fn">assert_eq_int</span>(<span class="num">3</span> <span class="op">*</span> <span class="num">7</span>, <span class="num">21</span>, <span class="str">"multiplication failed"</span>)
+    <span class="fn">assert_ne_int</span>(<span class="num">10</span> <span class="op">/</span> <span class="num">3</span>, <span class="num">4</span>, <span class="str">"integer division should truncate"</span>)
+    <span class="fn">println</span>(<span class="str">"arithmetic tests passed"</span>)
+}
+
+<span class="cmt">// Test string operations</span>
+<span class="kw">def</span> <span class="fn">test_strings</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    <span class="fn">assert_eq_str</span>(<span class="fn">to_upper</span>(<span class="str">"hello"</span>), <span class="str">"HELLO"</span>, <span class="str">"to_upper failed"</span>)
+    <span class="fn">assert_eq_str</span>(<span class="fn">to_lower</span>(<span class="str">"WORLD"</span>), <span class="str">"world"</span>, <span class="str">"to_lower failed"</span>)
+    <span class="fn">assert_ne_str</span>(<span class="str">"foo"</span>, <span class="str">"bar"</span>, <span class="str">"different strings should not match"</span>)
+    <span class="fn">println</span>(<span class="str">"string tests passed"</span>)
+}
+
+<span class="cmt">// Test math functions</span>
+<span class="kw">def</span> <span class="fn">test_math</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    <span class="fn">assert_eq_float</span>(<span class="fn">sqrt</span>(<span class="num">4.0</span>), <span class="num">2.0</span>, <span class="str">"sqrt(4) should be 2"</span>)
+    <span class="fn">assert_eq_int</span>(<span class="fn">abs_int</span>(<span class="op">-</span><span class="num">42</span>), <span class="num">42</span>, <span class="str">"abs(-42) should be 42"</span>)
+    <span class="fn">assert_eq_bool</span>(<span class="num">3</span> <span class="op">&lt;</span> <span class="num">5</span>, <span class="kw">true</span>, <span class="str">"3 should be less than 5"</span>)
+    <span class="fn">println</span>(<span class="str">"math tests passed"</span>)
+}
+
+<span class="cmt">// Run all tests</span>
+<span class="fn">test_arithmetic</span>()
+<span class="fn">test_strings</span>()
+<span class="fn">test_math</span>()
+<span class="fn">println</span>(<span class="str">"All tests passed!"</span>)</code></pre>
+
+  <div class="page-nav">
+    <a href="stdlib-logging.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.logging</span>
+    </a>
+    <a href="stdlib-torch.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">std.torch &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

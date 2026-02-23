@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resource Management - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Resource Management</div>
+
+  <h1>Resource Management</h1>
+  <p class="page-subtitle">Deterministic cleanup with <code>using</code> blocks and the <code>Disposable</code> interface.</p>
+
+  <h2>The <code>using</code> Block</h2>
+
+  <p>The <code>using</code> block ensures that resources are properly cleaned up when the block exits, even if an exception is thrown:</p>
+
+  <pre><code><span class="kw">using</span> (f <span class="op">=</span> File.<span class="fn">open</span>(<span class="str">"data.txt"</span>)) {
+    f.<span class="fn">write</span>(<span class="str">"hello"</span>)
+}
+<span class="cmt">// f.dispose() is called automatically here</span></code></pre>
+
+  <h2>The Disposable Interface</h2>
+
+  <p>Resources used in <code>using</code> blocks must implement the <code>Disposable</code> interface:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">interface</span> <span class="typ">Disposable</span> {
+    <span class="kw">def</span> <span class="fn">dispose</span>() <span class="op">-></span> <span class="typ">Unit</span>
+}</code></pre>
+
+  <h2>Multiple Resources</h2>
+
+  <p>You can acquire multiple resources in a single <code>using</code> block. They are disposed in reverse acquisition order:</p>
+
+  <pre><code><span class="kw">using</span> (a <span class="op">=</span> <span class="typ">ResourceA</span>(), b <span class="op">=</span> <span class="typ">ResourceB</span>()) {
+    <span class="cmt">// use a and b</span>
+}
+<span class="cmt">// b.dispose() called first, then a.dispose()</span></code></pre>
+
+  <h2>How It Works</h2>
+
+  <p>The <code>using</code> block is syntactic sugar for <code>try/finally</code>. This:</p>
+
+  <pre><code><span class="kw">using</span> (f <span class="op">=</span> File.<span class="fn">open</span>(<span class="str">"a.txt"</span>)) {
+    f.<span class="fn">write</span>(<span class="str">"hello"</span>)
+}</code></pre>
+
+  <p>Is equivalent to:</p>
+
+  <pre><code>f <span class="op">=</span> File.<span class="fn">open</span>(<span class="str">"a.txt"</span>)
+<span class="kw">try</span> {
+    f.<span class="fn">write</span>(<span class="str">"hello"</span>)
+} <span class="kw">finally</span> {
+    f.<span class="fn">dispose</span>()
+}</code></pre>
+
+  <h2>Real-World Example</h2>
+
+  <pre><code><span class="kw">from</span> std.io <span class="kw">import</span> open_console
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="kw">using</span> (resource <span class="op">=</span> <span class="fn">open_console</span>()) {
+        <span class="kw">try</span> {
+            <span class="fn">println</span>(<span class="str">"Running application..."</span>)
+            <span class="cmt">// ... application code ...</span>
+        } <span class="kw">catch</span> (err: <span class="typ">Error</span>) {
+            <span class="fn">println</span>(<span class="str">"Error: "</span> <span class="op">+</span> err)
+        } <span class="kw">finally</span> {
+            <span class="fn">println</span>(<span class="str">"shutdown"</span>)
+        }
+    }
+    <span class="kw">return</span>
+}</code></pre>
+
+  <h2>Creating Disposable Types</h2>
+
+  <pre><code><span class="kw">class</span> <span class="typ">DatabaseConnection</span> : <span class="typ">Disposable</span> {
+    handle: <span class="typ">Var</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(url: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.handle <span class="op">=</span> <span class="fn">connect</span>(url)
+        <span class="kw">return</span>
+    }
+
+    <span class="kw">def</span> <span class="fn">dispose</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="fn">close</span>(<span class="kw">self</span>.handle)
+        <span class="kw">return</span>
+    }
+}
+
+<span class="cmt">// Usage</span>
+<span class="kw">using</span> (db <span class="op">=</span> <span class="typ">DatabaseConnection</span>(<span class="str">"localhost:5432"</span>)) {
+    <span class="cmt">// db.dispose() called on exit</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="error-handling.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Error Handling</span>
+    </a>
+    <a href="generics.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Generics &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,322 @@
+use nexc_diag::Span;
+
+pub type Name = String;
+
+#[derive(Debug, Clone)]
+pub struct SourceFile {
+    pub path: String,
+    pub span: Span,
+    pub items: Vec<Item>,
+}
+
+impl Default for SourceFile {
+    fn default() -> Self {
+        Self {
+            path: String::new(),
+            span: Span::new(0, 0),
+            items: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    Internal,
+    Public,
+}
+
+#[derive(Debug, Clone)]
+pub enum ImportKind {
+    Module,
+    From(Vec<String>),
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportDecl {
+    pub path: Vec<String>,
+    pub alias: Option<String>,
+    pub kind: ImportKind,
+    pub span: Span,
+    pub visibility: Visibility,
+    pub synthetic: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub name: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeExpr {
+    pub span: Span,
+    pub kind: TypeExprKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeExprKind {
+    Named(String),
+    Var,
+    Unit,
+    Nullable(Box<TypeExpr>),
+    Function(Vec<TypeExpr>, Box<TypeExpr>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Literal {
+    Int(i64),
+    Float(f64),
+    Char(char),
+    Bool(bool),
+    String(String),
+    Null,
+}
+
+#[derive(Debug, Clone)]
+pub struct VarDecl {
+    pub name: Name,
+    pub inferred_type: Option<TypeExpr>,
+    pub explicit_type: Option<TypeExpr>,
+    pub initializer: Option<Expr>,
+    pub is_dynamic: bool,
+    pub visibility: Visibility,
+    pub attributes: Vec<Attribute>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ParamDecl {
+    pub name: Name,
+    pub type_hint: Option<TypeExpr>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionDecl {
+    pub name: Name,
+    pub type_params: Vec<Name>,
+    pub params: Vec<ParamDecl>,
+    pub return_type: Option<TypeExpr>,
+    pub is_public: bool,
+    pub is_virtual: bool,
+    pub is_override: bool,
+    pub is_static: bool,
+    pub operator: Option<String>,
+    pub body: Option<Expr>,
+    pub span: Span,
+    pub attributes: Vec<Attribute>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldDecl {
+    pub name: Name,
+    pub ty: Option<TypeExpr>,
+    pub initializer: Option<Expr>,
+    pub visibility: Visibility,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct BaseSpec {
+    pub name: Name,
+    pub shared: bool,
+    pub ctor_args: Vec<Expr>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassDecl {
+    pub name: Name,
+    pub is_partial: bool,
+    pub visibility: Visibility,
+    pub type_params: Vec<Name>,
+    pub base_specs: Vec<BaseSpec>,
+    pub fields: Vec<FieldDecl>,
+    pub methods: Vec<FunctionDecl>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct InterfaceDecl {
+    pub name: Name,
+    pub visibility: Visibility,
+    pub type_params: Vec<Name>,
+    pub methods: Vec<FunctionDecl>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructDecl {
+    pub name: Name,
+    pub visibility: Visibility,
+    pub type_params: Vec<Name>,
+    pub interfaces: Vec<Name>,
+    pub fields: Vec<FieldDecl>,
+    pub methods: Vec<FunctionDecl>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct UsingDecl {
+    pub variable_name: Name,
+    pub expr: Expr,
+    pub body: Block,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct CatchClause {
+    pub variable_name: Option<Name>,
+    pub variable_type: Option<TypeExpr>,
+    pub body: Block,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct IfStmt {
+    pub condition: Expr,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct WhileStmt {
+    pub condition: Expr,
+    pub body: Box<Stmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ForStmt {
+    pub init: Option<Expr>,
+    pub condition: Option<Expr>,
+    pub step: Option<Expr>,
+    pub body: Box<Stmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct TryStmt {
+    pub body: Block,
+    pub catches: Vec<CatchClause>,
+    pub finally: Option<Block>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct MemberQualifier {
+    pub base: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum AssignOp {
+    Assign,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryOp {
+    Or,
+    And,
+    EqEq,
+    NotEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+}
+
+#[derive(Debug, Clone)]
+pub enum UnaryOp {
+    Not,
+    Neg,
+}
+
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Literal {
+        value: Literal,
+        span: Span,
+    },
+    Binary {
+        op: BinaryOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+        span: Span,
+    },
+    Unary {
+        op: UnaryOp,
+        expr: Box<Expr>,
+        span: Span,
+    },
+    Assign {
+        target: Box<Expr>,
+        value: Box<Expr>,
+        op: AssignOp,
+        span: Span,
+    },
+    Call {
+        callee: Box<Expr>,
+        args: Vec<Expr>,
+        span: Span,
+    },
+    MemberAccess {
+        receiver: Box<Expr>,
+        name: String,
+        span: Span,
+        qualifier: Option<String>,
+    },
+    Block(Block),
+    Unsupported {
+        raw: String,
+        span: Span,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub statements: Vec<Stmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Expr(Expr),
+    Return(Option<Expr>, Span),
+    Throw(Expr, Span),
+    VarDecl(VarDecl),
+    Using(UsingDecl),
+    If(IfStmt),
+    While(WhileStmt),
+    For(ForStmt),
+    Try(TryStmt),
+    Block(Block),
+    Continue(Span),
+    Break(Span),
+}
+
+#[derive(Debug, Clone)]
+pub enum Item {
+    Import(ImportDecl),
+    Function(FunctionDecl),
+    Class(ClassDecl),
+    Interface(InterfaceDecl),
+    Struct(StructDecl),
+    Variable(VarDecl),
+    Using(UsingDecl),
+    Statement(Stmt),
+}

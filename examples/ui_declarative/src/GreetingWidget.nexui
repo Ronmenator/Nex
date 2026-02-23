@@ -1,0 +1,7 @@
+<Widget xmlns="std.ui" Extends="BaseWidget">
+  <Text Text="Greeting" FontSize="28" />
+  <Text Text="Enter your name:" FontSize="16" />
+  <TextInput Placeholder="Type a name..." Text="{Binding name_value, Mode=TwoWay}" />
+  <Button Label="Greet" Click="on_greet" />
+  <Text Text="{Binding GreetingText}" FontSize="18" />
+</Widget>

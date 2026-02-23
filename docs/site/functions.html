@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Functions - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Functions</div>
+
+  <h1>Functions</h1>
+  <p class="page-subtitle">Defining and calling functions in Nex.</p>
+
+  <h2>Function Declaration</h2>
+
+  <p>Functions are declared with the <code>def</code> keyword. Parameters require type annotations, and the return type follows the <code>-></code> arrow:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">add</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> a <span class="op">+</span> b
+}</code></pre>
+
+  <h2>Calling Functions</h2>
+
+  <pre><code>result <span class="op">=</span> <span class="fn">add</span>(<span class="num">3</span>, <span class="num">5</span>)  <span class="cmt">// result = 8</span>
+<span class="fn">println</span>(result)</code></pre>
+
+  <h2>Unit Return Type</h2>
+
+  <p>Functions that don't return a value use <code>Unit</code>:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">log_message</span>(msg: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"[LOG] "</span> <span class="op">+</span> msg)
+}</code></pre>
+
+  <h2>Recursion</h2>
+
+  <p>Functions can call themselves recursively:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">fibonacci</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">if</span> (n <span class="op">&lt;=</span> <span class="num">1</span>) {
+        <span class="kw">return</span> n
+    }
+    <span class="kw">return</span> <span class="fn">fibonacci</span>(n <span class="op">-</span> <span class="num">1</span>) <span class="op">+</span> <span class="fn">fibonacci</span>(n <span class="op">-</span> <span class="num">2</span>)
+}</code></pre>
+
+  <h2>Visibility</h2>
+
+  <p>Functions are module-internal by default. Add <code>public</code> to export them:</p>
+
+  <pre><code><span class="cmt">// Only visible within this module</span>
+<span class="kw">def</span> <span class="fn">helper</span>() <span class="op">-></span> <span class="typ">Unit</span> { }
+
+<span class="cmt">// Visible to other modules</span>
+<span class="kw">public</span> <span class="kw">def</span> <span class="fn">api_function</span>() <span class="op">-></span> <span class="typ">Unit</span> { }</code></pre>
+
+  <h2>Function Types</h2>
+
+  <p>Functions are first-class values and can be stored in variables or passed as arguments. Function type syntax uses <code>(ParamTypes) -> ReturnType</code>:</p>
+
+  <pre><code><span class="cmt">// Declare a variable with a function type</span>
+callback: (<span class="typ">Int</span>, <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Bool</span>
+
+<span class="kw">def</span> <span class="fn">is_greater</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Bool</span> {
+    <span class="kw">return</span> a <span class="op">&gt;</span> b
+}
+
+<span class="cmt">// Assign a function reference</span>
+callback <span class="op">=</span> is_greater</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p>v1 supports function references only. Closures and lambdas are planned for v2.</p>
+  </div>
+
+  <h2>The <code>main</code> Function</h2>
+
+  <p>Every Nex application requires a <code>main</code> function as the entry point:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Program started"</span>)
+}</code></pre>
+
+  <p>The <code>main</code> function must:</p>
+  <ul>
+    <li>Be named exactly <code>main</code></li>
+    <li>Take no parameters</li>
+    <li>Return <code>Unit</code></li>
+  </ul>
+
+  <h2>Static Methods</h2>
+
+  <p>Functions declared with <code>static</code> inside a class belong to the class itself, not instances. The <code>self</code> keyword is not available in static methods:</p>
+
+  <pre><code><span class="kw">class</span> <span class="typ">MathUtils</span> {
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">square</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+        <span class="kw">return</span> n <span class="op">*</span> n
+    }
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="control-flow.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Control Flow</span>
+    </a>
+    <a href="classes.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Classes &amp; Inheritance &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
