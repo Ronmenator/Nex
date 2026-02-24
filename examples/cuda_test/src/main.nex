@@ -1,0 +1,14 @@
+import torch.tensor
+
+def main() -> Unit {
+    println("CUDA test:")
+    if (cuda_is_available() == 1) {
+        println("  CUDA is available!")
+        print("  Device count: ")
+        println(cuda_device_count())
+    } else {
+        println("  CUDA is NOT available")
+    }
+    println("Done.")
+    return
+}

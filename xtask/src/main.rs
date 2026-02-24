@@ -162,6 +162,17 @@ fn deploy(args: &[String]) {
     if release {
         cmd.arg("--release");
     }
+
+    // Auto-detect libtorch if LIBTORCH is not already set.
+    // Check common locations and system environment variables (setx values
+    // aren't visible in the current session, so read from the registry).
+    if env::var("LIBTORCH").is_err() {
+        if let Some(libtorch_path) = detect_libtorch() {
+            println!("detected  LIBTORCH={}", libtorch_path.display());
+            cmd.env("LIBTORCH", &libtorch_path);
+        }
+    }
+
     let status = cmd.status().expect("failed to run cargo build");
     if !status.success() {
         eprintln!("cargo build failed");
@@ -494,6 +505,54 @@ fn create_dir_symlink(original: &Path, link: &Path) -> bool {
     {
         std::os::unix::fs::symlink(original, link).is_ok()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Libtorch auto-detection
+// ---------------------------------------------------------------------------
+
+/// Try to find a libtorch installation. Checks:
+/// 1. Common install locations (D:\libtorch, C:\libtorch)
+/// 2. User/system environment variables (reads registry on Windows for setx values)
+fn detect_libtorch() -> Option<PathBuf> {
+    // Check common paths first.
+    let common_paths = [
+        PathBuf::from("D:\\libtorch"),
+        PathBuf::from("C:\\libtorch"),
+    ];
+    for p in &common_paths {
+        if p.join("lib").is_dir() && p.join("include").is_dir() {
+            return Some(p.clone());
+        }
+    }
+
+    // On Windows, read LIBTORCH from the registry (captures setx values
+    // that aren't visible in the current process environment).
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("reg")
+            .args(["query", "HKCU\\Environment", "/v", "LIBTORCH"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .ok()?;
+        if output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            // Format: "    LIBTORCH    REG_SZ    D:\libtorch"
+            for line in text.lines() {
+                if line.contains("LIBTORCH") && line.contains("REG_SZ") {
+                    if let Some(val) = line.split("REG_SZ").nth(1) {
+                        let path = PathBuf::from(val.trim());
+                        if path.join("lib").is_dir() {
+                            return Some(path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,6 @@
+name = "cuda_test"
+version = "0.1.0"
+entry = "src/main.nex"
+
+[libs]
+torch = { path = "../../libs/torch" }

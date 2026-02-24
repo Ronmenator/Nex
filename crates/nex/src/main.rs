@@ -7,7 +7,7 @@ use std::process;
 use nexc_diag::{Diagnostic, Severity, SourceMap};
 use nexc_driver::{compile_module, compile_to_native, link_native, link_native_multi, link_shared_lib_multi, jit_run, jit_run_multi, CompileOptions, OutputKind};
 use nexc_fmt::format_source;
-use nexc_resolve::{discover_project_modules, discover_lib_names, discover_native_libs, discover_sibling_modules, nex_libs_dir, resolve_from_global_cache};
+use nexc_resolve::{discover_project_modules, discover_lib_names, discover_lib_modules, discover_native_libs, discover_sibling_modules, nex_libs_dir, resolve_from_global_cache, resolve_lib_auto};
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -16,11 +16,34 @@ fn main() {
         return;
     }
 
+    // `nex -c "code"` — run inline code (like `python -c "..."`)
+    if args[0] == "-c" {
+        args.remove(0);
+        if args.is_empty() {
+            eprintln!("nex: -c requires a code string");
+            process::exit(1);
+        }
+        let code_str = args.remove(0);
+        let exit = run_inline(&code_str, &args);
+        process::exit(exit);
+    }
+
     // Shorthand: `nex file.nex [args...]` -> JIT run
     if args[0].ends_with(".nex") {
         let source_path = PathBuf::from(args.remove(0));
         let code = run_jit(&source_path, &args);
         process::exit(code);
+    }
+
+    // Python-style: `nex <script> [args...]`
+    // If the first argument is not a known command, try to resolve it as a
+    // script file (with or without .nex extension) or a project directory.
+    if !is_known_command(&args[0]) {
+        if let Some(source_path) = resolve_script_path(&args[0]) {
+            args.remove(0);
+            let code = run_jit(&source_path, &args);
+            process::exit(code);
+        }
     }
 
     let command = args.remove(0);
@@ -187,20 +210,199 @@ fn main() {
             }
         }
         _ => {
+            eprintln!("nex: unknown command `{command}`");
+            eprintln!("      if this is a script, use: nex {command}.nex\n");
             usage();
+        }
+    }
+}
+
+/// Returns `true` if the argument matches a built-in nex subcommand.
+fn is_known_command(arg: &str) -> bool {
+    matches!(
+        arg,
+        "build" | "run" | "fmt" | "lint" | "repl" | "test"
+            | "install" | "uninstall" | "remove"
+            | "list" | "ls" | "new" | "clean"
+    )
+}
+
+/// Try to resolve an argument to a runnable `.nex` script path.
+///
+/// Resolution order:
+///   1. Exact path (e.g. `nex ./myscript`)
+///   2. Path with `.nex` appended (e.g. `nex myscript` -> `myscript.nex`)
+///   3. Directory with `src/main.nex` inside (e.g. `nex myproject/`)
+fn resolve_script_path(arg: &str) -> Option<PathBuf> {
+    let p = PathBuf::from(arg);
+
+    // 1. Exact file path
+    if p.is_file() {
+        return Some(p);
+    }
+
+    // 2. Append .nex extension
+    let with_ext = PathBuf::from(format!("{arg}.nex"));
+    if with_ext.is_file() {
+        return Some(with_ext);
+    }
+
+    // 3. Directory -> src/main.nex (project-style)
+    if p.is_dir() {
+        let main_nex = p.join("src").join("main.nex");
+        if main_nex.is_file() {
+            return Some(main_nex);
+        }
+    }
+
+    None
+}
+
+/// JIT-execute an inline code string.
+///
+/// If the code does not contain a `def main()` declaration, it is
+/// automatically wrapped in one so that top-level statements work as
+/// expected (matching Python's `-c` behaviour).
+///
+/// No project.toml is required.  Imports are auto-resolved by name
+/// from the global cache (`~/.nex/libs/`) and a local `libs/` directory.
+fn run_inline(code: &str, args: &[String]) -> i32 {
+    // Extract import lines before wrapping so they stay at the top level.
+    // Handle semicolons: "import torch; let x = ..." is split into separate statements.
+    let mut imports = Vec::new();
+    let mut body_lines = Vec::new();
+    for line in code.lines() {
+        // Split each line on semicolons to handle inline-style one-liners.
+        for part in line.split(';') {
+            let trimmed = part.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if trimmed.starts_with("import ") {
+                imports.push(trimmed.to_string());
+            } else {
+                body_lines.push(trimmed.to_string());
+            }
+        }
+    }
+
+    let source = if code.contains("def main(") {
+        code.to_string()
+    } else {
+        let import_block = if imports.is_empty() {
+            String::new()
+        } else {
+            format!("{}\n\n", imports.join("\n"))
+        };
+        let body: String = body_lines.iter()
+            .map(|line| format!("    {line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("{import_block}def main() -> Unit {{\n{body}\n    return\n}}")
+    };
+
+    // Extract unique top-level import prefixes (e.g. "torch" from "import torch.tensor").
+    let import_prefixes: HashSet<String> = imports.iter()
+        .filter_map(|line| {
+            let path = line.trim().strip_prefix("import ")?;
+            Some(path.split('.').next()?.to_string())
+        })
+        .collect();
+
+    // Auto-resolve each imported lib from global cache or local libs/ dir.
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut lib_names: HashSet<String> = HashSet::new();
+    let mut native_libs: Vec<PathBuf> = Vec::new();
+    let mut lib_modules: HashMap<String, PathBuf> = HashMap::new();
+
+    for prefix in &import_prefixes {
+        if let Some(dep) = resolve_lib_auto(prefix, Some(&cwd)) {
+            lib_names.insert(dep.name.clone());
+            if let Some(ref native) = dep.native_lib {
+                native_libs.push(native.clone());
+            }
+            let mut sink = nexc_diag::DiagnosticSink::new();
+            let modules = discover_lib_modules(&dep, &mut sink);
+            lib_modules.extend(modules);
+        }
+    }
+
+    // No lib modules — single-module fast path.
+    if lib_modules.is_empty() {
+        let options = CompileOptions {
+            source_path: "<inline>".to_string(),
+            emit_metadata: false,
+            output_dir: None,
+            lib_names,
+            ..Default::default()
+        };
+        return match jit_run(&source, options, args) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("nex: {e}");
+                1
+            }
+        };
+    }
+
+    // Multi-module path: compile lib modules + inline main together.
+    let mut all_known_names = lib_names.clone();
+    for name in lib_modules.keys() {
+        let root_prefix = name.split('.').next().unwrap_or(name);
+        all_known_names.insert(root_prefix.to_string());
+    }
+
+    let mut lib_texts: Vec<(String, String)> = Vec::new();
+    for (_module_name, path) in &lib_modules {
+        let text = match fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(err) => {
+                eprintln!("nex: cannot read {}: {err}", path.display());
+                return 1;
+            }
+        };
+        lib_texts.push((text, path.to_string_lossy().to_string()));
+    }
+
+    let mut compile_sources: Vec<(&str, CompileOptions)> = Vec::new();
+    for (text, path) in &lib_texts {
+        compile_sources.push((text.as_str(), CompileOptions {
+            source_path: path.clone(),
+            lib_names: all_known_names.clone(),
+            ..Default::default()
+        }));
+    }
+
+    // Inline source as the main module (last).
+    compile_sources.push((&source, CompileOptions {
+        source_path: "<inline>".to_string(),
+        lib_names: all_known_names,
+        ..Default::default()
+    }));
+
+    match jit_run_multi(&compile_sources, args, &native_libs) {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("nex: {e}");
+            1
         }
     }
 }
 
 fn usage() {
     println!("Nex compiler toolchain\n");
-    println!("Usage: nex <command> [args]\n");
+    println!("Usage: nex <script> [args]");
+    println!("       nex -c \"<code>\" [args]");
+    println!("       nex <command> [args]\n");
+    println!("Run a script:");
+    println!("  nex <file>                  Run a .nex script (extension optional)");
+    println!("  nex <dir>                   Run src/main.nex inside a project directory");
+    println!("  nex -c \"<code>\"             Execute inline code");
+    println!("  nex run [path] [-- args]    JIT compile and execute\n");
     println!("Commands:");
     println!("  new <name> [--lib]          Create a new project (--lib for a library)");
     println!("  build [path]                Compile to a native executable (AOT)");
     println!("  build --lib [path]          Compile a library to a shared library (DLL)");
-    println!("  run [path] [-- args]        JIT compile and execute");
-    println!("  <file>.nex [args]           Shorthand for: nex run <file>.nex -- [args]");
     println!("  install <user/repo[:ver]>   Install a library from GitHub");
     println!("  install                     Build release binaries and install to nex/bin/");
     println!("  uninstall <name>            Remove a library from project.toml");

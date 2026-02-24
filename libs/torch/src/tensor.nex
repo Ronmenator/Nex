@@ -39,7 +39,7 @@ public def eye(n: Int64) -> Int64 {
     return tensor_eye(n)
 }
 
-public def free(t: Int64) {
+public def free_tensor(t: Int64) {
     tensor_free(t)
     return
 }

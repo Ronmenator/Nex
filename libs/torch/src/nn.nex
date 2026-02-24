@@ -57,13 +57,19 @@ public def batch_norm(module: Int64, features: Int64) {
     return
 }
 
+// Moves a module (and all its parameters) to a device ("cpu" or "cuda").
+public def to_device(module: Int64, device: String) {
+    nn_to_device(module, device)
+    return
+}
+
 // Runs a forward pass through the module.
 public def forward(module: Int64, input: Int64) -> Int64 {
     return nn_forward(module, input)
 }
 
 // Frees a neural network module.
-public def free(module: Int64) {
+public def free_module(module: Int64) {
     nn_free(module)
     return
 }

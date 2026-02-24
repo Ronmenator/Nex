@@ -1,0 +1,38 @@
+# Nex compiler toolchain configuration
+# This file configures the Nex toolchain itself.
+# Place in the nex/ install directory or at ~/.nex/config.toml
+
+[toolchain]
+version = "0.1.82"
+
+[compiler]
+# Default optimization level: "debug" or "release"
+default_optimization = "release"
+
+# Emit LLVM IR text (for debugging / inspection)
+emit_llvm_ir = false
+
+# Codegen backend: Cranelift (native, no external tools required)
+# AOT builds produce object files linked with the system linker.
+# JIT mode (nex run) executes directly in memory.
+
+[lsp]
+# Enable the language server
+enabled = true
+
+# Port for LSP (0 = stdio mode)
+port = 0
+
+[formatter]
+# Indentation: "spaces" or "tabs"
+indent_style = "spaces"
+
+# Number of spaces per indent level
+indent_size = 4
+
+[linter]
+# Enable all lint rules by default
+enable_all = true
+
+# Specific rules to disable
+# disabled_rules = ["unused_imports"]

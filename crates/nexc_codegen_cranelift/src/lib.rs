@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt;
 
 use cranelift_codegen::ir::types;
 use cranelift_codegen::ir::{
@@ -309,6 +311,11 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
 // Dynamic native library loading
 // ---------------------------------------------------------------------------
 
+#[cfg(target_os = "windows")]
+unsafe extern "system" {
+    fn LoadLibraryW(lpLibFileName: *const u16) -> *mut std::ffi::c_void;
+}
+
 /// Load native dynamic libraries (.dll / .so) and register all their exported
 /// `nex_*` symbols with the JIT builder so Nex code can call them.
 ///
@@ -319,10 +326,62 @@ fn register_native_libs(
     builder: &mut cranelift_jit::JITBuilder,
     native_libs: &[std::path::PathBuf],
 ) -> Result<(), String> {
+    // On Windows, prepend libtorch/lib to PATH so that nex_torch_native.dll
+    // can find its libtorch dependencies (torch_cpu.dll, c10.dll,
+    // torch_cuda.dll, c10_cuda.dll, etc.) regardless of the user's PATH.
+    #[cfg(target_os = "windows")]
+    {
+        let libtorch_dir = std::env::var("LIBTORCH").ok()
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                // Auto-detect common libtorch locations.
+                for p in &["D:\\libtorch", "C:\\libtorch"] {
+                    let path = std::path::Path::new(p);
+                    if path.join("lib").is_dir() {
+                        return Some(path.to_path_buf());
+                    }
+                }
+                None
+            });
+        if let Some(libtorch) = libtorch_dir {
+            let lib_dir = libtorch.join("lib");
+            if lib_dir.is_dir() {
+                let current = std::env::var("PATH").unwrap_or_default();
+                let lib_str = lib_dir.to_string_lossy();
+                if !current.contains(&*lib_str) {
+                    std::env::set_var("PATH", format!("{};{}", lib_str, current));
+                }
+
+                // Eagerly load torch_cuda.dll BEFORE any other libtorch
+                // function is called.  If manual_seed() or any other torch
+                // op runs first, libtorch initialises in CPU-only mode and
+                // the CUDA hooks never register.
+                let cuda_dll = lib_dir.join("torch_cuda.dll");
+                if cuda_dll.exists() {
+                    let wide: Vec<u16> = cuda_dll.as_os_str()
+                        .encode_wide()
+                        .chain(std::iter::once(0))
+                        .collect();
+                    unsafe { LoadLibraryW(wide.as_ptr()); }
+                }
+            }
+        }
+    }
+
     for lib_path in native_libs {
+        // Strip \\?\ prefix that Windows canonicalize adds — it prevents
+        // LoadLibraryExW from searching the DLL's directory for dependencies.
+        let load_path = {
+            let s = lib_path.to_string_lossy();
+            if s.starts_with(r"\\?\") {
+                std::path::PathBuf::from(&s[4..])
+            } else {
+                lib_path.clone()
+            }
+        };
         unsafe {
-            let lib = libloading::Library::new(lib_path)
-                .map_err(|e| format!("failed to load native library {}: {e}", lib_path.display()))?;
+            let lib = libloading::Library::new(&load_path)
+                .map_err(|e| format!("failed to load native library {}: {e}", load_path.display()))?;
 
             // Probe for all known exported symbol names.
             // The DLLs export `nex_*` extern "C" functions.  We iterate a
@@ -459,6 +518,91 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_ui_set_checked",
     "nex_ui_set_border_width",
     "nex_ui_set_border_color",
+    // torch
+    "nex_torch_tensor_zeros",
+    "nex_torch_tensor_ones",
+    "nex_torch_tensor_rand",
+    "nex_torch_tensor_randn",
+    "nex_torch_tensor_from_float_data",
+    "nex_torch_tensor_arange",
+    "nex_torch_tensor_eye",
+    "nex_torch_tensor_free",
+    "nex_torch_tensor_add",
+    "nex_torch_tensor_sub",
+    "nex_torch_tensor_mul",
+    "nex_torch_tensor_div",
+    "nex_torch_tensor_matmul",
+    "nex_torch_tensor_neg",
+    "nex_torch_tensor_exp",
+    "nex_torch_tensor_log",
+    "nex_torch_tensor_sum",
+    "nex_torch_tensor_mean",
+    "nex_torch_tensor_reshape",
+    "nex_torch_tensor_transpose",
+    "nex_torch_tensor_squeeze",
+    "nex_torch_tensor_unsqueeze",
+    "nex_torch_tensor_print",
+    "nex_torch_tensor_shape_dim",
+    "nex_torch_tensor_get_float",
+    "nex_torch_tensor_item_float",
+    "nex_torch_tensor_ndim",
+    "nex_torch_tensor_numel",
+    "nex_torch_cuda_is_available",
+    "nex_torch_cuda_device_count",
+    "nex_torch_tensor_to_device",
+    "nex_torch_set_num_threads",
+    "nex_torch_tensor_requires_grad",
+    "nex_torch_tensor_backward",
+    "nex_torch_tensor_grad",
+    "nex_torch_no_grad",
+    "nex_torch_nn_sequential_new",
+    "nex_torch_nn_linear",
+    "nex_torch_nn_conv2d",
+    "nex_torch_nn_relu",
+    "nex_torch_nn_sigmoid",
+    "nex_torch_nn_tanh",
+    "nex_torch_nn_softmax",
+    "nex_torch_nn_dropout",
+    "nex_torch_nn_batch_norm",
+    "nex_torch_nn_to_device",
+    "nex_torch_nn_forward",
+    "nex_torch_nn_free",
+    "nex_torch_loss_mse",
+    "nex_torch_loss_cross_entropy",
+    "nex_torch_loss_bce",
+    "nex_torch_optim_sgd",
+    "nex_torch_optim_adam",
+    "nex_torch_optim_step",
+    "nex_torch_optim_zero_grad",
+    "nex_torch_optim_free",
+    "nex_torch_model_save",
+    "nex_torch_model_load",
+    "nex_torch_jit_load",
+    "nex_torch_jit_forward",
+    "nex_torch_manual_seed",
+    "nex_torch_version",
+    "nex_torch_tensor_to_string",
+    // crypto
+    "nex_crypto_sha256",
+    "nex_crypto_sha512",
+    "nex_crypto_md5",
+    "nex_crypto_random_bytes",
+    "nex_crypto_base64_encode",
+    "nex_crypto_base64_decode",
+    "nex_crypto_hmac_sha256",
+    // http
+    "nex_http_get",
+    "nex_http_post",
+    "nex_http_response_status",
+    "nex_http_response_body",
+    "nex_http_response_header",
+    "nex_http_response_free",
+    // regex
+    "nex_regex_new",
+    "nex_regex_is_match",
+    "nex_regex_find",
+    "nex_regex_replace",
+    "nex_regex_free",
 ];
 
 // ---------------------------------------------------------------------------
@@ -1745,6 +1889,7 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "nn_softmax" => Some("nex_torch_nn_softmax"),
         "nn_dropout" => Some("nex_torch_nn_dropout"),
         "nn_batch_norm" => Some("nex_torch_nn_batch_norm"),
+        "nn_to_device" => Some("nex_torch_nn_to_device"),
         "nn_forward" => Some("nex_torch_nn_forward"),
         "nn_free" => Some("nex_torch_nn_free"),
         // Loss functions
@@ -2433,6 +2578,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_nn_softmax", &sig_void_ptr2),
         ("nex_torch_nn_dropout", &sig_void_ptr2),
         ("nex_torch_nn_batch_norm", &sig_void_ptr2),
+        ("nex_torch_nn_to_device", &sig_void_ptr2),
         ("nex_torch_nn_forward", &sig_ptr_ptr2),
         ("nex_torch_nn_free", &sig_void_ptr),
         // Loss functions

@@ -34,7 +34,7 @@ public def zero_grad(optimizer: Int64) {
 }
 
 // Frees an optimizer.
-public def free(optimizer: Int64) {
+public def free_optimizer(optimizer: Int64) {
     optim_free(optimizer)
     return
 }

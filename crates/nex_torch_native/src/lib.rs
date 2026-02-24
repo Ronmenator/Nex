@@ -375,6 +375,14 @@ pub unsafe extern "C" fn nex_torch_nn_batch_norm(module: *mut NexModule, feature
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_to_device(module: *mut NexModule, device_str: *const c_char) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    let device = parse_device(cstr_to_str(device_str));
+    m.vs.set_device(device);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn nex_torch_nn_forward(module: *mut NexModule, input: *mut Tensor) -> *mut Tensor {
     if module.is_null() || input.is_null() { return ptr::null_mut(); }
     let m = &*module;

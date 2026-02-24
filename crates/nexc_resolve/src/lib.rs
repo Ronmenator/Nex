@@ -422,6 +422,70 @@ pub fn resolve_from_global_cache(name: &str, version: &str) -> Option<PathBuf> {
     }
 }
 
+/// Auto-resolve a library by name alone (no project.toml required).
+///
+/// Search order:
+///   1. Global cache `~/.nex/libs/<name>/` — picks the latest version dir.
+///   2. `libs/<name>/` relative to `search_root` (common workspace layout).
+///
+/// Returns a `LibDependency` ready for `discover_lib_modules`.
+pub fn resolve_lib_auto(name: &str, search_root: Option<&Path>) -> Option<LibDependency> {
+    // 1. Global cache
+    let cache_root = nex_libs_dir().join(name);
+    if cache_root.is_dir() {
+        if let Some((version_dir, version)) = latest_cached_version(&cache_root) {
+            let native_lib = resolve_native_lib(&version_dir);
+            return Some(LibDependency {
+                name: name.to_string(),
+                root: version_dir,
+                native_lib,
+                version: Some(version),
+                git: None,
+            });
+        }
+    }
+
+    // 2. Walk up from search_root looking for libs/<name>/ in each ancestor.
+    if let Some(root) = search_root {
+        let mut dir = root.to_path_buf();
+        loop {
+            let local = dir.join("libs").join(name);
+            if local.is_dir() && local.join("project.toml").exists() {
+                let native_lib = resolve_native_lib(&local);
+                return Some(LibDependency {
+                    name: name.to_string(),
+                    root: local,
+                    native_lib,
+                    version: None,
+                    git: None,
+                });
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+    }
+
+    None
+}
+
+/// Scan `<cache_root>/` for version subdirectories and return the one
+/// with the highest directory name (reverse-sorted, so newest first).
+fn latest_cached_version(cache_root: &Path) -> Option<(PathBuf, String)> {
+    let mut versions: Vec<(String, PathBuf)> = Vec::new();
+    let entries = fs::read_dir(cache_root).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() && path.join("project.toml").exists() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            versions.push((name, path));
+        }
+    }
+    // Sort descending so that "1.0.0" > "0.9.0", "latest" sorts high too.
+    versions.sort_by(|a, b| b.0.cmp(&a.0));
+    versions.into_iter().next().map(|(v, p)| (p, v))
+}
+
 fn parse_libs_section(toml: &str, project_root: &Path, sink: &mut DiagnosticSink) -> Vec<LibDependency> {
     let mut libs = Vec::new();
     let mut in_libs = false;
@@ -594,27 +658,10 @@ fn resolve_native_lib(lib_root: &Path) -> Option<PathBuf> {
     let toml_path = lib_root.join("project.toml");
     let toml_text = fs::read_to_string(&toml_path).ok()?;
 
-    // Try 1: look for a Nex-compiled lib DLL (name from `name` field)
-    if let Some(lib_name) = parse_name_field(&toml_text) {
-        let candidates = if cfg!(target_os = "windows") {
-            vec![lib_root.join(format!("{lib_name}.dll"))]
-        } else if cfg!(target_os = "macos") {
-            vec![
-                lib_root.join(format!("lib{lib_name}.dylib")),
-                lib_root.join(format!("lib{lib_name}.so")),
-            ]
-        } else {
-            vec![lib_root.join(format!("lib{lib_name}.so"))]
-        };
-
-        for path in &candidates {
-            if path.exists() {
-                return Some(path.clone());
-            }
-        }
-    }
-
-    // Try 2: legacy `native = "..."` field (Rust-compiled native DLLs)
+    // Try 1: `native = "..."` field — Rust-compiled native DLLs with runtime
+    // primitives.  These take priority because the JIT needs the actual
+    // native implementations (e.g. nex_torch_native.dll), not the
+    // Nex-compiled wrapper DLL (e.g. torch.dll).
     if let Some(native_name) = parse_native_field(&toml_text) {
         let candidates = if cfg!(target_os = "windows") {
             vec![lib_root.join(format!("{native_name}.dll"))]
@@ -640,6 +687,27 @@ fn resolve_native_lib(lib_root: &Path) -> Option<PathBuf> {
             return Some(lib_root.join(format!("lib{native_name}.dylib")));
         } else {
             return Some(lib_root.join(format!("lib{native_name}.so")));
+        }
+    }
+
+    // Try 2: Nex-compiled lib DLL (name from `name` field).
+    // Used for pure-Nex libraries that have no native runtime dependency.
+    if let Some(lib_name) = parse_name_field(&toml_text) {
+        let candidates = if cfg!(target_os = "windows") {
+            vec![lib_root.join(format!("{lib_name}.dll"))]
+        } else if cfg!(target_os = "macos") {
+            vec![
+                lib_root.join(format!("lib{lib_name}.dylib")),
+                lib_root.join(format!("lib{lib_name}.so")),
+            ]
+        } else {
+            vec![lib_root.join(format!("lib{lib_name}.so"))]
+        };
+
+        for path in &candidates {
+            if path.exists() {
+                return Some(path.clone());
+            }
         }
     }
 

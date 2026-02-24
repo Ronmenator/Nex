@@ -203,6 +203,21 @@ def main() -> Unit {
 
     println("  2 transformer blocks, 14 linear layers")
 
+    // ---- Move model to device ----
+    nn_to_device(tok_emb, device)
+    nn_to_device(pos_emb, device)
+    nn_to_device(b1_q, device)
+    nn_to_device(b1_k, device)
+    nn_to_device(b1_v, device)
+    nn_to_device(b1_o, device)
+    nn_to_device(b1_ffn, device)
+    nn_to_device(b2_q, device)
+    nn_to_device(b2_k, device)
+    nn_to_device(b2_v, device)
+    nn_to_device(b2_o, device)
+    nn_to_device(b2_ffn, device)
+    nn_to_device(lm_head, device)
+
     // ---- Optimizers (Adam, one per module) ----
     var o_te = optim_adam(tok_emb, 0.0003)
     var o_pe = optim_adam(pos_emb, 0.0003)

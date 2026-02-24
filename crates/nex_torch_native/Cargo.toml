@@ -10,4 +10,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
-tch = { version = "0.17", features = ["download-libtorch"] }
+tch = "0.22"
