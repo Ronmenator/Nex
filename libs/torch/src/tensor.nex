@@ -1,6 +1,13 @@
 // torch.tensor — Tensor creation, operations, and data access.
 
 // ===========================================================================
+// Device constants
+// ===========================================================================
+
+public def CPU() -> String  { return "cpu" }
+public def CUDA() -> String { return "cuda" }
+
+// ===========================================================================
 // Tensor creation
 // ===========================================================================
 
@@ -192,4 +199,53 @@ public def manual_seed(seed: Int64) {
 
 public def version() -> String {
     return torch_version()
+}
+
+// ===========================================================================
+// Convenience functions
+// ===========================================================================
+
+// Returns "cuda" if a CUDA device is available, otherwise "cpu".
+public def best_device() -> String {
+    if (cuda_is_available() != 0) {
+        return "cuda"
+    }
+    return "cpu"
+}
+
+// Returns true if the tensor is a scalar (0-dimensional).
+public def is_scalar(t: Int64) -> Bool {
+    return tensor_ndim(t) == 0
+}
+
+// Returns the total number of elements in the tensor (alias for numel).
+public def total_elements(t: Int64) -> Int64 {
+    return tensor_numel(t)
+}
+
+// Prints the shape of a tensor (supports up to 4 dimensions).
+public def print_shape(t: Int64) {
+    dims = tensor_ndim(t)
+    if (dims == 0) {
+        println("shape: []")
+        return
+    }
+    if (dims == 1) {
+        println("shape: [" + tensor_shape_dim(t, 0) + "]")
+        return
+    }
+    if (dims == 2) {
+        println("shape: [" + tensor_shape_dim(t, 0) + ", " + tensor_shape_dim(t, 1) + "]")
+        return
+    }
+    if (dims == 3) {
+        println("shape: [" + tensor_shape_dim(t, 0) + ", " + tensor_shape_dim(t, 1) + ", " + tensor_shape_dim(t, 2) + "]")
+        return
+    }
+    if (dims == 4) {
+        println("shape: [" + tensor_shape_dim(t, 0) + ", " + tensor_shape_dim(t, 1) + ", " + tensor_shape_dim(t, 2) + ", " + tensor_shape_dim(t, 3) + "]")
+        return
+    }
+    println("shape: [" + dims + " dims]")
+    return
 }

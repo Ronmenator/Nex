@@ -1,0 +1,24 @@
+// torch.train — High-level training utilities.
+// Combines forward pass, loss computation, backpropagation, and optimizer step.
+
+// Performs a single training step with MSE loss.
+// Returns the loss tensor handle (use item_float to read the scalar value).
+public def train_step_mse(model: Int64, optimizer: Int64, input: Int64, target: Int64) -> Int64 {
+    optim_zero_grad(optimizer)
+    output = nn_forward(model, input)
+    loss = loss_mse(output, target)
+    tensor_backward(loss)
+    optim_step(optimizer)
+    return loss
+}
+
+// Performs a single training step with cross-entropy loss.
+// Returns the loss tensor handle (use item_float to read the scalar value).
+public def train_step_ce(model: Int64, optimizer: Int64, input: Int64, target: Int64) -> Int64 {
+    optim_zero_grad(optimizer)
+    output = nn_forward(model, input)
+    loss = loss_cross_entropy(output, target)
+    tensor_backward(loss)
+    optim_step(optimizer)
+    return loss
+}

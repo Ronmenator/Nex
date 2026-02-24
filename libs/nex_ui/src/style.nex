@@ -1,7 +1,48 @@
-// nex_ui.style — Widget styling functions.
+// nex_ui.style — Widget styling functions, color constants, and presets.
 
 // ===========================================================================
-// Dimensions
+// RGBA color packing
+// ===========================================================================
+
+// Packs 0–255 RGBA channels into a single Int64.
+public def pack_rgba(r: Int64, g: Int64, b: Int64, a: Int64) -> Int64 {
+    return r * 16777216 + g * 65536 + b * 256 + a
+}
+
+// ===========================================================================
+// Named color constants (fully opaque RGBA packed into Int64)
+// ===========================================================================
+
+public def COLOR_WHITE() -> Int64       { return pack_rgba(255, 255, 255, 255) }
+public def COLOR_BLACK() -> Int64       { return pack_rgba(0, 0, 0, 255) }
+public def COLOR_RED() -> Int64         { return pack_rgba(255, 0, 0, 255) }
+public def COLOR_GREEN() -> Int64       { return pack_rgba(0, 255, 0, 255) }
+public def COLOR_BLUE() -> Int64        { return pack_rgba(0, 0, 255, 255) }
+public def COLOR_GRAY() -> Int64        { return pack_rgba(128, 128, 128, 255) }
+public def COLOR_DARK_GRAY() -> Int64   { return pack_rgba(64, 64, 64, 255) }
+public def COLOR_TRANSPARENT() -> Int64 { return pack_rgba(0, 0, 0, 0) }
+
+// ===========================================================================
+// Alignment constants (for set_align_items / set_align_self)
+// ===========================================================================
+
+public def ALIGN_START() -> Int64   { return 0 }
+public def ALIGN_CENTER() -> Int64  { return 1 }
+public def ALIGN_END() -> Int64     { return 2 }
+public def ALIGN_STRETCH() -> Int64 { return 3 }
+
+// ===========================================================================
+// Justify constants (for set_justify_content)
+// ===========================================================================
+
+public def JUSTIFY_START() -> Int64         { return 0 }
+public def JUSTIFY_CENTER() -> Int64        { return 1 }
+public def JUSTIFY_END() -> Int64           { return 2 }
+public def JUSTIFY_SPACE_BETWEEN() -> Int64 { return 3 }
+public def JUSTIFY_SPACE_AROUND() -> Int64  { return 4 }
+
+// ===========================================================================
+// Dimensions (existing API — preserved)
 // ===========================================================================
 
 public def set_width(widget: Int64, width: Float) {
@@ -106,5 +147,31 @@ public def set_justify_content(widget: Int64, justify: Int64) {
 
 public def set_align_self(widget: Int64, align: Int64) {
     ui_set_align_self(widget, align)
+    return
+}
+
+// ===========================================================================
+// Style presets — apply multiple styles at once.
+// ===========================================================================
+
+// Card style: padded, bordered, rounded, white background.
+public def apply_card_style(widget: Int64) {
+    border_color = pack_rgba(200, 200, 200, 255)
+    bg_color = pack_rgba(255, 255, 255, 255)
+    ui_set_padding_all(widget, 16.0f)
+    ui_set_border(widget, 1.0f, border_color)
+    ui_set_border_radius(widget, 8.0f)
+    ui_set_bg_color(widget, bg_color)
+    return
+}
+
+// Header style: large font, dark background, white text, padded.
+public def apply_header_style(widget: Int64) {
+    bg_color = pack_rgba(50, 50, 50, 255)
+    fg_color = pack_rgba(255, 255, 255, 255)
+    ui_set_font_size(widget, 24.0f)
+    ui_set_bg_color(widget, bg_color)
+    ui_set_fg_color(widget, fg_color)
+    ui_set_padding_all(widget, 12.0f)
     return
 }

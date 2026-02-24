@@ -1,5 +1,42 @@
 // http.client — HTTP client for GET and POST requests.
 
+// Response struct wrapping handle with pre-read status and body.
+public struct HttpResponse {
+    handle: Int64
+    status: Int64
+    body: String
+}
+
+// ---------------------------------------------------------------------------
+// Status code constants
+// ---------------------------------------------------------------------------
+
+public def STATUS_OK() -> Int64          { return 200 }
+public def STATUS_CREATED() -> Int64     { return 201 }
+public def STATUS_NO_CONTENT() -> Int64  { return 204 }
+public def STATUS_MOVED() -> Int64       { return 301 }
+public def STATUS_FOUND() -> Int64       { return 302 }
+public def STATUS_BAD_REQUEST() -> Int64 { return 400 }
+public def STATUS_UNAUTHORIZED() -> Int64 { return 401 }
+public def STATUS_FORBIDDEN() -> Int64   { return 403 }
+public def STATUS_NOT_FOUND() -> Int64   { return 404 }
+public def STATUS_SERVER_ERROR() -> Int64 { return 500 }
+public def STATUS_BAD_GATEWAY() -> Int64 { return 502 }
+public def STATUS_UNAVAILABLE() -> Int64 { return 503 }
+
+// ---------------------------------------------------------------------------
+// Content type constants
+// ---------------------------------------------------------------------------
+
+public def CONTENT_JSON() -> String { return "application/json" }
+public def CONTENT_FORM() -> String { return "application/x-www-form-urlencoded" }
+public def CONTENT_TEXT() -> String { return "text/plain" }
+public def CONTENT_HTML() -> String { return "text/html" }
+
+// ---------------------------------------------------------------------------
+// Core request functions (existing API — preserved)
+// ---------------------------------------------------------------------------
+
 public def get(url: String) -> Int64 {
     return http_get(url)
 }
@@ -23,4 +60,60 @@ public def response_header(handle: Int64, name: String) -> String {
 public def response_free(handle: Int64) {
     http_response_free(handle)
     return
+}
+
+// ---------------------------------------------------------------------------
+// High-level request functions — return HttpResponse struct
+// ---------------------------------------------------------------------------
+
+// Perform a GET request and return an HttpResponse with status and body pre-read.
+public def fetch(url: String) -> HttpResponse {
+    h = http_get(url)
+    s = http_response_status(h)
+    b = http_response_body(h)
+    return HttpResponse(h, s, b)
+}
+
+// POST JSON data and return an HttpResponse.
+public def post_json(url: String, json_body: String) -> HttpResponse {
+    h = http_post(url, json_body, "application/json")
+    s = http_response_status(h)
+    b = http_response_body(h)
+    return HttpResponse(h, s, b)
+}
+
+// POST form-encoded data and return an HttpResponse.
+public def post_form(url: String, form_body: String) -> HttpResponse {
+    h = http_post(url, form_body, "application/x-www-form-urlencoded")
+    s = http_response_status(h)
+    b = http_response_body(h)
+    return HttpResponse(h, s, b)
+}
+
+// Convenience: GET a URL and return only the body text.
+public def get_text(url: String) -> String {
+    h = http_get(url)
+    b = http_response_body(h)
+    http_response_free(h)
+    return b
+}
+
+// ---------------------------------------------------------------------------
+// Status category helpers
+// ---------------------------------------------------------------------------
+
+public def is_success(status: Int64) -> Bool {
+    return status >= 200 && status < 300
+}
+
+public def is_redirect(status: Int64) -> Bool {
+    return status >= 300 && status < 400
+}
+
+public def is_client_error(status: Int64) -> Bool {
+    return status >= 400 && status < 500
+}
+
+public def is_server_error(status: Int64) -> Bool {
+    return status >= 500 && status < 600
 }

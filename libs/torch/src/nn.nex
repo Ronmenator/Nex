@@ -1,5 +1,9 @@
 // torch.nn — Neural network layers and modules.
 
+// ===========================================================================
+// Core layer functions (existing API — preserved)
+// ===========================================================================
+
 // Creates a new Sequential module for building neural networks.
 public def sequential() -> Int64 {
     return nn_sequential_new()
@@ -62,4 +66,49 @@ public def forward(module: Int64, input: Int64) -> Int64 {
 public def free(module: Int64) {
     nn_free(module)
     return
+}
+
+// ===========================================================================
+// Combined layer builders — add a linear layer + activation in one call.
+// ===========================================================================
+
+public def linear_relu(module: Int64, in_f: Int64, out_f: Int64) {
+    nn_linear(module, in_f, out_f)
+    nn_relu(module)
+    return
+}
+
+public def linear_sigmoid(module: Int64, in_f: Int64, out_f: Int64) {
+    nn_linear(module, in_f, out_f)
+    nn_sigmoid(module)
+    return
+}
+
+public def linear_tanh(module: Int64, in_f: Int64, out_f: Int64) {
+    nn_linear(module, in_f, out_f)
+    nn_tanh(module)
+    return
+}
+
+// ===========================================================================
+// Model builders — create complete architectures in one call.
+// ===========================================================================
+
+// Builds a simple MLP: input -> hidden (ReLU) -> output.
+public def build_mlp(in_features: Int64, hidden: Int64, out_features: Int64) -> Int64 {
+    m = nn_sequential_new()
+    nn_linear(m, in_features, hidden)
+    nn_relu(m)
+    nn_linear(m, hidden, out_features)
+    return m
+}
+
+// Builds a classifier: input -> hidden (ReLU) -> num_classes (Softmax).
+public def build_classifier(in_features: Int64, hidden: Int64, num_classes: Int64) -> Int64 {
+    m = nn_sequential_new()
+    nn_linear(m, in_features, hidden)
+    nn_relu(m)
+    nn_linear(m, hidden, num_classes)
+    nn_softmax(m, 1)
+    return m
 }

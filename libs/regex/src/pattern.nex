@@ -1,5 +1,26 @@
 // regex.pattern — Regular expression matching and replacement.
 
+// Result struct for match operations.
+public struct MatchResult {
+    matched: Bool
+    value: String
+}
+
+// ---------------------------------------------------------------------------
+// Common pattern constants
+// ---------------------------------------------------------------------------
+
+public def PATTERN_EMAIL() -> String  { return "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}" }
+public def PATTERN_URL() -> String    { return "https?://[^\\s]+" }
+public def PATTERN_IPV4() -> String   { return "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}" }
+public def PATTERN_DIGITS() -> String { return "\\d+" }
+public def PATTERN_WORD() -> String   { return "\\w+" }
+public def PATTERN_HEX() -> String    { return "[0-9a-fA-F]+" }
+
+// ---------------------------------------------------------------------------
+// Core pattern functions (existing API — preserved)
+// ---------------------------------------------------------------------------
+
 public def compile(pattern: String) -> Int64 {
     return regex_new(pattern)
 }
@@ -19,4 +40,63 @@ public def replace_all(handle: Int64, text: String, replacement: String) -> Stri
 public def free(handle: Int64) {
     regex_free(handle)
     return
+}
+
+// ---------------------------------------------------------------------------
+// One-shot helpers — compile, use, and free in a single call.
+// Convenient when you only need to use a pattern once.
+// ---------------------------------------------------------------------------
+
+public def quick_match(pattern: String, text: String) -> Bool {
+    h = regex_new(pattern)
+    result = regex_is_match(h, text) != 0
+    regex_free(h)
+    return result
+}
+
+public def quick_find(pattern: String, text: String) -> MatchResult {
+    h = regex_new(pattern)
+    found = regex_is_match(h, text) != 0
+    val = regex_find(h, text)
+    regex_free(h)
+    return MatchResult(found, val)
+}
+
+public def quick_replace(pattern: String, text: String, replacement: String) -> String {
+    h = regex_new(pattern)
+    result = regex_replace(h, text, replacement)
+    regex_free(h)
+    return result
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers — check text against common patterns.
+// ---------------------------------------------------------------------------
+
+public def is_email(text: String) -> Bool {
+    h = regex_new("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")
+    result = regex_is_match(h, text) != 0
+    regex_free(h)
+    return result
+}
+
+public def is_url(text: String) -> Bool {
+    h = regex_new("https?://[^\\s]+")
+    result = regex_is_match(h, text) != 0
+    regex_free(h)
+    return result
+}
+
+public def is_ipv4(text: String) -> Bool {
+    h = regex_new("\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")
+    result = regex_is_match(h, text) != 0
+    regex_free(h)
+    return result
+}
+
+public def contains_digits(text: String) -> Bool {
+    h = regex_new("\\d+")
+    result = regex_is_match(h, text) != 0
+    regex_free(h)
+    return result
 }

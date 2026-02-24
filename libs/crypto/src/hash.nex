@@ -1,4 +1,19 @@
-// crypto.hash — Cryptographic hash functions.
+// crypto.hash — Cryptographic hash functions with verification support.
+
+// Result struct wrapping a hash output with its algorithm name.
+public struct HashResult {
+    hex: String
+    algorithm: String
+}
+
+// Algorithm name constants.
+public def ALGO_SHA256() -> String { return "sha256" }
+public def ALGO_SHA512() -> String { return "sha512" }
+public def ALGO_MD5() -> String { return "md5" }
+
+// ---------------------------------------------------------------------------
+// Core hash functions (existing API — preserved)
+// ---------------------------------------------------------------------------
 
 public def sha256(input: String) -> String {
     return crypto_sha256(input)
@@ -10,4 +25,43 @@ public def sha512(input: String) -> String {
 
 public def md5(input: String) -> String {
     return crypto_md5(input)
+}
+
+// ---------------------------------------------------------------------------
+// Struct-returning variants — return HashResult with hex + algorithm tag
+// ---------------------------------------------------------------------------
+
+public def sha256_hash(input: String) -> HashResult {
+    hex = crypto_sha256(input)
+    return HashResult(hex, "sha256")
+}
+
+public def sha512_hash(input: String) -> HashResult {
+    hex = crypto_sha512(input)
+    return HashResult(hex, "sha512")
+}
+
+public def md5_hash(input: String) -> HashResult {
+    hex = crypto_md5(input)
+    return HashResult(hex, "md5")
+}
+
+// ---------------------------------------------------------------------------
+// Verify functions — hash the input and compare to an expected hex digest.
+// Returns true if the computed hash matches the expected value.
+// ---------------------------------------------------------------------------
+
+public def sha256_verify(input: String, expected_hex: String) -> Bool {
+    computed = crypto_sha256(input)
+    return computed == expected_hex
+}
+
+public def sha512_verify(input: String, expected_hex: String) -> Bool {
+    computed = crypto_sha512(input)
+    return computed == expected_hex
+}
+
+public def md5_verify(input: String, expected_hex: String) -> Bool {
+    computed = crypto_md5(input)
+    return computed == expected_hex
 }

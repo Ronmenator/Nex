@@ -1,7 +1,16 @@
-// nex_ui.event — Event handling (callbacks and polling).
+// nex_ui.event — Event handling (callbacks, polling, and event type constants).
 
 // ===========================================================================
-// Callback model
+// Event type constants
+// ===========================================================================
+
+public def EVENT_CLICK() -> Int64  { return 1 }
+public def EVENT_CHANGE() -> Int64 { return 2 }
+public def EVENT_HOVER() -> Int64  { return 3 }
+public def EVENT_KEY() -> Int64    { return 4 }
+
+// ===========================================================================
+// Callback model (existing API — preserved)
 // ===========================================================================
 
 public def on_click(widget: Int64, callback: Int64) {
@@ -38,4 +47,24 @@ public def event_type(event: Int64) -> Int64 {
 
 public def event_widget(event: Int64) -> Int64 {
     return ui_event_widget(event)
+}
+
+// ===========================================================================
+// Event type helpers — check what kind of event was received.
+// ===========================================================================
+
+public def is_click(evt: Int64) -> Bool {
+    return ui_event_type(evt) == 1
+}
+
+public def is_change(evt: Int64) -> Bool {
+    return ui_event_type(evt) == 2
+}
+
+public def is_hover(evt: Int64) -> Bool {
+    return ui_event_type(evt) == 3
+}
+
+public def is_key(evt: Int64) -> Bool {
+    return ui_event_type(evt) == 4
 }

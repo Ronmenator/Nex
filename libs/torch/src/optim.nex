@@ -1,5 +1,16 @@
 // torch.optim — Optimizers for training neural networks.
 
+// ===========================================================================
+// Default learning rate constants
+// ===========================================================================
+
+public def DEFAULT_LR() -> Float { return 0.001f }
+public def DEFAULT_SGD_LR() -> Float { return 0.01f }
+
+// ===========================================================================
+// Core optimizer functions (existing API — preserved)
+// ===========================================================================
+
 // Creates an SGD optimizer for the given module.
 public def sgd(module: Int64, lr: Float) -> Int64 {
     return optim_sgd(module, lr)
@@ -26,4 +37,18 @@ public def zero_grad(optimizer: Int64) {
 public def free(optimizer: Int64) {
     optim_free(optimizer)
     return
+}
+
+// ===========================================================================
+// Convenience — create optimizers with default learning rates.
+// ===========================================================================
+
+// Creates an Adam optimizer with the default learning rate (0.001).
+public def adam_default(module: Int64) -> Int64 {
+    return optim_adam(module, 0.001f)
+}
+
+// Creates an SGD optimizer with the default learning rate (0.01).
+public def sgd_default(module: Int64) -> Int64 {
+    return optim_sgd(module, 0.01f)
 }

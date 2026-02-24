@@ -1,4 +1,8 @@
-// nex_ui.canvas — Canvas drawing API.
+// nex_ui.canvas — Canvas drawing API with shape helpers.
+
+// ===========================================================================
+// Core drawing functions (existing API — preserved)
+// ===========================================================================
 
 public def fill_rect(canvas: Int64, x: Float, y: Float, w: Float, h: Float, rgba: Int64) {
     ui_canvas_fill_rect(canvas, x, y, w, h, rgba)
@@ -27,5 +31,42 @@ public def draw_text(canvas: Int64, text: String, x: Float, y: Float, size: Floa
 
 public def clear(canvas: Int64, rgba: Int64) {
     ui_canvas_clear(canvas, rgba)
+    return
+}
+
+// ===========================================================================
+// Shape helpers — composed from core drawing primitives.
+// ===========================================================================
+
+// Draws a filled rounded rectangle using 2 overlapping rects + 4 corner circles.
+public def fill_rounded_rect(canvas: Int64, x: Float, y: Float, w: Float, h: Float, radius: Float, rgba: Int64) {
+    // Horizontal center strip
+    ui_canvas_fill_rect(canvas, x + radius, y, w - radius - radius, h, rgba)
+    // Vertical center strip
+    ui_canvas_fill_rect(canvas, x, y + radius, w, h - radius - radius, rgba)
+    // Four corner circles
+    ui_canvas_fill_circle(canvas, x + radius, y + radius, radius, rgba)
+    ui_canvas_fill_circle(canvas, x + w - radius, y + radius, radius, rgba)
+    ui_canvas_fill_circle(canvas, x + radius, y + h - radius, radius, rgba)
+    ui_canvas_fill_circle(canvas, x + w - radius, y + h - radius, radius, rgba)
+    return
+}
+
+// Draws an X mark (cross) centered at (cx, cy) with the given size.
+public def draw_cross(canvas: Int64, cx: Float, cy: Float, size: Float, line_width: Float, rgba: Int64) {
+    half = size / 2.0f
+    ui_canvas_draw_line(canvas, cx - half, cy - half, cx + half, cy + half, line_width, rgba)
+    ui_canvas_draw_line(canvas, cx + half, cy - half, cx - half, cy + half, line_width, rgba)
+    return
+}
+
+// Draws a checkmark centered at (cx, cy) with the given size.
+public def draw_check(canvas: Int64, cx: Float, cy: Float, size: Float, line_width: Float, rgba: Int64) {
+    half = size / 2.0f
+    quarter = size / 4.0f
+    // Short stroke going down to bottom-center
+    ui_canvas_draw_line(canvas, cx - half, cy, cx - quarter, cy + half, line_width, rgba)
+    // Long stroke going up to the right
+    ui_canvas_draw_line(canvas, cx - quarter, cy + half, cx + half, cy - half, line_width, rgba)
     return
 }

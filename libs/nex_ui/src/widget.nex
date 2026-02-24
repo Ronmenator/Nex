@@ -1,7 +1,7 @@
-// nex_ui.widget — Widget creation and tree management.
+// nex_ui.widget — Widget creation, tree management, and convenience builders.
 
 // ===========================================================================
-// Widget creation
+// Widget creation (existing API — preserved)
 // ===========================================================================
 
 public def text(label: String) -> Int64 {
@@ -109,4 +109,53 @@ public def get_value_float(widget: Int64) -> Float {
 public def set_value_float(widget: Int64, value: Float) {
     ui_set_value_float(widget, value)
     return
+}
+
+// ===========================================================================
+// Convenience builders — create widgets with common styling applied.
+// ===========================================================================
+
+// Creates a text widget with a specific font size.
+public def styled_text(content: String, font_size: Float) -> Int64 {
+    w = ui_text(content)
+    ui_set_font_size(w, font_size)
+    return w
+}
+
+// Creates a button with explicit width and height.
+public def sized_button(label: String, width: Float, height: Float) -> Int64 {
+    w = ui_button(label)
+    ui_set_width(w, width)
+    ui_set_height(w, height)
+    return w
+}
+
+// Creates a row container with a gap between children.
+public def spaced_row(gap: Float) -> Int64 {
+    w = ui_row()
+    ui_set_gap(w, gap)
+    return w
+}
+
+// Creates a column container with a gap between children.
+public def spaced_column(gap: Float) -> Int64 {
+    w = ui_column()
+    ui_set_gap(w, gap)
+    return w
+}
+
+// Creates a row with two children already added.
+public def row_of_2(left: Int64, right: Int64) -> Int64 {
+    w = ui_row()
+    ui_add_child(w, left)
+    ui_add_child(w, right)
+    return w
+}
+
+// Creates a column with two children already added.
+public def column_of_2(top: Int64, bottom: Int64) -> Int64 {
+    w = ui_column()
+    ui_add_child(w, top)
+    ui_add_child(w, bottom)
+    return w
 }

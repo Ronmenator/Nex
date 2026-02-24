@@ -1,5 +1,9 @@
 // nex_ui.dialog — Dialog boxes (message, confirm, file pickers).
 
+// ===========================================================================
+// Core dialog functions (existing API — preserved)
+// ===========================================================================
+
 public def message(title: String, msg: String) {
     ui_dialog_message(title, msg)
     return
@@ -15,4 +19,23 @@ public def open_file(title: String, filter: String) -> String {
 
 public def save_file(title: String, filter: String) -> String {
     return ui_dialog_save_file(title, filter)
+}
+
+// ===========================================================================
+// Convenience dialogs — pre-titled for common use cases.
+// ===========================================================================
+
+public def error_dialog(msg: String) {
+    ui_dialog_message("Error", msg)
+    return
+}
+
+public def warning_dialog(msg: String) {
+    ui_dialog_message("Warning", msg)
+    return
+}
+
+public def info_dialog(msg: String) {
+    ui_dialog_message("Information", msg)
+    return
 }

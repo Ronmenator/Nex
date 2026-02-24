@@ -1,5 +1,19 @@
 // crypto.hmac — HMAC message authentication.
 
+// ---------------------------------------------------------------------------
+// Core HMAC (existing API — preserved)
+// ---------------------------------------------------------------------------
+
 public def hmac_sha256(key: String, message: String) -> String {
     return crypto_hmac_sha256(key, message)
+}
+
+// ---------------------------------------------------------------------------
+// Verify HMAC — compute the HMAC and compare to an expected value.
+// Returns true if the computed HMAC matches the expected hex string.
+// ---------------------------------------------------------------------------
+
+public def hmac_sha256_verify(key: String, message: String, expected: String) -> Bool {
+    computed = crypto_hmac_sha256(key, message)
+    return computed == expected
 }
