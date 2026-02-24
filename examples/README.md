@@ -12,15 +12,15 @@
   input, colored geometry, frame timing, and UI overlay (HUD) on top of the 3D scene.
   Requires `nex3d_native.dll` in `libs/nex3d/` and `nex_ui_native.dll` next to `nex.exe`.
 
-- `ui_declarative`: A desktop GUI application demonstrating the `std.ui` module and
+- `ui_declarative`: A desktop GUI application demonstrating the `nex_ui` library and
   `.nexui` declarative markup — layout containers (Column, Row, Grid), widgets (Text,
   Button, TextInput, Checkbox, Slider), canvas drawing, event callbacks, dynamic
   updates, and styling.
   Requires `nex_ui_native.dll` next to `nex.exe`.
 
-- `gpt2_transformer`: A GPT-2-style language model built on `std.torch` bindings.
+- `gpt2_transformer`: A GPT-2-style language model built on the `torch` library.
   Demonstrates tensor operations, neural network layers, and training loops.
-  Requires `--features torch`.
+  Requires `nex_torch_native` DLL and libtorch at runtime.
 
 ## Running
 
