@@ -1,0 +1,36 @@
+// nex3d.color — Color type and named color constants.
+// Pure Nex implementation; no runtime dependency.
+
+public struct Color {
+    r: Float
+    g: Float
+    b: Float
+    a: Float
+}
+
+public def color(r: Float, g: Float, b: Float, a: Float) -> Color {
+    return Color(r, g, b, a)
+}
+
+public def color_rgb(r: Float, g: Float, b: Float) -> Color {
+    return Color(r, g, b, 1.0f)
+}
+
+public def color_hex(hex: Int64) -> Color {
+    r = ((hex / 65536) % 256)
+    g = ((hex / 256) % 256)
+    b = (hex % 256)
+    return Color(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f)
+}
+
+// Named color constants
+public def COLOR_WHITE() -> Color   { return Color(1.0f, 1.0f, 1.0f, 1.0f) }
+public def COLOR_BLACK() -> Color   { return Color(0.0f, 0.0f, 0.0f, 1.0f) }
+public def COLOR_RED() -> Color     { return Color(1.0f, 0.0f, 0.0f, 1.0f) }
+public def COLOR_GREEN() -> Color   { return Color(0.0f, 1.0f, 0.0f, 1.0f) }
+public def COLOR_BLUE() -> Color    { return Color(0.0f, 0.0f, 1.0f, 1.0f) }
+public def COLOR_YELLOW() -> Color  { return Color(1.0f, 1.0f, 0.0f, 1.0f) }
+public def COLOR_CYAN() -> Color    { return Color(0.0f, 1.0f, 1.0f, 1.0f) }
+public def COLOR_MAGENTA() -> Color { return Color(1.0f, 0.0f, 1.0f, 1.0f) }
+public def COLOR_ORANGE() -> Color  { return Color(1.0f, 0.65f, 0.0f, 1.0f) }
+public def COLOR_GRAY() -> Color    { return Color(0.5f, 0.5f, 0.5f, 1.0f) }

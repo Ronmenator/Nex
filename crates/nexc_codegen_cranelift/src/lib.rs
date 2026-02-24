@@ -41,7 +41,14 @@ pub fn generate_object(ir: &IrModule) -> Result<Vec<u8>, String> {
 
 /// JIT execution: compile IrModule in memory and call its `main` function.
 /// Returns the process exit code.
-pub fn jit_execute(ir: &IrModule, _args: &[String]) -> Result<i32, String> {
+///
+/// `native_libs` is a list of paths to native dynamic libraries (.dll / .so)
+/// whose exported symbols should be made available to JIT-compiled code.
+pub fn jit_execute(
+    ir: &IrModule,
+    _args: &[String],
+    native_libs: &[std::path::PathBuf],
+) -> Result<i32, String> {
     use cranelift_jit::{JITBuilder, JITModule};
 
     let flag_builder = build_settings();
@@ -53,6 +60,7 @@ pub fn jit_execute(ir: &IrModule, _args: &[String]) -> Result<i32, String> {
 
     let mut jit_builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
     register_runtime_symbols(&mut jit_builder);
+    register_native_libs(&mut jit_builder, native_libs)?;
 
     let mut module = JITModule::new(jit_builder);
     let mut ctx = module.make_context();
@@ -308,89 +316,6 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_assert_ne_str);
     sym!(nex_assert_true);
 
-    // std.ui
-    #[cfg(feature = "ui")]
-    {
-        sym!(nex_ui_app_create);
-        sym!(nex_ui_app_set_backend);
-        sym!(nex_ui_app_set_root);
-        sym!(nex_ui_app_run);
-        sym!(nex_ui_app_quit);
-        sym!(nex_ui_app_destroy);
-        sym!(nex_ui_app_is_running);
-        sym!(nex_ui_app_render);
-        sym!(nex_ui_poll_event);
-        sym!(nex_ui_event_type);
-        sym!(nex_ui_event_widget);
-        sym!(nex_ui_text);
-        sym!(nex_ui_button);
-        sym!(nex_ui_text_input);
-        sym!(nex_ui_image);
-        sym!(nex_ui_checkbox);
-        sym!(nex_ui_slider);
-        sym!(nex_ui_row);
-        sym!(nex_ui_column);
-        sym!(nex_ui_stack);
-        sym!(nex_ui_scroll);
-        sym!(nex_ui_grid);
-        sym!(nex_ui_canvas);
-        sym!(nex_ui_add_child);
-        sym!(nex_ui_remove_child);
-        sym!(nex_ui_set_id);
-        sym!(nex_ui_get_id);
-        sym!(nex_ui_set_text);
-        sym!(nex_ui_get_text);
-        sym!(nex_ui_set_visible);
-        sym!(nex_ui_set_enabled);
-        sym!(nex_ui_get_value_float);
-        sym!(nex_ui_set_value_float);
-        sym!(nex_ui_set_width);
-        sym!(nex_ui_set_height);
-        sym!(nex_ui_set_min_width);
-        sym!(nex_ui_set_min_height);
-        sym!(nex_ui_set_padding);
-        sym!(nex_ui_set_padding_all);
-        sym!(nex_ui_set_margin);
-        sym!(nex_ui_set_bg_color);
-        sym!(nex_ui_set_fg_color);
-        sym!(nex_ui_set_font_size);
-        sym!(nex_ui_set_border);
-        sym!(nex_ui_set_border_radius);
-        sym!(nex_ui_set_flex_grow);
-        sym!(nex_ui_set_align_self);
-        sym!(nex_ui_set_justify_content);
-        sym!(nex_ui_set_align_items);
-        sym!(nex_ui_set_gap);
-        sym!(nex_ui_on_click);
-        sym!(nex_ui_on_change);
-        sym!(nex_ui_on_hover);
-        sym!(nex_ui_on_key);
-        sym!(nex_ui_canvas_fill_rect);
-        sym!(nex_ui_canvas_stroke_rect);
-        sym!(nex_ui_canvas_fill_circle);
-        sym!(nex_ui_canvas_draw_line);
-        sym!(nex_ui_canvas_draw_text);
-        sym!(nex_ui_canvas_clear);
-        sym!(nex_ui_dialog_message);
-        sym!(nex_ui_dialog_confirm);
-        sym!(nex_ui_dialog_open_file);
-        sym!(nex_ui_dialog_save_file);
-        // Binding engine
-        sym!(nex_ui_bind);
-        sym!(nex_ui_unbind);
-        sym!(nex_ui_notify_changed);
-        sym!(nex_ui_bindings_clear);
-    }
-
-    #[cfg(feature = "engine")]
-    {
-        sym!(nex_engine_window_create);
-        sym!(nex_engine_window_run);
-        sym!(nex_engine_window_quit);
-        sym!(nex_engine_window_destroy);
-        sym!(nex_engine_window_is_running);
-    }
-
     #[cfg(feature = "torch")]
     {
         sym!(nex_torch_tensor_zeros);
@@ -457,6 +382,162 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
         sym!(nex_torch_tensor_to_string);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Dynamic native library loading
+// ---------------------------------------------------------------------------
+
+/// Load native dynamic libraries (.dll / .so) and register all their exported
+/// `nex_*` symbols with the JIT builder so Nex code can call them.
+///
+/// Each library is kept alive for the lifetime of the process (leaked via
+/// `std::mem::forget`) because the JIT may reference function pointers at any
+/// time during execution.
+fn register_native_libs(
+    builder: &mut cranelift_jit::JITBuilder,
+    native_libs: &[std::path::PathBuf],
+) -> Result<(), String> {
+    for lib_path in native_libs {
+        unsafe {
+            let lib = libloading::Library::new(lib_path)
+                .map_err(|e| format!("failed to load native library {}: {e}", lib_path.display()))?;
+
+            // Probe for all known exported symbol names.
+            // The DLLs export `nex_*` extern "C" functions.  We iterate a
+            // comprehensive list of symbol names and register any that the
+            // library actually exports.
+            for &name in NATIVE_SYMBOL_NAMES {
+                if let Ok(sym) = lib.get::<*const u8>(name.as_bytes()) {
+                    builder.symbol(name, *sym);
+                }
+            }
+
+            // Keep the library loaded for the duration of the process.
+            std::mem::forget(lib);
+        }
+    }
+    Ok(())
+}
+
+/// All possible native symbol names that DLLs may export.
+/// This list is probed at load time — missing symbols are silently skipped.
+static NATIVE_SYMBOL_NAMES: &[&str] = &[
+    // nex3d engine
+    "nex_engine_window_create",
+    "nex_engine_window_run",
+    "nex_engine_window_quit",
+    "nex_engine_window_destroy",
+    "nex_engine_window_is_running",
+    "nex_engine_clear_color",
+    "nex_engine_set_update_fn",
+    "nex_engine_window_width",
+    "nex_engine_window_height",
+    "nex_engine_key_down",
+    "nex_engine_key_pressed",
+    "nex_engine_key_released",
+    "nex_engine_mouse_x",
+    "nex_engine_mouse_y",
+    "nex_engine_mouse_delta_x",
+    "nex_engine_mouse_delta_y",
+    "nex_engine_mouse_button_down",
+    "nex_engine_mouse_button_pressed",
+    "nex_engine_delta_time",
+    "nex_engine_elapsed_time",
+    "nex_engine_frame_count",
+    "nex_engine_set_camera_pos",
+    "nex_engine_set_camera_target",
+    "nex_engine_set_camera_up",
+    "nex_engine_set_perspective",
+    "nex_engine_push_vertex",
+    "nex_engine_draw_triangles",
+    "nex_engine_enable_ui_overlay",
+    // nex UI
+    "nex_ui_app_create",
+    "nex_ui_app_set_backend",
+    "nex_ui_app_set_root",
+    "nex_ui_app_run",
+    "nex_ui_app_quit",
+    "nex_ui_app_destroy",
+    "nex_ui_app_is_running",
+    "nex_ui_app_render",
+    "nex_ui_poll_event",
+    "nex_ui_event_type",
+    "nex_ui_event_widget",
+    "nex_ui_text",
+    "nex_ui_button",
+    "nex_ui_text_input",
+    "nex_ui_image",
+    "nex_ui_checkbox",
+    "nex_ui_slider",
+    "nex_ui_row",
+    "nex_ui_column",
+    "nex_ui_stack",
+    "nex_ui_scroll",
+    "nex_ui_grid",
+    "nex_ui_canvas",
+    "nex_ui_add_child",
+    "nex_ui_remove_child",
+    "nex_ui_set_id",
+    "nex_ui_get_id",
+    "nex_ui_set_text",
+    "nex_ui_get_text",
+    "nex_ui_set_visible",
+    "nex_ui_set_enabled",
+    "nex_ui_get_value_float",
+    "nex_ui_set_value_float",
+    "nex_ui_set_width",
+    "nex_ui_set_height",
+    "nex_ui_set_min_width",
+    "nex_ui_set_min_height",
+    "nex_ui_set_padding",
+    "nex_ui_set_padding_all",
+    "nex_ui_set_margin",
+    "nex_ui_set_bg_color",
+    "nex_ui_set_fg_color",
+    "nex_ui_set_font_size",
+    "nex_ui_set_border",
+    "nex_ui_set_border_radius",
+    "nex_ui_set_flex_grow",
+    "nex_ui_set_align_self",
+    "nex_ui_set_justify_content",
+    "nex_ui_set_align_items",
+    "nex_ui_set_gap",
+    "nex_ui_on_click",
+    "nex_ui_on_change",
+    "nex_ui_on_hover",
+    "nex_ui_on_key",
+    "nex_ui_canvas_fill_rect",
+    "nex_ui_canvas_stroke_rect",
+    "nex_ui_canvas_fill_circle",
+    "nex_ui_canvas_draw_line",
+    "nex_ui_canvas_draw_text",
+    "nex_ui_canvas_clear",
+    "nex_ui_dialog_message",
+    "nex_ui_dialog_confirm",
+    "nex_ui_dialog_open_file",
+    "nex_ui_dialog_save_file",
+    "nex_ui_bind",
+    "nex_ui_unbind",
+    "nex_ui_notify_changed",
+    "nex_ui_bindings_clear",
+    "nex_ui_overlay_init",
+    "nex_ui_overlay_render",
+    "nex_ui_overlay_mouse_move",
+    "nex_ui_overlay_mouse_down",
+    "nex_ui_overlay_mouse_up",
+    "nex_ui_overlay_key_char",
+    "nex_ui_overlay_key_name",
+    "nex_ui_overlay_hit_test",
+    "nex_ui_set_h_align",
+    "nex_ui_set_v_align",
+    "nex_ui_set_max_width",
+    "nex_ui_set_max_height",
+    "nex_ui_set_flex_shrink",
+    "nex_ui_set_margin_all",
+    "nex_ui_set_checked",
+    "nex_ui_set_border_width",
+    "nex_ui_set_border_color",
+];
 
 // ---------------------------------------------------------------------------
 // Module-level translation (shared by AOT and JIT)
@@ -1528,11 +1609,9 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "assert_ne_str" => Some("nex_assert_ne_str"),
         "assert_true" => Some("nex_assert_true"),
         _ => {
-            #[cfg(feature = "ui")]
             if let Some(n) = ui_function_name(name) {
                 return Some(n);
             }
-            #[cfg(feature = "engine")]
             if let Some(n) = engine_function_name(name) {
                 return Some(n);
             }
@@ -1546,7 +1625,6 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
     }
 }
 
-#[cfg(feature = "ui")]
 fn ui_function_name(name: &str) -> Option<&'static str> {
     match name {
         // Application
@@ -1627,18 +1705,57 @@ fn ui_function_name(name: &str) -> Option<&'static str> {
         "nex_ui_unbind" => Some("nex_ui_unbind"),
         "notify_changed" | "nex_ui_notify_changed" => Some("nex_ui_notify_changed"),
         "nex_ui_bindings_clear" => Some("nex_ui_bindings_clear"),
+        // Overlay
+        "ui_overlay_init" => Some("nex_ui_overlay_init"),
+        "ui_overlay_render" => Some("nex_ui_overlay_render"),
+        "ui_overlay_mouse_move" => Some("nex_ui_overlay_mouse_move"),
+        "ui_overlay_mouse_down" => Some("nex_ui_overlay_mouse_down"),
+        "ui_overlay_mouse_up" => Some("nex_ui_overlay_mouse_up"),
+        "ui_overlay_key_char" => Some("nex_ui_overlay_key_char"),
+        "ui_overlay_key_name" => Some("nex_ui_overlay_key_name"),
+        "ui_overlay_hit_test" => Some("nex_ui_overlay_hit_test"),
         _ => None,
     }
 }
 
-#[cfg(feature = "engine")]
 fn engine_function_name(name: &str) -> Option<&'static str> {
     match name {
+        // Lifecycle
         "engine_window_create" => Some("nex_engine_window_create"),
         "engine_window_run" => Some("nex_engine_window_run"),
         "engine_window_quit" => Some("nex_engine_window_quit"),
         "engine_window_destroy" => Some("nex_engine_window_destroy"),
         "engine_window_is_running" => Some("nex_engine_window_is_running"),
+        // Config
+        "engine_clear_color" => Some("nex_engine_clear_color"),
+        "engine_set_update_fn" => Some("nex_engine_set_update_fn"),
+        "engine_window_width" => Some("nex_engine_window_width"),
+        "engine_window_height" => Some("nex_engine_window_height"),
+        // Input — keyboard
+        "engine_key_down" => Some("nex_engine_key_down"),
+        "engine_key_pressed" => Some("nex_engine_key_pressed"),
+        "engine_key_released" => Some("nex_engine_key_released"),
+        // Input — mouse
+        "engine_mouse_x" => Some("nex_engine_mouse_x"),
+        "engine_mouse_y" => Some("nex_engine_mouse_y"),
+        "engine_mouse_delta_x" => Some("nex_engine_mouse_delta_x"),
+        "engine_mouse_delta_y" => Some("nex_engine_mouse_delta_y"),
+        "engine_mouse_button_down" => Some("nex_engine_mouse_button_down"),
+        "engine_mouse_button_pressed" => Some("nex_engine_mouse_button_pressed"),
+        // Timing
+        "engine_delta_time" => Some("nex_engine_delta_time"),
+        "engine_elapsed_time" => Some("nex_engine_elapsed_time"),
+        "engine_frame_count" => Some("nex_engine_frame_count"),
+        // Camera
+        "engine_set_camera_pos" => Some("nex_engine_set_camera_pos"),
+        "engine_set_camera_target" => Some("nex_engine_set_camera_target"),
+        "engine_set_camera_up" => Some("nex_engine_set_camera_up"),
+        "engine_set_perspective" => Some("nex_engine_set_perspective"),
+        // Drawing
+        "engine_push_vertex" => Some("nex_engine_push_vertex"),
+        "engine_draw_triangles" => Some("nex_engine_draw_triangles"),
+        // UI Overlay
+        "engine_enable_ui_overlay" => Some("nex_engine_enable_ui_overlay"),
         _ => None,
     }
 }
@@ -2071,6 +2188,10 @@ fn declare_runtime_imports<M: Module>(
         ("nex_assert_true", &sig_void_ptr2),
     ];
 
+    // void(i64, i64, i64, i64) – four args, no return
+    let mut sig_void_ptr4 = Signature::new(cc);
+    for _ in 0..4 { sig_void_ptr4.params.push(AbiParam::new(types::I64)); }
+
     // void(i64, i64, i64, i64, i64, i64) – six args, no return
     let mut sig_void_ptr6 = Signature::new(cc);
     for _ in 0..6 { sig_void_ptr6.params.push(AbiParam::new(types::I64)); }
@@ -2089,7 +2210,6 @@ fn declare_runtime_imports<M: Module>(
     for _ in 0..4 { sig_ptr_ptr4.params.push(AbiParam::new(types::I64)); }
     sig_ptr_ptr4.returns.push(AbiParam::new(types::I64));
 
-    #[cfg(feature = "ui")]
     let ui_imports: Vec<(&str, &Signature)> = vec![
         // Application
         ("nex_ui_app_create", &sig_ptr_ptr3),
@@ -2169,15 +2289,54 @@ fn declare_runtime_imports<M: Module>(
         ("nex_ui_unbind", &sig_void_ptr),
         ("nex_ui_notify_changed", &sig_void_ptr),
         ("nex_ui_bindings_clear", &sig_void),
+        // Overlay
+        ("nex_ui_overlay_init", &sig_void_ptr2),
+        ("nex_ui_overlay_render", &sig_ptr_ptr2),
+        ("nex_ui_overlay_mouse_move", &sig_void_ptr2),
+        ("nex_ui_overlay_mouse_down", &sig_void_ptr2),
+        ("nex_ui_overlay_mouse_up", &sig_void_ptr2),
+        ("nex_ui_overlay_key_char", &sig_void_ptr),
+        ("nex_ui_overlay_key_name", &sig_void_ptr),
+        ("nex_ui_overlay_hit_test", &sig_ptr_ptr2),
     ];
 
-    #[cfg(feature = "engine")]
     let engine_imports: Vec<(&str, &Signature)> = vec![
+        // Lifecycle
         ("nex_engine_window_create", &sig_ptr_ptr3),
         ("nex_engine_window_run", &sig_void_ptr),
         ("nex_engine_window_quit", &sig_void_ptr),
         ("nex_engine_window_destroy", &sig_void_ptr),
         ("nex_engine_window_is_running", &sig_ptr_ptr),
+        // Config
+        ("nex_engine_clear_color", &sig_void_ptr4),
+        ("nex_engine_set_update_fn", &sig_void_ptr),
+        ("nex_engine_window_width", &sig_ret_ptr),
+        ("nex_engine_window_height", &sig_ret_ptr),
+        // Input — keyboard
+        ("nex_engine_key_down", &sig_ptr_ptr),
+        ("nex_engine_key_pressed", &sig_ptr_ptr),
+        ("nex_engine_key_released", &sig_ptr_ptr),
+        // Input — mouse
+        ("nex_engine_mouse_x", &sig_ret_ptr),
+        ("nex_engine_mouse_y", &sig_ret_ptr),
+        ("nex_engine_mouse_delta_x", &sig_ret_ptr),
+        ("nex_engine_mouse_delta_y", &sig_ret_ptr),
+        ("nex_engine_mouse_button_down", &sig_ptr_ptr),
+        ("nex_engine_mouse_button_pressed", &sig_ptr_ptr),
+        // Timing
+        ("nex_engine_delta_time", &sig_ret_ptr),
+        ("nex_engine_elapsed_time", &sig_ret_ptr),
+        ("nex_engine_frame_count", &sig_ret_ptr),
+        // Camera
+        ("nex_engine_set_camera_pos", &sig_void_ptr3),
+        ("nex_engine_set_camera_target", &sig_void_ptr3),
+        ("nex_engine_set_camera_up", &sig_void_ptr3),
+        ("nex_engine_set_perspective", &sig_void_ptr4),
+        // Drawing
+        ("nex_engine_push_vertex", &sig_void_ptr6),
+        ("nex_engine_draw_triangles", &sig_void),
+        // UI Overlay
+        ("nex_engine_enable_ui_overlay", &sig_void),
     ];
 
     #[cfg(feature = "torch")]
@@ -2265,7 +2424,6 @@ fn declare_runtime_imports<M: Module>(
         }
     }
 
-    #[cfg(feature = "ui")]
     for (name, sig) in ui_imports {
         if !func_ids.contains_key(name) {
             let id = module
@@ -2275,7 +2433,6 @@ fn declare_runtime_imports<M: Module>(
         }
     }
 
-    #[cfg(feature = "engine")]
     for (name, sig) in engine_imports {
         if !func_ids.contains_key(name) {
             let id = module

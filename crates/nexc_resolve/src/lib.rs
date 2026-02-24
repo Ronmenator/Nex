@@ -17,6 +17,12 @@ pub struct ModuleGraph {
 pub struct LibDependency {
     pub name: String,
     pub root: PathBuf,
+    /// Path to a native dynamic library (.dll / .so) if specified in project.toml.
+    pub native_lib: Option<PathBuf>,
+    /// Semver version string (e.g. "0.1.0") when resolved from the global cache.
+    pub version: Option<String>,
+    /// GitHub source in "user/repo" format, recorded for reinstallation.
+    pub git: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -278,10 +284,99 @@ pub fn discover_project_modules(root: &Path, sink: &mut DiagnosticSink) -> HashM
     modules
 }
 
+/// Discover all `.nex` files in `base_dir` and its subdirectories.
+/// Module names are derived relative to `base_dir` (no `src/` or `project.toml` required).
+///
+/// The file at `exclude_path` (if provided) is skipped — typically the main source file.
+pub fn discover_sibling_modules(
+    base_dir: &Path,
+    exclude_path: Option<&Path>,
+    sink: &mut DiagnosticSink,
+) -> HashMap<String, PathBuf> {
+    let mut modules = HashMap::new();
+    if !base_dir.exists() {
+        return modules;
+    }
+
+    let mut files = Vec::new();
+    collect_au_files(base_dir, &mut files, sink);
+
+    let exclude_canonical = exclude_path.and_then(|p| fs::canonicalize(p).ok());
+
+    for file in files {
+        if let Some(ref exc) = exclude_canonical {
+            if let Ok(file_canonical) = fs::canonicalize(&file) {
+                if file_canonical == *exc {
+                    continue;
+                }
+            }
+        }
+
+        let Some(module) = module_name_from_source_path(base_dir, &file) else {
+            continue;
+        };
+        if modules.insert(module.clone(), file.clone()).is_some() {
+            sink.push(Diagnostic {
+                id: "module_duplicate_path".to_string(),
+                severity: Severity::Error,
+                span: None,
+                file: Some(file),
+                message: format!("duplicate module path `{module}`"),
+                notes: Vec::new(),
+                suggestions: Vec::new(),
+            });
+        }
+    }
+
+    modules
+}
+
 /// Returns the library names declared in the project at `root`.
 pub fn discover_lib_names(root: &Path, sink: &mut DiagnosticSink) -> Vec<String> {
     let layout = discover_project_layout(root, sink);
     layout.libs.iter().map(|l| l.name.clone()).collect()
+}
+
+/// Discover native library paths (.dll / .so) from project dependencies.
+pub fn discover_native_libs(root: &Path, sink: &mut DiagnosticSink) -> Vec<PathBuf> {
+    let layout = discover_project_layout(root, sink);
+    layout
+        .libs
+        .iter()
+        .filter_map(|l| l.native_lib.clone())
+        .collect()
+}
+
+/// Discover native DLLs shipped alongside the nex executable (e.g. `nex_ui_native.dll`).
+/// Looks in the same directory as `std::env::current_exe()` and in a `native/` subdirectory.
+pub fn discover_std_native_libs() -> Vec<PathBuf> {
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+    let Some(exe_dir) = exe.parent() else {
+        return Vec::new();
+    };
+
+    let ext = if cfg!(target_os = "windows") { "dll" } else if cfg!(target_os = "macos") { "dylib" } else { "so" };
+    let prefix = if cfg!(target_os = "windows") { "" } else { "lib" };
+
+    let mut libs = Vec::new();
+    for name in &["nex_ui_native"] {
+        let filename = format!("{prefix}{name}.{ext}");
+        // Check exe dir
+        let path = exe_dir.join(&filename);
+        if path.exists() {
+            libs.push(path);
+            continue;
+        }
+        // Check native/ subdir
+        let path = exe_dir.join("native").join(&filename);
+        if path.exists() {
+            libs.push(path);
+        }
+    }
+    libs
 }
 
 pub fn discover_lib_modules(
@@ -336,6 +431,29 @@ fn parse_src_setting(toml: &str) -> Option<String> {
     None
 }
 
+/// Return the global library cache directory: `~/.nex/libs/`.
+pub fn nex_libs_dir() -> PathBuf {
+    let home = if cfg!(windows) {
+        std::env::var("USERPROFILE").unwrap_or_else(|_| {
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        })
+    } else {
+        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    };
+    PathBuf::from(home).join(".nex").join("libs")
+}
+
+/// Resolve a library from the global cache by name and version.
+/// Returns the cached library root path if it exists.
+pub fn resolve_from_global_cache(name: &str, version: &str) -> Option<PathBuf> {
+    let cache_dir = nex_libs_dir().join(name).join(version);
+    if cache_dir.exists() && cache_dir.join("project.toml").exists() {
+        Some(cache_dir)
+    } else {
+        None
+    }
+}
+
 fn parse_libs_section(toml: &str, project_root: &Path, sink: &mut DiagnosticSink) -> Vec<LibDependency> {
     let mut libs = Vec::new();
     let mut in_libs = false;
@@ -355,57 +473,221 @@ fn parse_libs_section(toml: &str, project_root: &Path, sink: &mut DiagnosticSink
         let name = key.trim().to_string();
         let value = value.trim();
 
-        // Parse inline table: { path = "..." }
-        let path_str = value
-            .strip_prefix('{')
-            .and_then(|v| v.strip_suffix('}'))
-            .and_then(|inner| {
-                inner.split(',').find_map(|part| {
+        // Determine which format this entry uses.
+        if let Some(inner) = value.strip_prefix('{').and_then(|v| v.strip_suffix('}')) {
+            // Inline table: { path = "..." } or { git = "...", version = "..." }
+            let fields: HashMap<String, String> = inner
+                .split(',')
+                .filter_map(|part| {
                     let (k, v) = part.split_once('=')?;
-                    if k.trim() == "path" {
-                        Some(v.trim().trim_matches('"').trim_matches('\'').to_string())
-                    } else {
-                        None
-                    }
+                    Some((
+                        k.trim().to_string(),
+                        v.trim().trim_matches('"').trim_matches('\'').to_string(),
+                    ))
                 })
-            })
-            .or_else(|| {
-                // Also support simple string: name = "../path"
-                let v = value.trim_matches('"').trim_matches('\'');
-                if v.is_empty() { None } else { Some(v.to_string()) }
-            });
+                .collect();
 
-        let Some(path_str) = path_str else {
-            sink.push(Diagnostic {
-                id: "lib_invalid_entry".to_string(),
-                severity: Severity::Error,
-                span: None,
-                file: None,
-                message: format!("invalid [libs] entry for `{name}`: expected {{ path = \"...\" }}"),
-                notes: Vec::new(),
-                suggestions: Vec::new(),
-            });
-            continue;
-        };
+            if let Some(path_str) = fields.get("path") {
+                // Local path dependency (existing behavior)
+                let lib_root = project_root.join(path_str);
+                if !lib_root.exists() {
+                    sink.push(Diagnostic {
+                        id: "lib_path_missing".to_string(),
+                        severity: Severity::Error,
+                        span: None,
+                        file: Some(lib_root.clone()),
+                        message: format!("library `{name}` path does not exist: {}", lib_root.display()),
+                        notes: Vec::new(),
+                        suggestions: Vec::new(),
+                    });
+                    continue;
+                }
+                let native_lib = resolve_native_lib(&lib_root);
+                libs.push(LibDependency {
+                    name,
+                    root: lib_root,
+                    native_lib,
+                    version: fields.get("version").cloned(),
+                    git: fields.get("git").cloned(),
+                });
+            } else if let Some(git_source) = fields.get("git") {
+                // Git dependency: resolve from global cache
+                let version = fields.get("version").cloned().unwrap_or_else(|| "latest".to_string());
+                match resolve_from_global_cache(&name, &version) {
+                    Some(lib_root) => {
+                        let native_lib = resolve_native_lib(&lib_root);
+                        libs.push(LibDependency {
+                            name,
+                            root: lib_root,
+                            native_lib,
+                            version: Some(version),
+                            git: Some(git_source.clone()),
+                        });
+                    }
+                    None => {
+                        sink.push(Diagnostic {
+                            id: "lib_not_installed".to_string(),
+                            severity: Severity::Error,
+                            span: None,
+                            file: None,
+                            message: format!(
+                                "library `{name}` (git: {git_source}, version: {version}) is not installed. Run: nex install {git_source}:{version}"
+                            ),
+                            notes: Vec::new(),
+                            suggestions: Vec::new(),
+                        });
+                    }
+                }
+            } else {
+                sink.push(Diagnostic {
+                    id: "lib_invalid_entry".to_string(),
+                    severity: Severity::Error,
+                    span: None,
+                    file: None,
+                    message: format!("invalid [libs] entry for `{name}`: expected {{ path = \"...\" }} or {{ git = \"...\", version = \"...\" }}"),
+                    notes: Vec::new(),
+                    suggestions: Vec::new(),
+                });
+            }
+        } else {
+            // Plain string value — could be a version or a local path.
+            let v = value.trim_matches('"').trim_matches('\'');
+            if v.is_empty() {
+                continue;
+            }
 
-        let lib_root = project_root.join(&path_str);
-        if !lib_root.exists() {
-            sink.push(Diagnostic {
-                id: "lib_path_missing".to_string(),
-                severity: Severity::Error,
-                span: None,
-                file: Some(lib_root.clone()),
-                message: format!("library `{name}` path does not exist: {}", lib_root.display()),
-                notes: Vec::new(),
-                suggestions: Vec::new(),
-            });
-            continue;
+            // Heuristic: if it looks like a semver (starts with digit), treat as version.
+            // Otherwise treat as a local path (backwards compat).
+            let is_version = v.chars().next().map_or(false, |c| c.is_ascii_digit());
+
+            if is_version {
+                // Version string: resolve from global cache
+                match resolve_from_global_cache(&name, v) {
+                    Some(lib_root) => {
+                        let native_lib = resolve_native_lib(&lib_root);
+                        libs.push(LibDependency {
+                            name,
+                            root: lib_root,
+                            native_lib,
+                            version: Some(v.to_string()),
+                            git: None,
+                        });
+                    }
+                    None => {
+                        sink.push(Diagnostic {
+                            id: "lib_not_installed".to_string(),
+                            severity: Severity::Error,
+                            span: None,
+                            file: None,
+                            message: format!(
+                                "library `{name}` version {v} is not installed. Run: nex install <user/repo>:{v}"
+                            ),
+                            notes: Vec::new(),
+                            suggestions: Vec::new(),
+                        });
+                    }
+                }
+            } else {
+                // Local path (backwards compat)
+                let lib_root = project_root.join(v);
+                if !lib_root.exists() {
+                    sink.push(Diagnostic {
+                        id: "lib_path_missing".to_string(),
+                        severity: Severity::Error,
+                        span: None,
+                        file: Some(lib_root.clone()),
+                        message: format!("library `{name}` path does not exist: {}", lib_root.display()),
+                        notes: Vec::new(),
+                        suggestions: Vec::new(),
+                    });
+                    continue;
+                }
+                let native_lib = resolve_native_lib(&lib_root);
+                libs.push(LibDependency {
+                    name,
+                    root: lib_root,
+                    native_lib,
+                    version: None,
+                    git: None,
+                });
+            }
         }
-
-        libs.push(LibDependency { name, root: lib_root });
     }
 
     libs
+}
+
+/// Read a library's `project.toml` and resolve the `native` field to a
+/// platform-specific dynamic library path.
+///
+/// The `native` field specifies a base name (e.g. `"nex3d_native"`).  This
+/// function looks for the platform-specific file in the library root:
+///   - Windows: `<root>/<name>.dll`
+///   - Linux/macOS: `<root>/lib<name>.so` or `<root>/lib<name>.dylib`
+fn resolve_native_lib(lib_root: &Path) -> Option<PathBuf> {
+    let toml_path = lib_root.join("project.toml");
+    let toml_text = fs::read_to_string(&toml_path).ok()?;
+
+    // Find `native = "..."` in the top-level section
+    let native_name = parse_native_field(&toml_text)?;
+
+    // Look for the platform-specific DLL in the library root
+    let candidates = if cfg!(target_os = "windows") {
+        vec![lib_root.join(format!("{native_name}.dll"))]
+    } else if cfg!(target_os = "macos") {
+        vec![
+            lib_root.join(format!("lib{native_name}.dylib")),
+            lib_root.join(format!("lib{native_name}.so")),
+        ]
+    } else {
+        vec![lib_root.join(format!("lib{native_name}.so"))]
+    };
+
+    for path in candidates {
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    // DLL not found yet — that's OK, it may be built later.
+    // Return the expected path so the caller can report a useful error.
+    if cfg!(target_os = "windows") {
+        Some(lib_root.join(format!("{native_name}.dll")))
+    } else if cfg!(target_os = "macos") {
+        Some(lib_root.join(format!("lib{native_name}.dylib")))
+    } else {
+        Some(lib_root.join(format!("lib{native_name}.so")))
+    }
+}
+
+/// Parse the `native = "..."` field from a project.toml string.
+fn parse_native_field(toml: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            // We're entering a section — `native` must be at the top level
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            continue;
+        }
+        if !trimmed.starts_with("native") {
+            continue;
+        }
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        if key.trim() != "native" {
+            continue;
+        }
+        let value = value.trim().trim_matches('"').trim_matches('\'');
+        if !value.is_empty() {
+            return Some(value.to_string());
+        }
+    }
+    None
 }
 
 fn collect_au_files(dir: &Path, out: &mut Vec<PathBuf>, sink: &mut DiagnosticSink) {
@@ -834,6 +1116,32 @@ mod tests {
         let modules = discover_project_modules(&root, &mut sink);
         assert!(sink.is_empty(), "{:?}", sink.diagnostics());
         assert!(modules.contains_key("net.http"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn discovers_sibling_modules_from_directory() {
+        let mut sink = DiagnosticSink::new();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("nex_sibling_{nonce}"));
+        let net_dir = root.join("net");
+        fs::create_dir_all(&net_dir).unwrap();
+        fs::write(root.join("main.nex"), "def main() -> Unit { return }").unwrap();
+        fs::write(root.join("utils.nex"), "def helper() -> Unit { return }").unwrap();
+        fs::write(net_dir.join("http.nex"), "def fetch() -> Unit { return }").unwrap();
+
+        let main_path = root.join("main.nex");
+        let modules = discover_sibling_modules(&root, Some(&main_path), &mut sink);
+
+        assert!(sink.is_empty(), "{:?}", sink.diagnostics());
+        assert!(!modules.contains_key("main"), "should exclude the main file");
+        assert!(modules.contains_key("utils"), "should find utils.nex");
+        assert!(modules.contains_key("net.http"), "should find net/http.nex");
+        assert_eq!(modules.len(), 2);
 
         let _ = fs::remove_dir_all(&root);
     }

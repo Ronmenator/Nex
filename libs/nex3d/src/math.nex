@@ -102,6 +102,26 @@ public def vec3_normalize(v: Vec3) -> Vec3 {
     return vec3_mul(v, 1.0f / len)
 }
 
+public def vec3_cross(a: Vec3, b: Vec3) -> Vec3 {
+    return Vec3(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    )
+}
+
+public def vec3_negate(v: Vec3) -> Vec3 {
+    return Vec3(0.0f - v.x, 0.0f - v.y, 0.0f - v.z)
+}
+
+public def vec3_lerp(a: Vec3, b: Vec3, t: Float) -> Vec3 {
+    return Vec3(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t
+    )
+}
+
 // ===========================================================================
 // Vec4 — 4D vector for homogeneous coordinates and RGBA colors
 // ===========================================================================
@@ -123,4 +143,311 @@ public def vec4_from_vec3(v: Vec3, w: Float) -> Vec4 {
 
 public def vec4_zero() -> Vec4 {
     return Vec4(0.0f, 0.0f, 0.0f, 0.0f)
+}
+
+public def vec4_one() -> Vec4 {
+    return Vec4(1.0f, 1.0f, 1.0f, 1.0f)
+}
+
+public def vec4_add(a: Vec4, b: Vec4) -> Vec4 {
+    return Vec4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w)
+}
+
+public def vec4_sub(a: Vec4, b: Vec4) -> Vec4 {
+    return Vec4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w)
+}
+
+public def vec4_mul(a: Vec4, s: Float) -> Vec4 {
+    return Vec4(a.x * s, a.y * s, a.z * s, a.w * s)
+}
+
+public def vec4_dot(a: Vec4, b: Vec4) -> Float {
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
+}
+
+public def vec4_length(v: Vec4) -> Float {
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w)
+}
+
+public def vec4_normalize(v: Vec4) -> Vec4 {
+    len = vec4_length(v)
+    if (len < 0.0001f) {
+        return vec4_zero()
+    }
+    return vec4_mul(v, 1.0f / len)
+}
+
+// ===========================================================================
+// Mat4 — 4x4 matrix (column-major) for transforms and projections
+// ===========================================================================
+
+public struct Mat4 {
+    m00: Float  m01: Float  m02: Float  m03: Float
+    m10: Float  m11: Float  m12: Float  m13: Float
+    m20: Float  m21: Float  m22: Float  m23: Float
+    m30: Float  m31: Float  m32: Float  m33: Float
+}
+
+public def mat4_identity() -> Mat4 {
+    return Mat4(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_zero() -> Mat4 {
+    return Mat4(
+        0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f
+    )
+}
+
+public def mat4_multiply(a: Mat4, b: Mat4) -> Mat4 {
+    return Mat4(
+        a.m00*b.m00 + a.m01*b.m10 + a.m02*b.m20 + a.m03*b.m30,
+        a.m00*b.m01 + a.m01*b.m11 + a.m02*b.m21 + a.m03*b.m31,
+        a.m00*b.m02 + a.m01*b.m12 + a.m02*b.m22 + a.m03*b.m32,
+        a.m00*b.m03 + a.m01*b.m13 + a.m02*b.m23 + a.m03*b.m33,
+
+        a.m10*b.m00 + a.m11*b.m10 + a.m12*b.m20 + a.m13*b.m30,
+        a.m10*b.m01 + a.m11*b.m11 + a.m12*b.m21 + a.m13*b.m31,
+        a.m10*b.m02 + a.m11*b.m12 + a.m12*b.m22 + a.m13*b.m32,
+        a.m10*b.m03 + a.m11*b.m13 + a.m12*b.m23 + a.m13*b.m33,
+
+        a.m20*b.m00 + a.m21*b.m10 + a.m22*b.m20 + a.m23*b.m30,
+        a.m20*b.m01 + a.m21*b.m11 + a.m22*b.m21 + a.m23*b.m31,
+        a.m20*b.m02 + a.m21*b.m12 + a.m22*b.m22 + a.m23*b.m32,
+        a.m20*b.m03 + a.m21*b.m13 + a.m22*b.m23 + a.m23*b.m33,
+
+        a.m30*b.m00 + a.m31*b.m10 + a.m32*b.m20 + a.m33*b.m30,
+        a.m30*b.m01 + a.m31*b.m11 + a.m32*b.m21 + a.m33*b.m31,
+        a.m30*b.m02 + a.m31*b.m12 + a.m32*b.m22 + a.m33*b.m32,
+        a.m30*b.m03 + a.m31*b.m13 + a.m32*b.m23 + a.m33*b.m33
+    )
+}
+
+public def mat4_translate(tx: Float, ty: Float, tz: Float) -> Mat4 {
+    return Mat4(
+        1.0f, 0.0f, 0.0f, tx,
+        0.0f, 1.0f, 0.0f, ty,
+        0.0f, 0.0f, 1.0f, tz,
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_scale(sx: Float, sy: Float, sz: Float) -> Mat4 {
+    return Mat4(
+        sx,   0.0f, 0.0f, 0.0f,
+        0.0f, sy,   0.0f, 0.0f,
+        0.0f, 0.0f, sz,   0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_rotate_x(angle: Float) -> Mat4 {
+    c = cos(angle)
+    s = sin(angle)
+    return Mat4(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, c,    0.0f - s, 0.0f,
+        0.0f, s,    c,    0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_rotate_y(angle: Float) -> Mat4 {
+    c = cos(angle)
+    s = sin(angle)
+    return Mat4(
+        c,    0.0f, s,    0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f - s, 0.0f, c, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_rotate_z(angle: Float) -> Mat4 {
+    c = cos(angle)
+    s = sin(angle)
+    return Mat4(
+        c,    0.0f - s, 0.0f, 0.0f,
+        s,    c,    0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_perspective(fov_y: Float, aspect: Float, near: Float, far: Float) -> Mat4 {
+    half_tan = sin(fov_y / 2.0f) / cos(fov_y / 2.0f)
+    return Mat4(
+        1.0f / (aspect * half_tan), 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f / half_tan, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f - (far + near) / (far - near), 0.0f - (2.0f * far * near) / (far - near),
+        0.0f, 0.0f, 0.0f - 1.0f, 0.0f
+    )
+}
+
+public def mat4_ortho(left: Float, right: Float, bottom: Float, top: Float, near: Float, far: Float) -> Mat4 {
+    return Mat4(
+        2.0f / (right - left), 0.0f, 0.0f, 0.0f - (right + left) / (right - left),
+        0.0f, 2.0f / (top - bottom), 0.0f, 0.0f - (top + bottom) / (top - bottom),
+        0.0f, 0.0f, 0.0f - 2.0f / (far - near), 0.0f - (far + near) / (far - near),
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_look_at(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
+    f = vec3_normalize(vec3_sub(target, eye))
+    s = vec3_normalize(vec3_cross(f, up))
+    u = vec3_cross(s, f)
+    return Mat4(
+        s.x,  s.y,  s.z,  0.0f - vec3_dot(s, eye),
+        u.x,  u.y,  u.z,  0.0f - vec3_dot(u, eye),
+        0.0f - f.x, 0.0f - f.y, 0.0f - f.z, vec3_dot(f, eye),
+        0.0f, 0.0f, 0.0f, 1.0f
+    )
+}
+
+public def mat4_mul_vec4(m: Mat4, v: Vec4) -> Vec4 {
+    return Vec4(
+        m.m00*v.x + m.m01*v.y + m.m02*v.z + m.m03*v.w,
+        m.m10*v.x + m.m11*v.y + m.m12*v.z + m.m13*v.w,
+        m.m20*v.x + m.m21*v.y + m.m22*v.z + m.m23*v.w,
+        m.m30*v.x + m.m31*v.y + m.m32*v.z + m.m33*v.w
+    )
+}
+
+public def mat4_transpose(m: Mat4) -> Mat4 {
+    return Mat4(
+        m.m00, m.m10, m.m20, m.m30,
+        m.m01, m.m11, m.m21, m.m31,
+        m.m02, m.m12, m.m22, m.m32,
+        m.m03, m.m13, m.m23, m.m33
+    )
+}
+
+// ===========================================================================
+// Quaternion — rotation representation (x, y, z, w)
+// ===========================================================================
+
+public struct Quat {
+    x: Float
+    y: Float
+    z: Float
+    w: Float
+}
+
+public def quat_identity() -> Quat {
+    return Quat(0.0f, 0.0f, 0.0f, 1.0f)
+}
+
+public def quat_from_axis_angle(axis: Vec3, angle: Float) -> Quat {
+    half = angle / 2.0f
+    s = sin(half)
+    a = vec3_normalize(axis)
+    return Quat(a.x * s, a.y * s, a.z * s, cos(half))
+}
+
+public def quat_multiply(a: Quat, b: Quat) -> Quat {
+    return Quat(
+        a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+        a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+        a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
+        a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z
+    )
+}
+
+public def quat_normalize(q: Quat) -> Quat {
+    len = sqrt(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w)
+    if (len < 0.0001f) {
+        return quat_identity()
+    }
+    inv = 1.0f / len
+    return Quat(q.x * inv, q.y * inv, q.z * inv, q.w * inv)
+}
+
+public def quat_rotate_vec3(q: Quat, v: Vec3) -> Vec3 {
+    qv = Vec3(q.x, q.y, q.z)
+    uv = vec3_cross(qv, v)
+    uuv = vec3_cross(qv, uv)
+    uv = vec3_mul(uv, 2.0f * q.w)
+    uuv = vec3_mul(uuv, 2.0f)
+    return vec3_add(vec3_add(v, uv), uuv)
+}
+
+public def quat_to_mat4(q: Quat) -> Mat4 {
+    xx = q.x * q.x
+    yy = q.y * q.y
+    zz = q.z * q.z
+    xy = q.x * q.y
+    xz = q.x * q.z
+    yz = q.y * q.z
+    wx = q.w * q.x
+    wy = q.w * q.y
+    wz = q.w * q.z
+    return Mat4(
+        1.0f - 2.0f*(yy + zz), 2.0f*(xy - wz),        2.0f*(xz + wy),        0.0f,
+        2.0f*(xy + wz),        1.0f - 2.0f*(xx + zz),  2.0f*(yz - wx),        0.0f,
+        2.0f*(xz - wy),        2.0f*(yz + wx),         1.0f - 2.0f*(xx + yy), 0.0f,
+        0.0f,                   0.0f,                    0.0f,                   1.0f
+    )
+}
+
+public def quat_slerp(a: Quat, b: Quat, t: Float) -> Quat {
+    dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w
+    bx = b.x
+    by = b.y
+    bz = b.z
+    bw = b.w
+    if (dot < 0.0f) {
+        dot = 0.0f - dot
+        bx = 0.0f - bx
+        by = 0.0f - by
+        bz = 0.0f - bz
+        bw = 0.0f - bw
+    }
+    if (dot > 0.9995f) {
+        return quat_normalize(Quat(
+            a.x + (bx - a.x) * t,
+            a.y + (by - a.y) * t,
+            a.z + (bz - a.z) * t,
+            a.w + (bw - a.w) * t
+        ))
+    }
+    theta = cos(dot)
+    sin_theta = sin(theta)
+    s0 = sin((1.0f - t) * theta) / sin_theta
+    s1 = sin(t * theta) / sin_theta
+    return Quat(
+        s0*a.x + s1*bx,
+        s0*a.y + s1*by,
+        s0*a.z + s1*bz,
+        s0*a.w + s1*bw
+    )
+}
+
+// ===========================================================================
+// Utility functions
+// ===========================================================================
+
+public def lerp(a: Float, b: Float, t: Float) -> Float {
+    return a + (b - a) * t
+}
+
+public def deg_to_rad(degrees: Float) -> Float {
+    return degrees * 3.14159265358979f / 180.0f
+}
+
+public def rad_to_deg(radians: Float) -> Float {
+    return radians * 180.0f / 3.14159265358979f
+}
+
+public def clampf(v: Float, min_val: Float, max_val: Float) -> Float {
+    if (v < min_val) { return min_val }
+    if (v > max_val) { return max_val }
+    return v
 }

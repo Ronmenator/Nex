@@ -995,14 +995,12 @@ impl Parser {
                     let callee_span = expr_span(&callee);
                     self.advance();
                     let args = self.parse_expr_list(TokenKind::RParen);
-                    let end = if self.consume_if(&TokenKind::RParen) {
-                        self.tokens
-                            .get(self.pos.saturating_sub(1))
-                            .map(|token| token.span.hi)
-                            .unwrap_or(callee_span.hi)
-                    } else {
-                        callee_span.hi
-                    };
+                    // parse_expr_list already consumed the closing ')'.
+                    // Use the position just before current to get the span end.
+                    let end = self.tokens
+                        .get(self.pos.saturating_sub(1))
+                        .map(|token| token.span.hi)
+                        .unwrap_or(callee_span.hi);
                     let span = Span::new(callee_span.lo, end);
                     lhs = Expr::Call {
                         callee,
@@ -1270,7 +1268,11 @@ impl Parser {
 
     fn parse_int_literal(&self, text: &str) -> i64 {
         let cleaned = text.trim_end_matches(|ch| matches!(ch, 'i' | 'I' | 'u' | 'U' | 'l' | 'L'));
-        cleaned.parse::<i64>().unwrap_or(0)
+        if let Some(hex) = cleaned.strip_prefix("0x").or_else(|| cleaned.strip_prefix("0X")) {
+            i64::from_str_radix(hex, 16).unwrap_or(0)
+        } else {
+            cleaned.parse::<i64>().unwrap_or(0)
+        }
     }
 
     fn parse_float_literal(&self, text: &str) -> f64 {

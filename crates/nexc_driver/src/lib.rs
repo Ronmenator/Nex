@@ -18,6 +18,8 @@ pub struct CompileOptions {
     pub emit_metadata: bool,
     pub output_dir: Option<PathBuf>,
     pub lib_names: HashSet<String>,
+    /// Paths to native dynamic libraries (.dll / .so) to load for JIT.
+    pub native_libs: Vec<PathBuf>,
 }
 
 impl Default for CompileOptions {
@@ -27,6 +29,7 @@ impl Default for CompileOptions {
             emit_metadata: false,
             output_dir: None,
             lib_names: HashSet::new(),
+            native_libs: Vec::new(),
         }
     }
 }
@@ -198,6 +201,7 @@ pub fn link_native_multi(obj_paths: &[PathBuf], out_dir: &Path, stem: &str) -> R
 
 /// JIT execution: compile source and execute `main` in-memory.
 pub fn jit_run(source: &str, options: CompileOptions, args: &[String]) -> Result<i32, String> {
+    let native_libs = options.native_libs.clone();
     let result = compile_module(source, options);
 
     if result.diagnostics.iter().any(|d| matches!(d.severity, Severity::Error)) {
@@ -218,7 +222,67 @@ pub fn jit_run(source: &str, options: CompileOptions, args: &[String]) -> Result
         None => return Err("no IR produced".into()),
     };
 
-    nexc_codegen_cranelift::jit_execute(ir, args)
+    nexc_codegen_cranelift::jit_execute(ir, args, &native_libs)
+}
+
+/// JIT execution with multiple source modules.
+///
+/// Each entry in `sources` is `(source_text, CompileOptions)`.  All modules
+/// are compiled independently and their IR is merged into a single module
+/// before JIT execution.  The last module is expected to contain `main`.
+pub fn jit_run_multi(
+    sources: &[(&str, CompileOptions)],
+    args: &[String],
+    native_libs: &[PathBuf],
+) -> Result<i32, String> {
+    use std::collections::HashMap;
+
+    let mut merged = IrModule {
+        name: "merged".to_string(),
+        functions: Vec::new(),
+        types: HashMap::new(),
+        layouts: HashMap::new(),
+        globals: Vec::new(),
+    };
+    let mut had_error = false;
+
+    for (source, options) in sources {
+        let result = compile_module(source, options.clone());
+
+        for d in &result.diagnostics {
+            if matches!(d.severity, Severity::Error) {
+                eprint!("{}", d.render(&result.source_map));
+                had_error = true;
+            } else if matches!(d.severity, Severity::Warning) {
+                eprint!("{}", d.render(&result.source_map));
+            }
+        }
+
+        if let Some(ir) = &result.ir {
+            for func in &ir.functions {
+                if !merged.functions.iter().any(|f| f.name == func.name) {
+                    merged.functions.push(func.clone());
+                }
+            }
+            merged.types.extend(ir.types.clone());
+            merged.layouts.extend(ir.layouts.clone());
+            for g in &ir.globals {
+                if !merged.globals.contains(g) {
+                    merged.globals.push(g.clone());
+                }
+            }
+        }
+    }
+
+    if had_error {
+        return Err("compilation failed".into());
+    }
+
+    if merged.functions.is_empty() {
+        return Err("no IR produced".into());
+    }
+
+    nexc_codegen_cranelift::jit_execute(&merged, args, native_libs)
 }
 
 // ---------------------------------------------------------------------------

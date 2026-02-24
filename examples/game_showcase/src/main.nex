@@ -1,26 +1,192 @@
-// Game Showcase — nex3d library demonstration
+// Game Showcase — nex3d engine demonstration
 //
-// Uses the nex3d library for 2D/3D game development:
-//   - nex3d.math: Vec2, Vec3, Vec4 and math helpers
-//   - nex3d.engine: Window and main loop
+// Demonstrates the complete nex3d game engine:
+//   - Window creation and game loop with update callback
+//   - 3D camera with perspective projection
+//   - Keyboard input (WASD + arrow keys)
+//   - Colored 3D geometry (cubes, grid)
+//   - Frame timing (delta time)
+//   - UI overlay (HUD) on top of 3D scene
 //
-// Requires: cargo build --features engine -p nex
+// Requires: nex3d_native.dll in libs/nex3d/ and nex_ui_native.dll next to nex.exe
 // Run:      nex run   (from this directory)
 
 import nex3d.math
 import nex3d.engine
+import nex3d.color
+import nex3d.input
+import nex3d.time
+import nex3d.draw
+import std.ui
+
+// Camera orbit state
+cam_angle = 0.0f
+cam_height = 3.0f
+cam_distance = 8.0f
+spin_speed = 0.5f
+
+// HUD widget handles
+score_label = 0
+fps_label = 0
+score = 0
+frame_acc = 0
+fps_timer = 0.0f
+
+def update() {
+    dt = delta_time()
+
+    // Read key states
+    k_left = key_down(KEY_LEFT())
+    k_right = key_down(KEY_RIGHT())
+    k_w = key_down(KEY_W())
+    k_s = key_down(KEY_S())
+    k_up = key_down(KEY_UP())
+    k_down = key_down(KEY_DOWN())
+    k_space = key_pressed(KEY_SPACE())
+
+    // Rotate camera with left/right arrow keys
+    if (k_left) {
+        cam_angle = cam_angle - 2.0f * dt
+    }
+    if (k_right) {
+        cam_angle = cam_angle + 2.0f * dt
+    }
+    // Move camera up/down with W/S
+    if (k_w) {
+        cam_height = cam_height + 3.0f * dt
+    }
+    if (k_s) {
+        cam_height = cam_height - 3.0f * dt
+    }
+    // Zoom in/out with up/down arrows
+    if (k_up) {
+        cam_distance = cam_distance - 3.0f * dt
+        if (cam_distance < 2.0f) { cam_distance = 2.0f }
+    }
+    if (k_down) {
+        cam_distance = cam_distance + 3.0f * dt
+    }
+
+    // Score increment with space
+    if (k_space) {
+        score = score + 10
+        ui_set_text(score_label, "Score: " + score)
+    }
+
+    // FPS counter
+    frame_acc = frame_acc + 1
+    fps_timer = fps_timer + dt
+    if (fps_timer >= 1.0f) {
+        ui_set_text(fps_label, "FPS: " + frame_acc)
+        frame_acc = 0
+        fps_timer = fps_timer - 1.0f
+    }
+
+    // Spin the cubes
+    spin_speed = 0.5f
+
+    // Update camera position (orbiting around origin)
+    cx = cos(cam_angle) * cam_distance
+    cz = sin(cam_angle) * cam_distance
+    engine_camera_position(cx, cam_height, cz)
+    engine_camera_target(0.0f, 0.5f, 0.0f)
+
+    // -- Draw the scene --
+
+    // Ground grid
+    draw_grid(20.0f, 20, COLOR_GRAY())
+
+    // Central red cube
+    t = elapsed_time() * spin_speed
+    draw_cube(vec3(0.0f, 0.5f, 0.0f), 1.0f, COLOR_RED())
+
+    // Orbiting green cube
+    ox = cos(t * 2.0f) * 3.0f
+    oz = sin(t * 2.0f) * 3.0f
+    draw_cube(vec3(ox, 0.5f, oz), 0.6f, COLOR_GREEN())
+
+    // Orbiting blue cube (opposite direction)
+    ox2 = cos(0.0f - t * 1.5f) * 2.0f
+    oy2 = sin(t * 3.0f) * 0.5f + 1.5f
+    oz2 = sin(0.0f - t * 1.5f) * 2.0f
+    draw_cube(vec3(ox2, oy2, oz2), 0.4f, COLOR_BLUE())
+
+    // Yellow cube at a fixed position
+    draw_cube(vec3(3.0f, 0.25f, 3.0f), 0.5f, COLOR_YELLOW())
+
+    // Cyan cube
+    draw_cube(vec3(0.0f - 3.0f, 0.25f, 0.0f - 3.0f), 0.5f, COLOR_CYAN())
+
+    // Colored triangle on the ground
+    draw_triangle(
+        vec3(0.0f - 2.0f, 0.01f, 2.0f), COLOR_RED(),
+        vec3(0.0f, 0.01f, 4.0f), COLOR_GREEN(),
+        vec3(2.0f, 0.01f, 2.0f), COLOR_BLUE()
+    )
+
+    // Flush all geometry
+    flush_triangles()
+    return
+}
+
+def build_hud() {
+    // Top bar: score and FPS
+    top_bar = ui_row()
+    ui_set_width(top_bar, 1024.0f)
+    ui_set_height(top_bar, 40.0f)
+    ui_set_bg_color(top_bar, 0x99000000)
+    ui_set_padding_all(top_bar, 8.0f)
+    ui_set_gap(top_bar, 16.0f)
+
+    score_label = ui_text("Score: 0")
+    ui_set_fg_color(score_label, 0xFFFFFFFF)
+    ui_set_font_size(score_label, 20.0f)
+    ui_add_child(top_bar, score_label)
+
+    fps_label = ui_text("FPS: --")
+    ui_set_fg_color(fps_label, 0xFF00FF00)
+    ui_set_font_size(fps_label, 20.0f)
+    ui_add_child(top_bar, fps_label)
+
+    // Controls hint at the bottom
+    controls = ui_text("Arrows: orbit/zoom | W/S: height | Space: score")
+    ui_set_fg_color(controls, 0xCCFFFFFF)
+    ui_set_font_size(controls, 14.0f)
+
+    // Root column layout
+    root = ui_column()
+    ui_add_child(root, top_bar)
+    ui_add_child(root, controls)
+
+    ui_app_set_root(0, root)
+    return
+}
 
 def main() {
     println("=== nex3d Game Showcase ===")
+    println("Controls:")
+    println("  Left/Right arrows: orbit camera")
+    println("  Up/Down arrows:    zoom in/out")
+    println("  W/S:               camera height")
+    println("  Space:             add score")
+    println("")
 
-    // Use math types (Vec2, Vec3)
-    v = vec2(100.0f, 200.0f)
-    len = vec2_length(v)
-    println("Vec2(100, 200) length computed")
-
-    // Create game window and run
-    handle = engine_create_window("nex3d Game", 800, 600)
+    handle = engine_create_window("nex3d Game Showcase", 1024, 768)
     if (handle != 0) {
+        engine_set_clear_color(0.05f, 0.05f, 0.08f, 1.0f)
+
+        // Set camera
+        engine_camera_position(0.0f, 3.0f, 8.0f)
+        engine_camera_target(0.0f, 0.5f, 0.0f)
+        engine_camera_up(0.0f, 1.0f, 0.0f)
+        engine_camera_perspective(deg_to_rad(60.0f), 1024.0f / 768.0f, 0.1f, 1000.0f)
+
+        // Enable UI overlay and build HUD
+        engine_enable_ui()
+        build_hud()
+
+        // Set update callback and run
+        engine_set_update(update)
         engine_run(handle)
         engine_destroy(handle)
     }

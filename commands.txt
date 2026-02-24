@@ -1,6 +1,133 @@
+# Nex Commands Reference
+# =====================
+
+# --- Environment (PowerShell) ---
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
+# --- Build the Nex Toolchain ---
 
+# Build nex.exe (compiler/runtime CLI) — debug
+cargo build -p nex
 
-cargo build --release --features nexc_codegen_cranelift/torch
-cargo build --release --features nexc_codegen_cranelift/ui
+# Build nex.exe — release
+cargo build --release -p nex
+
+# Build nex.exe with PyTorch/libtorch support
+cargo build --release -p nex --features torch
+
+# Build all compiler crates (nex, nexc, nex-lsp)
+cargo build -p nex -p nexc -p nex_lsp
+
+# --- Build Native DLLs ---
+
+# Build nex3d_native.dll (3D engine: windowing, rendering, input, camera)
+cargo build -p nex3d_native
+
+# Build nex_ui_native.dll (UI framework: widgets, layout, text rendering)
+cargo build -p nex_ui_native
+
+# Build both native DLLs — release
+cargo build --release -p nex3d_native -p nex_ui_native
+
+# --- Place Native DLLs ---
+
+# Copy nex3d_native.dll to the nex3d library (required for nex3d imports)
+cp target/debug/nex3d_native.dll libs/nex3d/
+# or release:
+cp target/release/nex3d_native.dll libs/nex3d/
+
+# nex_ui_native.dll must be next to nex.exe (auto-discovered for std.ui)
+# When building debug, cargo already places it in target/debug/ alongside nex.exe.
+# For release installs, copy it to nex/bin/:
+cp target/release/nex_ui_native.dll nex/bin/
+
+# --- Run Nex Programs ---
+
+# Run a single .nex file (JIT)
+nex hello.nex
+
+# Run a project (from project directory containing project.toml)
+nex run
+
+# Run a project from a specific path
+nex run path/to/project
+
+# Run with program arguments
+nex run -- arg1 arg2
+
+# --- Nex CLI Commands ---
+
+# Create a new project
+nex new myproject
+
+# Create a new library
+nex new mylib --lib
+
+# Build project to native executable (AOT via Cranelift)
+nex build
+
+# Format source code
+nex fmt src/main.nex
+
+# Run linter
+nex lint src/main.nex
+
+# Interactive REPL
+nex repl
+
+# Clean build artifacts
+nex clean
+
+# Install toolchain (builds release, copies to nex/bin/, backs up previous version)
+nex install
+
+# --- Run Examples ---
+
+# Hello world / language basics
+cd examples/hello && nex run
+
+# Console showcase (stdlib features)
+cd examples/console_showcase && nex run
+
+# Game showcase (3D engine + UI overlay — requires nex3d_native.dll + nex_ui_native.dll)
+cd examples/game_showcase && nex run
+
+# Declarative UI example (requires nex_ui_native.dll)
+cd examples/ui_declarative && nex run
+
+# GPT-2 transformer (requires --features torch)
+cd examples/gpt2_transformer && nex run
+
+# --- Run Tests ---
+
+# All tests
+cargo test
+
+# Specific crate tests
+cargo test -p nexc_resolve
+cargo test -p nexc_codegen_cranelift
+cargo test -p nexc_driver
+cargo test -p nex_runtime
+
+# Integration tests (codegen)
+cargo test -p nexc_driver -- --test codegen_integration
+
+# --- Deploy / Version Management ---
+
+# Deploy a new version (bumps version, builds release, installs to nex/bin/)
+cargo xtask deploy                # patch bump (default)
+cargo xtask deploy --minor        # minor bump
+cargo xtask deploy --major        # major bump
+cargo xtask deploy --release      # release build (default)
+
+# --- Workspace Info ---
+
+# List all workspace crates
+# Compiler:   nexc_diag, nexc_lex, nexc_ast, nexc_parse, nexc_resolve,
+#             nexc_type, nexc_layout, nexc_ir, nexc_codegen_cranelift,
+#             nexc_codegen_llvm, nexc_codegen_llvm_jit, nexc_meta,
+#             nexc_driver, nexc, nexc_fmt, nexc_lint
+# Runtime:    nex_runtime, nex_std
+# Native DLLs: nex3d_native (cdylib), nex_ui_native (cdylib)
+# UI markup:  nexui_parse, nexui_lower
+# Tooling:    nex (CLI), nex_lsp, nex_repl, xtask

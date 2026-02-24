@@ -22,13 +22,15 @@ members = [
   "crates/nex_repl",
   "crates/nex_runtime",
   "crates/nex_std",
+  "crates/nex3d_native",
+  "crates/nex_ui_native",
   "crates/nexui_parse",
   "crates/nexui_lower",
   "xtask",
 ]
 
 [workspace.package]
-version = "0.1.53"
+version = "0.1.61"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 rust-version = "1.75"

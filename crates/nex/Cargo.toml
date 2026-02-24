@@ -8,8 +8,6 @@ rust-version.workspace = true
 [features]
 default = []
 torch = ["nexc_driver/torch"]
-ui = ["nexc_driver/ui"]
-engine = ["nexc_driver/engine"]
 
 [dependencies]
 nexc_ast = { path = "../nexc_ast" }
@@ -19,6 +17,7 @@ nexc_fmt = { path = "../nexc_fmt" }
 nexc_lint = { path = "../nexc_lint" }
 nexc_resolve = { path = "../nexc_resolve" }
 nex_repl = { path = "../nex_repl" }
+serde_json = "1"
 
 [[bin]]
 name = "nex"

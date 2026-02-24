@@ -3,7 +3,7 @@
 # Place in the nex/ install directory or at ~/.nex/config.toml
 
 [toolchain]
-version = "0.1.53"
+version = "0.1.61"
 
 [compiler]
 # Default optimization level: "debug" or "release"

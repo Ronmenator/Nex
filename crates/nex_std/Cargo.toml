@@ -8,7 +8,6 @@ rust-version.workspace = true
 [features]
 default = []
 torch = ["nex_runtime/torch"]
-ui = ["nex_runtime/ui"]
 
 [dependencies]
 nex_runtime = { path = "../nex_runtime" }

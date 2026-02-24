@@ -567,6 +567,26 @@ impl Lexer {
 
     fn scan_number(&mut self) -> Token {
         let start = self.pos;
+
+        // Check for hex literal: 0x or 0X
+        if self.pos + 1 < self.len
+            && self.source[self.pos] == b'0'
+            && matches!(self.source[self.pos + 1], b'x' | b'X')
+        {
+            self.pos += 2; // skip '0x'
+            while self.pos < self.len && self.source[self.pos].is_ascii_hexdigit() {
+                self.pos += 1;
+            }
+            // Optional integer suffix
+            if self.pos < self.len && matches!(self.source[self.pos], b'i' | b'I' | b'u' | b'U' | b'l' | b'L') {
+                self.pos += 1;
+            }
+            let lexeme = std::str::from_utf8(&self.source[start..self.pos])
+                .unwrap_or("")
+                .to_string();
+            return Token::new(TokenKind::IntLiteral, start, self.pos, lexeme);
+        }
+
         while self.pos < self.len && self.source[self.pos].is_ascii_digit() {
             self.pos += 1;
         }

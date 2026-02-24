@@ -1,0 +1,14 @@
+// nex3d.time — Frame timing utilities.
+// Wraps nex_engine_* runtime FFI functions.
+
+public def delta_time() -> Float {
+    return engine_delta_time()
+}
+
+public def elapsed_time() -> Float {
+    return engine_elapsed_time()
+}
+
+public def frame_count() -> Int64 {
+    return engine_frame_count()
+}

@@ -1,0 +1,113 @@
+// nex3d.input — Keyboard and mouse input queries.
+// Wraps nex_engine_* runtime FFI functions.
+
+// ---- Keyboard ----
+
+public def key_down(key: Int64) -> Bool {
+    return engine_key_down(key) != 0
+}
+
+public def key_pressed(key: Int64) -> Bool {
+    return engine_key_pressed(key) != 0
+}
+
+public def key_released(key: Int64) -> Bool {
+    return engine_key_released(key) != 0
+}
+
+// ---- Mouse ----
+
+public def mouse_x() -> Float {
+    return engine_mouse_x()
+}
+
+public def mouse_y() -> Float {
+    return engine_mouse_y()
+}
+
+public def mouse_delta_x() -> Float {
+    return engine_mouse_delta_x()
+}
+
+public def mouse_delta_y() -> Float {
+    return engine_mouse_delta_y()
+}
+
+public def mouse_button_down(button: Int64) -> Bool {
+    return engine_mouse_button_down(button) != 0
+}
+
+public def mouse_button_pressed(button: Int64) -> Bool {
+    return engine_mouse_button_pressed(button) != 0
+}
+
+// ---- Key codes (matching winit virtual key codes) ----
+
+public def KEY_A() -> Int64 { return 0 }
+public def KEY_B() -> Int64 { return 1 }
+public def KEY_C() -> Int64 { return 2 }
+public def KEY_D() -> Int64 { return 3 }
+public def KEY_E() -> Int64 { return 4 }
+public def KEY_F() -> Int64 { return 5 }
+public def KEY_G() -> Int64 { return 6 }
+public def KEY_H() -> Int64 { return 7 }
+public def KEY_I() -> Int64 { return 8 }
+public def KEY_J() -> Int64 { return 9 }
+public def KEY_K() -> Int64 { return 10 }
+public def KEY_L() -> Int64 { return 11 }
+public def KEY_M() -> Int64 { return 12 }
+public def KEY_N() -> Int64 { return 13 }
+public def KEY_O() -> Int64 { return 14 }
+public def KEY_P() -> Int64 { return 15 }
+public def KEY_Q() -> Int64 { return 16 }
+public def KEY_R() -> Int64 { return 17 }
+public def KEY_S() -> Int64 { return 18 }
+public def KEY_T() -> Int64 { return 19 }
+public def KEY_U() -> Int64 { return 20 }
+public def KEY_V() -> Int64 { return 21 }
+public def KEY_W() -> Int64 { return 22 }
+public def KEY_X() -> Int64 { return 23 }
+public def KEY_Y() -> Int64 { return 24 }
+public def KEY_Z() -> Int64 { return 25 }
+
+public def KEY_0() -> Int64 { return 26 }
+public def KEY_1() -> Int64 { return 27 }
+public def KEY_2() -> Int64 { return 28 }
+public def KEY_3() -> Int64 { return 29 }
+public def KEY_4() -> Int64 { return 30 }
+public def KEY_5() -> Int64 { return 31 }
+public def KEY_6() -> Int64 { return 32 }
+public def KEY_7() -> Int64 { return 33 }
+public def KEY_8() -> Int64 { return 34 }
+public def KEY_9() -> Int64 { return 35 }
+
+public def KEY_ESCAPE() -> Int64    { return 36 }
+public def KEY_SPACE() -> Int64     { return 37 }
+public def KEY_ENTER() -> Int64     { return 38 }
+public def KEY_TAB() -> Int64       { return 39 }
+public def KEY_BACKSPACE() -> Int64 { return 40 }
+public def KEY_LEFT() -> Int64      { return 41 }
+public def KEY_RIGHT() -> Int64     { return 42 }
+public def KEY_UP() -> Int64        { return 43 }
+public def KEY_DOWN() -> Int64      { return 44 }
+public def KEY_LEFT_SHIFT() -> Int64  { return 45 }
+public def KEY_LEFT_CTRL() -> Int64   { return 46 }
+public def KEY_LEFT_ALT() -> Int64    { return 47 }
+public def KEY_F1() -> Int64  { return 48 }
+public def KEY_F2() -> Int64  { return 49 }
+public def KEY_F3() -> Int64  { return 50 }
+public def KEY_F4() -> Int64  { return 51 }
+public def KEY_F5() -> Int64  { return 52 }
+public def KEY_F6() -> Int64  { return 53 }
+public def KEY_F7() -> Int64  { return 54 }
+public def KEY_F8() -> Int64  { return 55 }
+public def KEY_F9() -> Int64  { return 56 }
+public def KEY_F10() -> Int64 { return 57 }
+public def KEY_F11() -> Int64 { return 58 }
+public def KEY_F12() -> Int64 { return 59 }
+
+// ---- Mouse button codes ----
+
+public def MOUSE_LEFT() -> Int64   { return 0 }
+public def MOUSE_RIGHT() -> Int64  { return 1 }
+public def MOUSE_MIDDLE() -> Int64 { return 2 }

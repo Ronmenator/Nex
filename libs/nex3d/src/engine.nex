@@ -1,8 +1,9 @@
 // nex3d.engine — Game engine window and main loop.
-// Requires: cargo build --features engine
-// Wraps nex_engine_* runtime functions for 2D and 3D rendering.
+// Wraps nex_engine_* native functions (from nex3d_native DLL) for 2D and 3D rendering.
 
-// Engine lifecycle: create window -> run loop -> quit -> destroy
+// ===========================================================================
+// Engine lifecycle: create window -> configure -> set update -> run -> destroy
+// ===========================================================================
 
 public def engine_create_window(title: String, width: Int64, height: Int64) -> Int64 {
     return engine_window_create(title, width, height)
@@ -25,4 +26,62 @@ public def engine_destroy(handle: Int64) -> Unit {
 
 public def engine_is_running(handle: Int64) -> Bool {
     return engine_window_is_running(handle) != 0
+}
+
+// ===========================================================================
+// Configuration
+// ===========================================================================
+
+public def engine_set_clear_color(r: Float, g: Float, b: Float, a: Float) {
+    engine_clear_color(r, g, b, a)
+    return
+}
+
+public def engine_set_update(callback: Int64) {
+    engine_set_update_fn(callback)
+    return
+}
+
+public def engine_get_window_width() -> Int64 {
+    return engine_window_width()
+}
+
+public def engine_get_window_height() -> Int64 {
+    return engine_window_height()
+}
+
+// ===========================================================================
+// Camera
+// ===========================================================================
+
+public def engine_camera_position(x: Float, y: Float, z: Float) {
+    engine_set_camera_pos(x, y, z)
+    return
+}
+
+public def engine_camera_target(x: Float, y: Float, z: Float) {
+    engine_set_camera_target(x, y, z)
+    return
+}
+
+public def engine_camera_up(x: Float, y: Float, z: Float) {
+    engine_set_camera_up(x, y, z)
+    return
+}
+
+public def engine_camera_perspective(fov: Float, aspect: Float, near: Float, far: Float) {
+    engine_set_perspective(fov, aspect, near, far)
+    return
+}
+
+// ===========================================================================
+// UI Overlay
+// ===========================================================================
+
+public def engine_enable_ui() {
+    engine_enable_ui_overlay()
+    w = engine_window_width()
+    h = engine_window_height()
+    ui_overlay_init(w, h)
+    return
 }

@@ -8,8 +8,6 @@ rust-version.workspace = true
 [features]
 default = []
 torch = ["nexc_driver/torch"]
-ui = ["nexc_driver/ui"]
-engine = ["nexc_driver/engine"]
 
 [dependencies]
 nexc_diag = { path = "../nexc_diag" }

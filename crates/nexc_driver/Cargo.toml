@@ -8,8 +8,6 @@ rust-version.workspace = true
 [features]
 default = []
 torch = ["nexc_codegen_cranelift/torch"]
-ui = ["nexc_codegen_cranelift/ui"]
-engine = ["nexc_codegen_cranelift/engine"]
 
 [dependencies]
 nexc_ast = { path = "../nexc_ast" }

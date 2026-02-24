@@ -2,15 +2,30 @@
 
 ## Available examples
 
+- `hello`: Language basics — factorial, FizzBuzz, string concatenation.
+
 - `console_showcase`: A small console-style app showing imports, interfaces, classes,
   base qualification with `::`, `if/else`, `using`, `try/catch/finally`, assignment,
   and expression precedence.
+
+- `game_showcase`: 3D game engine demonstration — window creation, camera, keyboard
+  input, colored geometry, frame timing, and UI overlay (HUD) on top of the 3D scene.
+  Requires `nex3d_native.dll` in `libs/nex3d/` and `nex_ui_native.dll` next to `nex.exe`.
+
+- `ui_declarative`: A desktop GUI application demonstrating the `std.ui` module and
+  `.nexui` declarative markup — layout containers (Column, Row, Grid), widgets (Text,
+  Button, TextInput, Checkbox, Slider), canvas drawing, event callbacks, dynamic
+  updates, and styling.
+  Requires `nex_ui_native.dll` next to `nex.exe`.
 
 - `gpt2_transformer`: A GPT-2-style language model built on `std.torch` bindings.
   Demonstrates tensor operations, neural network layers, and training loops.
   Requires `--features torch`.
 
-- `ui_showcase`: A desktop GUI application demonstrating the full `std.ui` module —
-  layout containers (Column, Row, Grid), widgets (Text, Button, TextInput, Checkbox,
-  Slider), canvas drawing, event callbacks, dynamic updates, and styling.
-  Requires `--features ui`.
+## Running
+
+From any example directory:
+
+```
+nex run
+```

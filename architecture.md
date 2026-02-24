@@ -54,20 +54,57 @@ Not supported v1:
 
 ## Library Dependencies
 
-External libraries are declared in `project.toml` under a `[libs]` section. Each library is another Nex project referenced by local path:
+External libraries are declared in `project.toml` under a `[libs]` section. Libraries can be referenced by local path, version (from the global cache), or GitHub source:
 
 ```toml
 [libs]
+nex3d = { git = "nexlang/nex3d", version = "0.1.0" }
 graphics = { path = "../graphics" }
+utils = "1.2.0"
+```
+
+### Dependency formats
+
+| Format | Example | Resolution |
+|--------|---------|------------|
+| Version string | `nex3d = "0.1.0"` | Global cache `~/.nex/libs/nex3d/0.1.0/` |
+| Git source | `{ git = "user/repo", version = "0.1.0" }` | Global cache, records source for reinstall |
+| Local path | `{ path = "../graphics" }` | Relative to project root |
+
+### Installing libraries
+
+Libraries are installed from GitHub via the `nex install` command:
+
+```
+nex install user/repo           # install latest tag
+nex install user/repo:0.1.0     # install specific version
+nex install user/repo:v0.1.0    # tag with v-prefix
+```
+
+The command downloads the library source to the global cache at `~/.nex/libs/<name>/<version>/`, checks for native DLL assets in GitHub release artifacts, and updates the project's `project.toml`.
+
+### Uninstalling
+
+```
+nex uninstall <name>            # remove from project.toml
+```
+
+Cached files in `~/.nex/libs/` are retained (other projects may depend on them).
+
+### Listing dependencies
+
+```
+nex list                        # show all [libs] entries
 ```
 
 Library rules:
 
-* A library is an Nex project with its own `project.toml` and `src/` directory.
+* A library is a Nex project with its own `project.toml` and `src/` directory.
 * The library name in `[libs]` becomes the import namespace prefix: modules in `graphics/src/shapes.nex` are imported as `import graphics.shapes`.
 * Library sources are compiled alongside the main project and linked into a single executable.
-* v1: local paths only (no registry, no git URLs).
+* v1: GitHub is the only remote source (no central registry).
 * v1: flat resolution — libraries cannot themselves declare `[libs]` (no transitive dependencies).
+* If a library's `project.toml` declares `native = "name"`, the installer looks for prebuilt DLLs in GitHub release assets.
 
 ## Visibility
 
@@ -701,6 +738,8 @@ Namespace layout (17 modules, ~170 functions):
 
 All stdlib functions are C ABI runtime functions in `nex_runtime`, registered in the Cranelift codegen for both JIT and AOT. Nex names map to `nex_`-prefixed runtime symbols via `stdlib_function_name()` in the codegen.
 
+Engine and UI functions live in separate native DLLs (`nex3d_native`, `nex_ui_native`) that are loaded dynamically at JIT time via `libloading`. Libraries declare their native DLL dependency via a `native` field in `project.toml`.
+
 ## 15.1 `std.core`
 
 * `Object` class (root)
@@ -877,13 +916,13 @@ Utility:
 
 * `torch_manual_seed(seed)`, `torch_version() -> String`, `tensor_to_string(t) -> String`
 
-## 15.21 `std.ui` (optional -- requires `--features ui`)
+## 15.21 `std.ui` (separate native DLL)
 
-Cross-platform UI framework with WGPU-based desktop rendering and a terminal (TUI) backend. Gated behind the `ui` cargo feature; not compiled by default.
+Cross-platform UI framework with WGPU-based desktop rendering and a terminal (TUI) backend. Compiled as a separate native DLL (`nex_ui_native.dll` / `libnex_ui_native.so`) and loaded dynamically at JIT time.
 
-Build with UI: `cargo build --features ui`.
+Build the DLL: `cargo build -p nex_ui_native`. Place it next to `nex.exe` (auto-discovered when `import std.ui` is used).
 
-Dependencies: `winit` (windowing), `wgpu` (GPU rendering), `cosmic-text` (font shaping), `taffy` (flexbox layout), `crossterm` (terminal backend), `pollster` (async bridge).
+Dependencies (in `nex_ui_native` crate): `winit` (windowing), `wgpu` (GPU rendering), `cosmic-text` (font shaping), `taffy` (flexbox layout), `crossterm` (terminal backend), `pollster` (async bridge).
 
 Backends:
 
@@ -1106,8 +1145,18 @@ Tooling:
 * `nexc_lint`: linter
 * `nex_lsp`: LSP server
 * `nex_repl`: REPL client
-* `nex_runtime`: runtime library
+* `nex_runtime`: runtime library (statically linked into nex.exe)
 * `nex_std`: stdlib package
+
+Native DLLs (cdylib, loaded dynamically at JIT time via `libloading`):
+
+* `nex3d_native`: 3D engine (windowing, rendering, input, camera, drawing) — shipped with the nex3d library
+* `nex_ui_native`: UI framework (widgets, layout, text rendering) — shipped alongside nex.exe
+
+UI markup:
+
+* `nexui_parse`: `.nexui` XML parser producing `UIDocument` AST
+* `nexui_lower`: transforms `UIDocument` into imperative `std.ui` code
 
 ## 16.2 Crate dependency graph
 
@@ -1128,8 +1177,9 @@ nexc_layout        (depends: nexc_ast, nexc_diag, nexc_type)
   ↑
 nexc_ir            (depends: nexc_diag, nexc_type, nexc_layout)
   ↑
-nexc_codegen_llvm  (depends: nexc_diag, nexc_ir)
-nexc_codegen_llvm_jit (depends: nexc_diag, nexc_ir)
+nexc_codegen_llvm      (depends: nexc_diag, nexc_ir)
+nexc_codegen_llvm_jit  (depends: nexc_diag, nexc_ir)
+nexc_codegen_cranelift (depends: nexc_ir, nex_runtime, libloading — JIT backend + dynamic native lib loading)
   ↑
 nexc_meta          (depends: nexc_diag, serde, serde_json)
   ↑
@@ -1138,7 +1188,10 @@ nexc_driver        (depends: all compiler crates — orchestrates full pipeline)
 nexc               (depends: nexc_diag, nexc_driver — compiler CLI)
 nex                (depends: nexc_driver, nexc_diag, nexc_fmt, nexc_lint, nexc_resolve, nex_repl — build tool CLI)
 nex_lsp            (depends: nexc_ast, nexc_diag, nexc_driver, nexc_lint, nexc_parse, nexc_lex)
-nex_repl           (depends: nexc_driver, nexc_codegen_llvm_jit)
+nex_repl           (depends: nexc_driver)
+
+nex3d_native       (standalone cdylib — winit, wgpu, pollster, bytemuck)
+nex_ui_native      (standalone cdylib — winit, wgpu, cosmic-text, taffy, crossterm, pollster)
 ```
 
 ## 16.3 Data flow between stages
@@ -1195,7 +1248,12 @@ Fields:
 * `version` — semver string (required).
 * `entry` — entry point file path, relative to project root.
 * `src` — source directory, relative to project root (default `"src"`).
-* `[libs]` — optional section declaring library dependencies. Each entry maps a library name to `{ path = "..." }` where the path is relative to the project root. The library name becomes the import namespace prefix.
+* `native` — optional name of a native DLL shipped with the library. The runtime looks for `<native>.dll` (Windows) or `lib<native>.so` (Linux) in the library's root directory and loads it at JIT time.
+* `[libs]` — optional section declaring library dependencies. Supported entry formats:
+  * Version string: `nex3d = "0.1.0"` — resolved from global cache `~/.nex/libs/<name>/<version>/`
+  * Git source: `nex3d = { git = "user/repo", version = "0.1.0" }` — resolved from global cache, records origin
+  * Local path: `graphics = { path = "../graphics" }` — relative to the project root
+  The library name becomes the import namespace prefix.
 
 ## 16.7 Canonical pipeline order
 
@@ -1262,6 +1320,9 @@ Rebuild if:
 Commands:
 
 * `build`, `run`, `test`, `repl`, `fmt`, `lint`, `clean`
+* `install <user/repo[:version]>` — download a library from GitHub to the global cache and add it to `project.toml`
+* `uninstall <name>` — remove a library entry from `project.toml`
+* `list` — display all project dependencies
 
 Responsibilities:
 
@@ -1269,6 +1330,7 @@ Responsibilities:
 * build module DAG
 * incremental compilation via `.nexmeta`
 * link runtime + stdlib + objects
+* package management (install, uninstall, list)
 
 ## Formatter
 

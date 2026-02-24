@@ -1,0 +1,144 @@
+// nex3d.draw — Drawing primitives for 3D rendering.
+// Wraps nex_engine_* runtime FFI functions with convenience helpers.
+
+import nex3d.math
+import nex3d.color
+
+// ---- Core vertex pushing (FFI wrappers) ----
+
+public def push_vertex(x: Float, y: Float, z: Float, r: Float, g: Float, b: Float) {
+    engine_push_vertex(x, y, z, r, g, b)
+    return
+}
+
+public def flush_triangles() {
+    engine_draw_triangles()
+    return
+}
+
+// ---- Convenience: draw a single triangle ----
+
+public def draw_triangle(p1: Vec3, c1: Color, p2: Vec3, c2: Color, p3: Vec3, c3: Color) {
+    engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
+    engine_push_vertex(p2.x, p2.y, p2.z, c2.r, c2.g, c2.b)
+    engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
+    return
+}
+
+// ---- Convenience: draw a quad (two triangles) ----
+
+public def draw_quad(p1: Vec3, c1: Color, p2: Vec3, c2: Color, p3: Vec3, c3: Color, p4: Vec3, c4: Color) {
+    // Triangle 1: p1, p2, p3
+    engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
+    engine_push_vertex(p2.x, p2.y, p2.z, c2.r, c2.g, c2.b)
+    engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
+    // Triangle 2: p1, p3, p4
+    engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
+    engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
+    engine_push_vertex(p4.x, p4.y, p4.z, c4.r, c4.g, c4.b)
+    return
+}
+
+// ---- Convenience: draw a flat-colored quad ----
+
+public def draw_quad_flat(p1: Vec3, p2: Vec3, p3: Vec3, p4: Vec3, c: Color) {
+    draw_quad(p1, c, p2, c, p3, c, p4, c)
+    return
+}
+
+// ---- Convenience: draw a wireframe-style line as a thin quad ----
+
+public def draw_line(start: Vec3, to: Vec3, c: Color, thickness: Float) {
+    dir = vec3_sub(to, start)
+    len = vec3_length(dir)
+    if (len < 0.0001f) { return }
+    up = vec3(0.0f, 1.0f, 0.0f)
+    if (vec3_length(vec3_cross(dir, up)) < 0.0001f) {
+        up = vec3(1.0f, 0.0f, 0.0f)
+    }
+    side = vec3_normalize(vec3_cross(dir, up))
+    half = vec3_mul(side, thickness * 0.5f)
+    p1 = vec3_add(start, half)
+    p2 = vec3_sub(start, half)
+    p3 = vec3_sub(to, half)
+    p4 = vec3_add(to, half)
+    draw_quad_flat(p1, p2, p3, p4, c)
+    return
+}
+
+// ---- Convenience: draw a colored cube (6 faces, 12 triangles) ----
+
+public def draw_cube(center: Vec3, size: Float, c: Color) {
+    h = size / 2.0f
+    cx = center.x
+    cy = center.y
+    cz = center.z
+
+    // Front face (z+)
+    draw_quad_flat(
+        vec3(cx - h, cy - h, cz + h),
+        vec3(cx + h, cy - h, cz + h),
+        vec3(cx + h, cy + h, cz + h),
+        vec3(cx - h, cy + h, cz + h),
+        c
+    )
+    // Back face (z-)
+    draw_quad_flat(
+        vec3(cx + h, cy - h, cz - h),
+        vec3(cx - h, cy - h, cz - h),
+        vec3(cx - h, cy + h, cz - h),
+        vec3(cx + h, cy + h, cz - h),
+        c
+    )
+    // Top face (y+)
+    draw_quad_flat(
+        vec3(cx - h, cy + h, cz + h),
+        vec3(cx + h, cy + h, cz + h),
+        vec3(cx + h, cy + h, cz - h),
+        vec3(cx - h, cy + h, cz - h),
+        c
+    )
+    // Bottom face (y-)
+    draw_quad_flat(
+        vec3(cx - h, cy - h, cz - h),
+        vec3(cx + h, cy - h, cz - h),
+        vec3(cx + h, cy - h, cz + h),
+        vec3(cx - h, cy - h, cz + h),
+        c
+    )
+    // Right face (x+)
+    draw_quad_flat(
+        vec3(cx + h, cy - h, cz + h),
+        vec3(cx + h, cy - h, cz - h),
+        vec3(cx + h, cy + h, cz - h),
+        vec3(cx + h, cy + h, cz + h),
+        c
+    )
+    // Left face (x-)
+    draw_quad_flat(
+        vec3(cx - h, cy - h, cz - h),
+        vec3(cx - h, cy - h, cz + h),
+        vec3(cx - h, cy + h, cz + h),
+        vec3(cx - h, cy + h, cz - h),
+        c
+    )
+    return
+}
+
+// ---- Convenience: draw a ground grid ----
+
+public def draw_grid(size: Float, divisions: Int64, c: Color) {
+    half = size / 2.0f
+    step = size / divisions
+    thickness = 0.01f
+    i = 0
+    while (i <= divisions) {
+        pos = 0.0f - half + step * i
+        // Lines along X axis
+        draw_line(vec3(0.0f - half, 0.0f, pos), vec3(half, 0.0f, pos), c, thickness)
+        // Lines along Z axis
+        draw_line(vec3(pos, 0.0f, 0.0f - half), vec3(pos, 0.0f, half), c, thickness)
+        i = i + 1
+    }
+    return
+}

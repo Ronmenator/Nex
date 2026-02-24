@@ -25,6 +25,7 @@ fn compile_ok(source: &str) -> nexc_driver::CompileResult {
         emit_metadata: false,
         output_dir: None,
         lib_names: HashSet::new(),
+        ..Default::default()
     };
     let result = nexc_driver::compile_module(source, opts);
     let errors: Vec<_> = result

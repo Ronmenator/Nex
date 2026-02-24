@@ -1,0 +1,62 @@
+// nex3d.camera — Camera helpers for 3D rendering.
+// Pure Nex implementation using nex3d.math types.
+
+import nex3d.math
+
+public struct Camera {
+    pos: Vec3
+    target: Vec3
+    up: Vec3
+    fov: Float
+    near: Float
+    far: Float
+}
+
+public def camera_default() -> Camera {
+    return Camera(
+        vec3(0.0f, 2.0f, 5.0f),
+        vec3_zero(),
+        vec3(0.0f, 1.0f, 0.0f),
+        deg_to_rad(60.0f),
+        0.1f,
+        1000.0f
+    )
+}
+
+public def camera_new(pos: Vec3, target: Vec3, fov: Float) -> Camera {
+    return Camera(
+        pos,
+        target,
+        vec3(0.0f, 1.0f, 0.0f),
+        fov,
+        0.1f,
+        1000.0f
+    )
+}
+
+public def camera_view_matrix(cam: Camera) -> Mat4 {
+    return mat4_look_at(cam.pos, cam.target, cam.up)
+}
+
+public def camera_proj_matrix(cam: Camera, aspect: Float) -> Mat4 {
+    return mat4_perspective(cam.fov, aspect, cam.near, cam.far)
+}
+
+public def camera_view_proj(cam: Camera, aspect: Float) -> Mat4 {
+    view = camera_view_matrix(cam)
+    proj = camera_proj_matrix(cam, aspect)
+    return mat4_multiply(proj, view)
+}
+
+// Apply camera to the engine (sends camera params to the runtime)
+public def camera_apply(cam: Camera) {
+    engine_set_camera_pos(cam.pos.x, cam.pos.y, cam.pos.z)
+    engine_set_camera_target(cam.target.x, cam.target.y, cam.target.z)
+    engine_set_camera_up(cam.up.x, cam.up.y, cam.up.z)
+    return
+}
+
+public def camera_apply_perspective(cam: Camera, aspect: Float) {
+    engine_set_perspective(cam.fov, aspect, cam.near, cam.far)
+    return
+}
