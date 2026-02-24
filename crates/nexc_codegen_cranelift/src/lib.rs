@@ -505,7 +505,10 @@ fn translate_module<M: Module>(
     }
 
     // Declare external runtime functions used by Print / Call instructions.
-    declare_runtime_imports(module, &mut func_ids)?;
+    // Only declare symbols actually referenced by the IR to avoid unresolved
+    // import errors when linking shared libraries on MSVC.
+    let needed = collect_needed_imports(ir);
+    declare_runtime_imports(module, &mut func_ids, Some(&needed))?;
 
     // Translate each function body.
     for func in &ir.functions {
@@ -1902,10 +1905,85 @@ fn collect_variable_names(func: &IrFunction) -> Vec<String> {
     names
 }
 
+/// Scan the IR module and collect the set of runtime symbol names that are
+/// actually referenced.  This allows `declare_runtime_imports` to skip
+/// declaring hundreds of unused imports — critical for MSVC DLL linking which
+/// requires all imports to be resolved at link time.
+fn collect_needed_imports(ir: &IrModule) -> std::collections::HashSet<String> {
+    let mut needed: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Core runtime symbols — always needed by any module.
+    for s in &[
+        "nex_gc_alloc",
+        "nex_gc_collect",
+        "nex_gc_safepoint",
+        "nex_throw",
+        "nex_dispose",
+        "puts",
+    ] {
+        needed.insert(s.to_string());
+    }
+
+    for func in &ir.functions {
+        for block in &func.blocks {
+            for inst in &block.instructions {
+                match inst {
+                    IrInstruction::Print { .. } => {
+                        // Print can dispatch to any typed print function at
+                        // codegen time, so include all variants.
+                        for s in &[
+                            "nex_print_str", "nex_println_str",
+                            "nex_print_int", "nex_println_int",
+                            "nex_print_double", "nex_println_double",
+                            "nex_print_bool", "nex_println_bool",
+                            "nex_print_char", "nex_println_char",
+                        ] {
+                            needed.insert(s.to_string());
+                        }
+                    }
+                    IrInstruction::Call { target, .. } => {
+                        // print/println route through pick_print_runtime.
+                        if target == "print" || target == "println" {
+                            for s in &[
+                                "nex_print_str", "nex_println_str",
+                                "nex_print_int", "nex_println_int",
+                                "nex_print_double", "nex_println_double",
+                                "nex_print_bool", "nex_println_bool",
+                                "nex_print_char", "nex_println_char",
+                            ] {
+                                needed.insert(s.to_string());
+                            }
+                        } else if let Some(rt) = stdlib_function_name(target) {
+                            needed.insert(rt.to_string());
+                        }
+                    }
+                    IrInstruction::BinOp { op, .. } if op == "add" => {
+                        // String concat and coerce_to_str may be used.
+                        for s in &[
+                            "nex_str_concat",
+                            "nex_int_to_str",
+                            "nex_double_to_str",
+                            "nex_bool_to_str",
+                        ] {
+                            needed.insert(s.to_string());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    needed
+}
+
 /// Declare common runtime functions as imports so generated code can call them.
+/// When `filter` is `Some`, only symbols in the set are declared (used for
+/// shared library builds to avoid unresolved MSVC linker errors).
 fn declare_runtime_imports<M: Module>(
     module: &mut M,
     func_ids: &mut HashMap<String, FuncId>,
+    filter: Option<&std::collections::HashSet<String>>,
 ) -> Result<(), String> {
     let cc = module.isa().default_call_conv();
 
@@ -2378,40 +2456,35 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_tensor_to_string", &sig_ptr_ptr),
     ];
 
+    // Helper: declare an import only if not already declared, and if it passes
+    // the optional filter (when building shared libs).
+    let mut declare = |name: &str, sig: &Signature| -> Result<(), String> {
+        if func_ids.contains_key(name) {
+            return Ok(());
+        }
+        if let Some(f) = filter {
+            if !f.contains(name) {
+                return Ok(());
+            }
+        }
+        let id = module
+            .declare_function(name, Linkage::Import, sig)
+            .map_err(|e| format!("declare import {name}: {e}"))?;
+        func_ids.insert(name.to_string(), id);
+        Ok(())
+    };
+
     for (name, sig) in imports {
-        if !func_ids.contains_key(name) {
-            let id = module
-                .declare_function(name, Linkage::Import, sig)
-                .map_err(|e| format!("declare import {name}: {e}"))?;
-            func_ids.insert(name.to_string(), id);
-        }
+        declare(name, sig)?;
     }
-
     for (name, sig) in ui_imports {
-        if !func_ids.contains_key(name) {
-            let id = module
-                .declare_function(name, Linkage::Import, sig)
-                .map_err(|e| format!("declare import {name}: {e}"))?;
-            func_ids.insert(name.to_string(), id);
-        }
+        declare(name, sig)?;
     }
-
     for (name, sig) in engine_imports {
-        if !func_ids.contains_key(name) {
-            let id = module
-                .declare_function(name, Linkage::Import, sig)
-                .map_err(|e| format!("declare import {name}: {e}"))?;
-            func_ids.insert(name.to_string(), id);
-        }
+        declare(name, sig)?;
     }
-
     for (name, sig) in torch_imports {
-        if !func_ids.contains_key(name) {
-            let id = module
-                .declare_function(name, Linkage::Import, sig)
-                .map_err(|e| format!("declare import {name}: {e}"))?;
-            func_ids.insert(name.to_string(), id);
-        }
+        declare(name, sig)?;
     }
 
     let crypto_imports: Vec<(&str, &Signature)> = vec![
@@ -2443,12 +2516,7 @@ fn declare_runtime_imports<M: Module>(
 
     for imports_list in [crypto_imports, http_imports, regex_imports] {
         for (name, sig) in imports_list {
-            if !func_ids.contains_key(name) {
-                let id = module
-                    .declare_function(name, Linkage::Import, sig)
-                    .map_err(|e| format!("declare import {name}: {e}"))?;
-                func_ids.insert(name.to_string(), id);
-            }
+            declare(name, sig)?;
         }
     }
 

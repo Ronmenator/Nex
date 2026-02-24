@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use nexc_diag::{Diagnostic, Severity, SourceMap};
-use nexc_driver::{compile_module, compile_to_native, link_native, link_native_multi, link_shared_lib, link_shared_lib_multi, jit_run, jit_run_multi, CompileOptions, OutputKind};
+use nexc_driver::{compile_module, compile_to_native, link_native, link_native_multi, link_shared_lib_multi, jit_run, jit_run_multi, CompileOptions, OutputKind};
 use nexc_fmt::format_source;
 use nexc_resolve::{discover_project_modules, discover_lib_names, discover_native_libs, discover_sibling_modules, nex_libs_dir, resolve_from_global_cache};
 
@@ -405,6 +405,16 @@ fn build_project_modules(root: &PathBuf) -> i32 {
 
 /// Build a Nex lib project into a shared library (DLL / .so / .dylib).
 fn build_lib_project(root: &PathBuf) -> i32 {
+    let root = fs::canonicalize(root).unwrap_or_else(|_| root.clone());
+    // Strip \\?\ prefix that Windows canonicalize adds — it confuses cmd.exe/batch scripts.
+    let root = {
+        let s = root.to_string_lossy();
+        if s.starts_with(r"\\?\") {
+            PathBuf::from(&s[4..])
+        } else {
+            root
+        }
+    };
     let toml_path = root.join("project.toml");
     let toml_text = match fs::read_to_string(&toml_path) {
         Ok(t) => t,
@@ -512,7 +522,7 @@ fn build_lib_project(root: &PathBuf) -> i32 {
     }
 
     // Link into a shared library placed in the lib root
-    match link_shared_lib_multi(&obj_paths, root, &lib_name) {
+    match link_shared_lib_multi(&obj_paths, &root, &lib_name) {
         Ok(lib_path) => {
             println!("linked -> {}", lib_path.display());
         }

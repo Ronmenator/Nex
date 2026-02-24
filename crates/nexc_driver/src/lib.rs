@@ -204,14 +204,12 @@ pub fn link_shared_lib(result: &mut CompileResult, out_dir: &Path, stem: &str) -
     };
     let lib_path = out_dir.join(&lib_name);
 
-    let runtime_lib = find_runtime_library();
-
     let linker = find_linker()
         .ok_or_else(|| "no linker found. Install a C toolchain (gcc, clang, or MSVC Build Tools).".to_string())?;
 
-    let output = invoke_linker_shared(&linker, &obj_path, &lib_path, runtime_lib.as_deref())?;
+    let output = invoke_linker_shared(&linker, &obj_path, &lib_path, None)?;
 
-    if !output.status.success() {
+    if !output.status.success() && !lib_path.exists() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         return Err(format!("linker failed (exit {}):\n{stdout}{stderr}", output.status));
@@ -235,13 +233,18 @@ pub fn link_shared_lib_multi(obj_paths: &[PathBuf], out_dir: &Path, stem: &str) 
     };
     let lib_path = out_dir.join(&lib_name);
 
-    let runtime_lib = find_runtime_library();
+    // Nex lib DLLs do NOT link against nex_runtime — they contain only compiled
+    // Nex functions.  Runtime symbols are resolved when the host app loads the
+    // DLL (the host has the runtime linked in).
     let linker = find_linker()
         .ok_or_else(|| "no linker found. Install a C toolchain (gcc, clang, or MSVC Build Tools).".to_string())?;
 
-    let output = invoke_linker_multi_shared(&linker, obj_paths, &lib_path, runtime_lib.as_deref())?;
+    let output = invoke_linker_multi_shared(&linker, obj_paths, &lib_path, None)?;
 
-    if !output.status.success() {
+    // MSVC with /FORCE returns non-zero even when it successfully
+    // produces the DLL.  Check whether the output file was created instead of
+    // relying solely on the exit code.
+    if !output.status.success() && !lib_path.exists() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         return Err(format!("linker failed (exit {}):\n{stdout}{stderr}", output.status));
@@ -929,14 +932,9 @@ fn invoke_linker_shared(
             args.extend([
                 "/link".into(),
                 "/DLL".into(),
-                "ws2_32.lib".into(),
-                "advapi32.lib".into(),
-                "userenv.lib".into(),
-                "ntdll.lib".into(),
-                "bcrypt.lib".into(),
-                "kernel32.lib".into(),
-                "msvcrt.lib".into(),
-                "/DEFAULTLIB:libcmt".into(),
+                "/NOENTRY".into(),
+                "/NODEFAULTLIB".into(),
+                "/FORCE".into(),
             ]);
             Command::new(cmd)
                 .args(&args)
@@ -946,6 +944,9 @@ fn invoke_linker_shared(
         Linker::Cc(cmd) => {
             let mut args: Vec<String> = vec![
                 "-shared".into(),
+                "-nostdlib".into(),
+                "-Wl,--allow-shlib-undefined".into(),
+                "-Wl,--no-as-needed".into(),
                 obj_path.to_string_lossy().into_owned(),
                 "-o".into(),
                 lib_path.to_string_lossy().into_owned(),
@@ -970,16 +971,13 @@ fn invoke_linker_shared(
                 .map(|p| format!(" \"{}\"", p.display()))
                 .unwrap_or_default();
 
-            let win_libs = " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib ole32.lib oleaut32.lib";
-
             let bat_content = format!(
-                "@echo off\r\ncall \"{}\" {} >nul 2>&1\r\nif errorlevel 1 exit /b 1\r\nlink /nologo /DLL /OUT:\"{}\" \"{}\"{}{}\r\n",
+                "@echo off\r\ncall \"{}\" {} >nul 2>&1\r\nif errorlevel 1 exit /b 1\r\nlink /nologo /DLL /NOENTRY /NODEFAULTLIB /FORCE /OUT:\"{}\" \"{}\"{}\r\n",
                 vcvarsall.display(),
                 arch,
                 lib_path.display(),
                 obj_path.display(),
                 rt_arg,
-                win_libs,
             );
             std::fs::write(&bat_path, &bat_content)
                 .map_err(|e| format!("cannot write link script: {e}"))?;
@@ -1016,14 +1014,9 @@ fn invoke_linker_multi_shared(
             args.extend([
                 "/link".into(),
                 "/DLL".into(),
-                "ws2_32.lib".into(),
-                "advapi32.lib".into(),
-                "userenv.lib".into(),
-                "ntdll.lib".into(),
-                "bcrypt.lib".into(),
-                "kernel32.lib".into(),
-                "msvcrt.lib".into(),
-                "/DEFAULTLIB:libcmt".into(),
+                "/NOENTRY".into(),
+                "/NODEFAULTLIB".into(),
+                "/FORCE".into(),
             ]);
             Command::new(cmd)
                 .args(&args)
@@ -1031,7 +1024,12 @@ fn invoke_linker_multi_shared(
                 .map_err(|e| format!("failed to run cl: {e}"))
         }
         Linker::Cc(cmd) => {
-            let mut args: Vec<String> = vec!["-shared".into()];
+            let mut args: Vec<String> = vec![
+                "-shared".into(),
+                "-nostdlib".into(),
+                "-Wl,--allow-shlib-undefined".into(),
+                "-Wl,--no-as-needed".into(),
+            ];
             args.extend(obj_paths.iter().map(|p| p.to_string_lossy().into_owned()));
             args.push("-o".into());
             args.push(lib_path.to_string_lossy().into_owned());
@@ -1059,16 +1057,13 @@ fn invoke_linker_multi_shared(
                 .map(|p| format!(" \"{}\"", p.display()))
                 .unwrap_or_default();
 
-            let win_libs = " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib ole32.lib oleaut32.lib";
-
             let bat_content = format!(
-                "@echo off\r\ncall \"{}\" {} >nul 2>&1\r\nif errorlevel 1 exit /b 1\r\nlink /nologo /DLL /OUT:\"{}\"{}{}{}\r\n",
+                "@echo off\r\ncall \"{}\" {} >nul 2>&1\r\nif errorlevel 1 exit /b 1\r\nlink /nologo /DLL /NOENTRY /NODEFAULTLIB /FORCE /OUT:\"{}\"{}{}\r\n",
                 vcvarsall.display(),
                 arch,
                 lib_path.display(),
                 obj_args,
                 rt_arg,
-                win_libs,
             );
             std::fs::write(&bat_path, &bat_content)
                 .map_err(|e| format!("cannot write link script: {e}"))?;
