@@ -585,47 +585,85 @@ fn parse_libs_section(toml: &str, project_root: &Path, sink: &mut DiagnosticSink
     libs
 }
 
-/// Read a library's `project.toml` and resolve the `native` field to a
-/// platform-specific dynamic library path.
+/// Resolve a library's dynamic library path.
 ///
-/// The `native` field specifies a base name (e.g. `"nex3d_native"`).  This
-/// function looks for the platform-specific file in the library root:
-///   - Windows: `<root>/<name>.dll`
-///   - Linux/macOS: `<root>/lib<name>.so` or `<root>/lib<name>.dylib`
+/// First checks for a Nex-compiled shared library (named after the lib's
+/// `name` field in project.toml, e.g. `torch.dll`).  Falls back to the
+/// legacy `native = "..."` field for Rust-compiled native DLLs.
 fn resolve_native_lib(lib_root: &Path) -> Option<PathBuf> {
     let toml_path = lib_root.join("project.toml");
     let toml_text = fs::read_to_string(&toml_path).ok()?;
 
-    // Find `native = "..."` in the top-level section
-    let native_name = parse_native_field(&toml_text)?;
+    // Try 1: look for a Nex-compiled lib DLL (name from `name` field)
+    if let Some(lib_name) = parse_name_field(&toml_text) {
+        let candidates = if cfg!(target_os = "windows") {
+            vec![lib_root.join(format!("{lib_name}.dll"))]
+        } else if cfg!(target_os = "macos") {
+            vec![
+                lib_root.join(format!("lib{lib_name}.dylib")),
+                lib_root.join(format!("lib{lib_name}.so")),
+            ]
+        } else {
+            vec![lib_root.join(format!("lib{lib_name}.so"))]
+        };
 
-    // Look for the platform-specific DLL in the library root
-    let candidates = if cfg!(target_os = "windows") {
-        vec![lib_root.join(format!("{native_name}.dll"))]
-    } else if cfg!(target_os = "macos") {
-        vec![
-            lib_root.join(format!("lib{native_name}.dylib")),
-            lib_root.join(format!("lib{native_name}.so")),
-        ]
-    } else {
-        vec![lib_root.join(format!("lib{native_name}.so"))]
-    };
-
-    for path in candidates {
-        if path.exists() {
-            return Some(path);
+        for path in &candidates {
+            if path.exists() {
+                return Some(path.clone());
+            }
         }
     }
 
-    // DLL not found yet — that's OK, it may be built later.
-    // Return the expected path so the caller can report a useful error.
-    if cfg!(target_os = "windows") {
-        Some(lib_root.join(format!("{native_name}.dll")))
-    } else if cfg!(target_os = "macos") {
-        Some(lib_root.join(format!("lib{native_name}.dylib")))
-    } else {
-        Some(lib_root.join(format!("lib{native_name}.so")))
+    // Try 2: legacy `native = "..."` field (Rust-compiled native DLLs)
+    if let Some(native_name) = parse_native_field(&toml_text) {
+        let candidates = if cfg!(target_os = "windows") {
+            vec![lib_root.join(format!("{native_name}.dll"))]
+        } else if cfg!(target_os = "macos") {
+            vec![
+                lib_root.join(format!("lib{native_name}.dylib")),
+                lib_root.join(format!("lib{native_name}.so")),
+            ]
+        } else {
+            vec![lib_root.join(format!("lib{native_name}.so"))]
+        };
+
+        for path in candidates {
+            if path.exists() {
+                return Some(path);
+            }
+        }
+
+        // DLL not found yet — return the expected path for error messages.
+        if cfg!(target_os = "windows") {
+            return Some(lib_root.join(format!("{native_name}.dll")));
+        } else if cfg!(target_os = "macos") {
+            return Some(lib_root.join(format!("lib{native_name}.dylib")));
+        } else {
+            return Some(lib_root.join(format!("lib{native_name}.so")));
+        }
     }
+
+    None
+}
+
+/// Parse the `name = "..."` field from the top-level of a project.toml string.
+fn parse_name_field(toml: &str) -> Option<String> {
+    for line in toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            break; // entered a section
+        }
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        if key.trim() == "name" {
+            let v = value.trim().trim_matches('"').trim_matches('\'');
+            if !v.is_empty() {
+                return Some(v.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Parse the `native = "..."` field from a project.toml string.

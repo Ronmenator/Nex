@@ -632,6 +632,7 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
             output_dir: None,
             lib_names,
             native_libs,
+            ..Default::default()
         };
         return match jit_run(&source_text, options, args) {
             Ok(code) => code,
@@ -683,19 +684,15 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
     for (text, path) in &sibling_texts {
         compile_sources.push((text.as_str(), CompileOptions {
             source_path: path.clone(),
-            emit_metadata: false,
-            output_dir: None,
             lib_names: all_known_names.clone(),
-            native_libs: Vec::new(),
+            ..Default::default()
         }));
     }
     for (text, path) in &lib_texts {
         compile_sources.push((text.as_str(), CompileOptions {
             source_path: path.clone(),
-            emit_metadata: false,
-            output_dir: None,
             lib_names: all_known_names.clone(),
-            native_libs: Vec::new(),
+            ..Default::default()
         }));
     }
 
@@ -706,10 +703,8 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
 
     compile_sources.push((&source_text, CompileOptions {
         source_path: main_relative,
-        emit_metadata: false,
-        output_dir: None,
         lib_names: all_known_names,
-        native_libs: Vec::new(),
+        ..Default::default()
     }));
 
     match jit_run_multi(&compile_sources, args, &native_libs) {
