@@ -6,7 +6,7 @@
 // that extends BaseWidget.  All per-screen state and event handlers live
 // in the respective widget's .nex code-behind.
 
-import std.ui
+import nex_ui.binding
 
 public partial class MainWindow {
     active_screen = 0

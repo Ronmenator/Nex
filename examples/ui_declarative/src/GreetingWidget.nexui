@@ -1,4 +1,4 @@
-<Widget xmlns="std.ui" Extends="BaseWidget">
+<Widget xmlns="nex_ui" Extends="BaseWidget">
   <Text Text="Greeting" FontSize="28" />
   <Text Text="Enter your name:" FontSize="16" />
   <TextInput Placeholder="Type a name..." Text="{Binding name_value, Mode=TwoWay}" />

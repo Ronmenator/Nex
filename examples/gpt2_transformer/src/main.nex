@@ -1,7 +1,7 @@
 // GPT-2 Transformer — Nex + libtorch demonstration
 //
-// A GPT-2-style language model built on Nex's std.torch bindings
-// (requires: cargo build --features torch).
+// A GPT-2-style language model built on the torch library.
+// Requires nex_torch_native DLL and libtorch at runtime.
 //
 // Architecture (Radford et al., 2019):
 //   Embedding → N × [Self-Attention + Residual → FFN + Residual] → LM Head
@@ -10,7 +10,11 @@
 // The main() function uses direct torch calls because the compiler's
 // object field access codegen is still in progress.
 
-import std.torch
+import torch.tensor
+import torch.nn
+import torch.loss
+import torch.optim
+import torch.model
 
 // ===========================================================================
 // Class hierarchy (language design reference)

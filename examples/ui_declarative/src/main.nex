@@ -7,7 +7,11 @@
 //
 // Run: nex run (from this directory)
 
-import std.ui
+import nex_ui.app
+import nex_ui.widget
+import nex_ui.style
+import nex_ui.event
+import nex_ui.binding
 
 def main() {
     _init_ui()

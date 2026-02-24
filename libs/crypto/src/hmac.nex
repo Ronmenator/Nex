@@ -1,0 +1,5 @@
+// crypto.hmac — HMAC message authentication.
+
+public def hmac_sha256(key: String, message: String) -> String {
+    return crypto_hmac_sha256(key, message)
+}

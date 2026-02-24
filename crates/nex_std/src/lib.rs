@@ -192,10 +192,6 @@ pub mod json {
     pub use nex_runtime::json::*;
 }
 
-pub mod regex {
-    pub use nex_runtime::regex_ext::*;
-}
-
 pub mod process {
     pub use nex_runtime::process::*;
 }
@@ -204,16 +200,8 @@ pub mod net {
     pub use nex_runtime::net::*;
 }
 
-pub mod http {
-    pub use nex_runtime::http::*;
-}
-
 pub mod threading {
     pub use nex_runtime::threading::*;
-}
-
-pub mod crypto {
-    pub use nex_runtime::crypto::*;
 }
 
 pub mod logging {
@@ -222,14 +210,4 @@ pub mod logging {
 
 pub mod testing {
     pub use nex_runtime::testing::*;
-}
-
-#[cfg(feature = "torch")]
-pub mod torch {
-    pub use nex_runtime::torch::*;
-}
-
-#[cfg(feature = "ui")]
-pub mod ui {
-    pub use nex_runtime::ui::*;
 }

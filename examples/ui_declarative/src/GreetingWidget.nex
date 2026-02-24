@@ -1,6 +1,6 @@
 // GreetingWidget code-behind — self-contained greeting with its own state.
 
-import std.ui
+import nex_ui.binding
 
 public partial class GreetingWidget {
     name_value = ""

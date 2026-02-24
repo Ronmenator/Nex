@@ -347,38 +347,6 @@ pub fn discover_native_libs(root: &Path, sink: &mut DiagnosticSink) -> Vec<PathB
         .collect()
 }
 
-/// Discover native DLLs shipped alongside the nex executable (e.g. `nex_ui_native.dll`).
-/// Looks in the same directory as `std::env::current_exe()` and in a `native/` subdirectory.
-pub fn discover_std_native_libs() -> Vec<PathBuf> {
-    let exe = match std::env::current_exe() {
-        Ok(e) => e,
-        Err(_) => return Vec::new(),
-    };
-    let Some(exe_dir) = exe.parent() else {
-        return Vec::new();
-    };
-
-    let ext = if cfg!(target_os = "windows") { "dll" } else if cfg!(target_os = "macos") { "dylib" } else { "so" };
-    let prefix = if cfg!(target_os = "windows") { "" } else { "lib" };
-
-    let mut libs = Vec::new();
-    for name in &["nex_ui_native"] {
-        let filename = format!("{prefix}{name}.{ext}");
-        // Check exe dir
-        let path = exe_dir.join(&filename);
-        if path.exists() {
-            libs.push(path);
-            continue;
-        }
-        // Check native/ subdir
-        let path = exe_dir.join("native").join(&filename);
-        if path.exists() {
-            libs.push(path);
-        }
-    }
-    libs
-}
-
 pub fn discover_lib_modules(
     lib: &LibDependency,
     sink: &mut DiagnosticSink,

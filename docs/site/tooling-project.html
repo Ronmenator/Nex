@@ -31,8 +31,9 @@ entry = "src/main.nex"
 src = "src"
 
 [libs]
+nex3d = { git = "nexlang/nex3d", version = "0.1.0" }
 graphics = { path = "../graphics" }
-utils = { path = "../shared/utils" }</code></pre>
+utils = "1.2.0"</code></pre>
 
   <h2>Fields</h2>
 
@@ -55,7 +56,7 @@ utils = { path = "../shared/utils" }</code></pre>
         <td><code>entry</code></td>
         <td>No</td>
         <td><code>"src/main.nex"</code></td>
-        <td>The entry point file path, relative to the project root. This is the file executed by <code>aur run</code> and the starting point for <code>aur build</code>.</td>
+        <td>The entry point file path, relative to the project root. This is the file executed by <code>nex run</code> and the starting point for <code>nex build</code>.</td>
       </tr>
       <tr>
         <td><code>src</code></td>
@@ -64,10 +65,16 @@ utils = { path = "../shared/utils" }</code></pre>
         <td>The source directory, relative to the project root. All <code>.nex</code> files in this directory (and its subdirectories) form the module graph.</td>
       </tr>
       <tr>
+        <td><code>native</code></td>
+        <td>No</td>
+        <td>—</td>
+        <td>Name of a native DLL shipped with the library. The runtime looks for <code>&lt;native&gt;.dll</code> (Windows) or <code>lib&lt;native&gt;.so</code> (Linux) in the library root.</td>
+      </tr>
+      <tr>
         <td><code>[libs]</code></td>
         <td>No</td>
         <td>—</td>
-        <td>A section declaring external library dependencies. Each entry maps a name to <code>{ path = "..." }</code>.</td>
+        <td>A section declaring external library dependencies. Supports version strings (<code>"0.1.0"</code>), git sources (<code>{ git = "user/repo", version = "..." }</code>), and local paths (<code>{ path = "..." }</code>).</td>
       </tr>
     </tbody>
   </table>
@@ -84,42 +91,84 @@ utils = { path = "../shared/utils" }</code></pre>
     net/
       http.nex           <span class="cmt"># Module: import net.http</span>
       json.nex           <span class="cmt"># Module: import net.json</span>
-  build/                <span class="cmt"># Output directory (created by aur build)</span>
+  build/                <span class="cmt"># Output directory (created by nex build)</span>
     my_project          <span class="cmt"># Compiled binary</span></code></pre>
 
   <p>Module names are derived from file paths relative to <code>src/</code>. For example, <code>src/net/http.nex</code> becomes the module <code>net.http</code>, importable as <code>import net.http</code>.</p>
 
   <h2>Library Dependencies</h2>
 
-  <p>External libraries are other Nex projects referenced by local path. The library name in <code>[libs]</code> becomes the import namespace prefix.</p>
+  <p>External libraries are Nex projects that can be referenced by GitHub source, version, or local path. The library name in <code>[libs]</code> becomes the import namespace prefix.</p>
+
+  <h3>Dependency Formats</h3>
+
+  <table>
+    <thead><tr><th>Format</th><th>Example</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Version string</td>
+        <td><code>nex3d = "0.1.0"</code></td>
+        <td>Global cache <code>~/.nex/libs/nex3d/0.1.0/</code></td>
+      </tr>
+      <tr>
+        <td>Git source</td>
+        <td><code>{ git = "user/repo", version = "0.1.0" }</code></td>
+        <td>Global cache, records origin for reinstall</td>
+      </tr>
+      <tr>
+        <td>Local path</td>
+        <td><code>{ path = "../graphics" }</code></td>
+        <td>Relative to project root</td>
+      </tr>
+    </tbody>
+  </table>
 
   <pre><code><span class="cmt"># project.toml</span>
 name = "my_app"
 version = "1.0.0"
 
 [libs]
+nex3d = { git = "nexlang/nex3d", version = "0.1.0" }
 graphics = { path = "../graphics" }</code></pre>
 
-  <p>With this configuration, modules in the <code>graphics</code> library's <code>src/</code> directory are imported using the <code>graphics.</code> prefix:</p>
+  <p>With this configuration, modules in each library's <code>src/</code> directory are imported using the library name as prefix:</p>
 
-  <pre><code><span class="kw">import</span> graphics.shapes
-<span class="kw">import</span> graphics.renderer
+  <pre><code><span class="kw">import</span> nex3d.engine
+<span class="kw">import</span> graphics.shapes
 <span class="kw">from</span> graphics.colors <span class="kw">import</span> RGB, HSL</code></pre>
+
+  <h3>Installing Libraries</h3>
+
+  <p>Install libraries from GitHub using <code>nex install</code>:</p>
+
+  <pre><code><span class="cmt"># Install the latest tagged version</span>
+$ nex install nexlang/nex3d
+
+<span class="cmt"># Install a specific version</span>
+$ nex install nexlang/nex3d:0.1.0</code></pre>
+
+  <p>This downloads the library to the global cache at <code>~/.nex/libs/</code>, checks for native DLL assets in GitHub release artifacts, and updates <code>project.toml</code>.</p>
+
+  <p>Manage dependencies with:</p>
+
+  <pre><code>$ nex list                <span class="cmt"># show all dependencies</span>
+$ nex uninstall nex3d     <span class="cmt"># remove from project.toml</span></code></pre>
 
   <h3>Library Rules</h3>
 
   <ul>
     <li>A library must be a valid Nex project with its own <code>project.toml</code> and <code>src/</code> directory.</li>
     <li>Library sources are compiled alongside the main project and linked into a single executable.</li>
-    <li>Only local paths are supported in v1 (no registry, no git URLs).</li>
+    <li>GitHub is the only remote source in v1 (no central registry).</li>
     <li>Libraries cannot declare their own <code>[libs]</code> — no transitive dependencies in v1.</li>
+    <li>If a library's <code>project.toml</code> declares <code>native = "name"</code>, the installer downloads prebuilt DLLs from GitHub release assets.</li>
   </ul>
 
   <h3>Library Project Example</h3>
 
-  <p>Create a library with <code>aur new</code>:</p>
+  <p>Create a library with <code>nex new</code>:</p>
 
-  <pre><code>$ aur new my_lib --lib</code></pre>
+  <pre><code>$ nex new my_lib --lib</code></pre>
 
   <p>Library <code>project.toml</code>:</p>
 
@@ -142,9 +191,9 @@ src = "src"</code></pre>
 <span class="fn">greet</span>(<span class="str">"Nex"</span>)   <span class="cmt">// Hello, Nex</span></code></pre>
 
   <div class="page-nav">
-    <a href="tooling-aur.html">
+    <a href="tooling-nex.html">
       <span class="nav-label">Previous</span>
-      <span class="nav-title">&larr; Build Tool (aur)</span>
+      <span class="nav-title">&larr; Build Tool (nex)</span>
     </a>
     <a href="tooling-repl.html">
       <span class="nav-label">Next</span>

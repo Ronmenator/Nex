@@ -4,3 +4,4 @@ entry = "src/main.nex"
 
 [libs]
 nex3d = { path = "../../libs/nex3d" }
+nex_ui = { path = "../../libs/nex_ui" }

@@ -1,0 +1,9 @@
+// crypto.encode — Encoding and decoding utilities.
+
+public def base64_encode(input: String) -> String {
+    return crypto_base64_encode(input)
+}
+
+public def base64_decode(input: String) -> String {
+    return crypto_base64_decode(input)
+}

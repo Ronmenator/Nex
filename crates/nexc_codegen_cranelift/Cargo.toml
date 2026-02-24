@@ -4,9 +4,6 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
-[features]
-default = []
-torch = ["nex_runtime/torch"]
 
 [dependencies]
 nexc_ir = { path = "../nexc_ir" }

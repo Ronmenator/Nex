@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use nexc_diag::{Diagnostic, Severity, SourceMap};
-use nexc_driver::{compile_module, compile_to_native, link_native, link_native_multi, jit_run, jit_run_multi, CompileOptions};
+use nexc_driver::{compile_module, compile_to_native, link_native, link_native_multi, link_shared_lib, link_shared_lib_multi, jit_run, jit_run_multi, CompileOptions, OutputKind};
 use nexc_fmt::format_source;
-use nexc_resolve::{discover_project_modules, discover_lib_names, discover_native_libs, discover_std_native_libs, discover_sibling_modules, nex_libs_dir, resolve_from_global_cache};
+use nexc_resolve::{discover_project_modules, discover_lib_names, discover_native_libs, discover_sibling_modules, nex_libs_dir, resolve_from_global_cache};
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -16,7 +16,7 @@ fn main() {
         return;
     }
 
-    // Shorthand: `aur file.nex [args...]` -> JIT run
+    // Shorthand: `nex file.nex [args...]` -> JIT run
     if args[0].ends_with(".nex") {
         let source_path = PathBuf::from(args.remove(0));
         let code = run_jit(&source_path, &args);
@@ -26,10 +26,20 @@ fn main() {
     let command = args.remove(0);
     match command.as_str() {
         "build" => {
+            let is_lib = args.iter().any(|a| a == "--lib");
+            args.retain(|a| a != "--lib");
+
             let target = args.pop().unwrap_or_else(|| ".".to_string());
             let target_path = PathBuf::from(&target);
 
-            let code = if target_path.is_file() {
+            let code = if is_lib {
+                let root = if target_path.is_dir() {
+                    target_path
+                } else {
+                    PathBuf::from(".")
+                };
+                build_lib_project(&root)
+            } else if target_path.is_file() {
                 build_single_module(&target_path)
             } else {
                 let root = if target_path.is_dir() {
@@ -47,7 +57,7 @@ fn main() {
             let mut program_args: Vec<String> = Vec::new();
             let mut source_arg = ".".to_string();
 
-            // Split args at "--": before is for aur, after is for the program
+            // Split args at "--": before is for nex, after is for the program
             if let Some(sep) = args.iter().position(|a| a == "--") {
                 program_args = args.split_off(sep + 1);
                 args.pop(); // remove the "--"
@@ -83,7 +93,7 @@ fn main() {
                 let text = match fs::read_to_string(&file) {
                     Ok(s) => s,
                     Err(err) => {
-                        eprintln!("aur lint: cannot read {file}: {err}");
+                        eprintln!("nex lint: cannot read {file}: {err}");
                         return;
                     }
                 };
@@ -107,14 +117,14 @@ fn main() {
                     print_diagnostics(&all_diags, &result.source_map);
                 }
             } else {
-                eprintln!("aur lint: no file specified");
+                eprintln!("nex lint: no file specified");
             }
         }
         "repl" => {
             nex_repl::run_repl();
         }
         "test" => {
-            eprintln!("aur test: not implemented yet");
+            eprintln!("nex test: not implemented yet");
         }
         "install" => {
             if args.is_empty() {
@@ -154,8 +164,8 @@ fn main() {
             let name = match args.pop() {
                 Some(n) => n,
                 None => {
-                    eprintln!("aur new: missing project name");
-                    eprintln!("Usage: aur new <name> [--lib]");
+                    eprintln!("nex new: missing project name");
+                    eprintln!("Usage: nex new <name> [--lib]");
                     process::exit(1);
                 }
             };
@@ -168,7 +178,7 @@ fn main() {
             let dir = PathBuf::from("build");
             if dir.exists() {
                 if let Err(e) = fs::remove_dir_all(&dir) {
-                    eprintln!("aur clean: {e}");
+                    eprintln!("nex clean: {e}");
                 } else {
                     println!("cleaned build/");
                 }
@@ -188,6 +198,7 @@ fn usage() {
     println!("Commands:");
     println!("  new <name> [--lib]          Create a new project (--lib for a library)");
     println!("  build [path]                Compile to a native executable (AOT)");
+    println!("  build --lib [path]          Compile a library to a shared library (DLL)");
     println!("  run [path] [-- args]        JIT compile and execute");
     println!("  <file>.nex [args]           Shorthand for: nex run <file>.nex -- [args]");
     println!("  install <user/repo[:ver]>   Install a library from GitHub");
@@ -232,7 +243,7 @@ fn build_single_module(source_path: &PathBuf) -> i32 {
     let source_text = match fs::read_to_string(source_path) {
         Ok(text) => text,
         Err(err) => {
-            eprintln!("aur build: cannot read {}: {err}", source_path.display());
+            eprintln!("nex build: cannot read {}: {err}", source_path.display());
             return 1;
         }
     };
@@ -269,7 +280,7 @@ fn build_single_module(source_path: &PathBuf) -> i32 {
             println!("compiled {} -> {}", source_path_text, exe.display());
         }
         Err(e) => {
-            eprintln!("aur build: link failed: {e}");
+            eprintln!("nex build: link failed: {e}");
             return 1;
         }
     }
@@ -295,7 +306,7 @@ fn build_project_modules(root: &PathBuf) -> i32 {
         if main_au.is_file() {
             return build_single_module(&main_au);
         }
-        eprintln!("aur build: no modules found under {}", root.join("src").display());
+        eprintln!("nex build: no modules found under {}", root.join("src").display());
         return 1;
     }
 
@@ -320,7 +331,7 @@ fn build_project_modules(root: &PathBuf) -> i32 {
         let source_text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {
-                eprintln!("aur build: cannot read {}: {err}", path.display());
+                eprintln!("nex build: cannot read {}: {err}", path.display());
                 had_error = true;
                 continue;
             }
@@ -351,12 +362,12 @@ fn build_project_modules(root: &PathBuf) -> i32 {
         if let Some(object_bytes) = &result.object {
             let obj_path = out_dir.join(format!("{stem}.{obj_ext}"));
             if let Err(e) = fs::create_dir_all(&out_dir) {
-                eprintln!("aur build: cannot create output directory: {e}");
+                eprintln!("nex build: cannot create output directory: {e}");
                 had_error = true;
                 continue;
             }
             if let Err(e) = fs::write(&obj_path, object_bytes) {
-                eprintln!("aur build: cannot write {}: {e}", obj_path.display());
+                eprintln!("nex build: cannot write {}: {e}", obj_path.display());
                 had_error = true;
                 continue;
             }
@@ -370,7 +381,7 @@ fn build_project_modules(root: &PathBuf) -> i32 {
     }
 
     if obj_paths.is_empty() {
-        eprintln!("aur build: no object files produced");
+        eprintln!("nex build: no object files produced");
         return 1;
     }
 
@@ -384,7 +395,7 @@ fn build_project_modules(root: &PathBuf) -> i32 {
             println!("linked -> {}", exe.display());
         }
         Err(e) => {
-            eprintln!("aur build: link failed: {e}");
+            eprintln!("nex build: link failed: {e}");
             return 1;
         }
     }
@@ -392,11 +403,166 @@ fn build_project_modules(root: &PathBuf) -> i32 {
     0
 }
 
+/// Build a Nex lib project into a shared library (DLL / .so / .dylib).
+fn build_lib_project(root: &PathBuf) -> i32 {
+    let toml_path = root.join("project.toml");
+    let toml_text = match fs::read_to_string(&toml_path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("nex build --lib: cannot read {}: {e}", toml_path.display());
+            return 1;
+        }
+    };
+
+    let lib_name = match parse_toml_name(&toml_text) {
+        Some(n) => n,
+        None => {
+            eprintln!("nex build --lib: no `name` field in {}", toml_path.display());
+            return 1;
+        }
+    };
+
+    // Discover .nex sources under the lib's src/ directory
+    let src_dir = root.join("src");
+    if !src_dir.is_dir() {
+        eprintln!("nex build --lib: no src/ directory in {}", root.display());
+        return 1;
+    }
+
+    let mut nex_files = Vec::new();
+    collect_nex_files(&src_dir, &mut nex_files);
+
+    if nex_files.is_empty() {
+        eprintln!("nex build --lib: no .nex files found under {}", src_dir.display());
+        return 1;
+    }
+
+    let out_dir = root.join("build");
+    let obj_ext = if cfg!(windows) { "obj" } else { "o" };
+    let mut had_error = false;
+    let mut obj_paths: Vec<PathBuf> = Vec::new();
+
+    for path in &nex_files {
+        let source_text = match fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(err) => {
+                eprintln!("nex build --lib: cannot read {}: {err}", path.display());
+                had_error = true;
+                continue;
+            }
+        };
+
+        let source_path = path.to_string_lossy().to_string();
+
+        // Derive module name: <lib_name>.<relative_path_without_ext>
+        let rel = path.strip_prefix(&src_dir).unwrap_or(path);
+        let module = format!(
+            "{}.{}",
+            lib_name,
+            rel.with_extension("")
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, ".")
+                .replace('/', ".")
+        );
+        let stem = module.replace('.', "_");
+
+        let result = compile_to_native(
+            &source_text,
+            CompileOptions {
+                source_path: source_path.clone(),
+                emit_metadata: false,
+                output_dir: Some(out_dir.clone()),
+                output_kind: OutputKind::SharedLib,
+                ..Default::default()
+            },
+        );
+
+        if has_errors(&result.diagnostics) {
+            had_error = true;
+            print_diagnostics(&result.diagnostics, &result.source_map);
+            continue;
+        }
+
+        print_warnings(&result.diagnostics, &result.source_map);
+
+        if let Some(object_bytes) = &result.object {
+            let obj_path = out_dir.join(format!("{stem}.{obj_ext}"));
+            if let Err(e) = fs::create_dir_all(&out_dir) {
+                eprintln!("nex build --lib: cannot create output directory: {e}");
+                had_error = true;
+                continue;
+            }
+            if let Err(e) = fs::write(&obj_path, object_bytes) {
+                eprintln!("nex build --lib: cannot write {}: {e}", obj_path.display());
+                had_error = true;
+                continue;
+            }
+            println!("  compiled {module}");
+            obj_paths.push(obj_path);
+        }
+    }
+
+    if had_error {
+        return 1;
+    }
+
+    if obj_paths.is_empty() {
+        eprintln!("nex build --lib: no object files produced");
+        return 1;
+    }
+
+    // Link into a shared library placed in the lib root
+    match link_shared_lib_multi(&obj_paths, root, &lib_name) {
+        Ok(lib_path) => {
+            println!("linked -> {}", lib_path.display());
+        }
+        Err(e) => {
+            eprintln!("nex build --lib: link failed: {e}");
+            return 1;
+        }
+    }
+
+    0
+}
+
+/// Parse `name = "..."` from the top-level of a project.toml string.
+fn parse_toml_name(toml: &str) -> Option<String> {
+    for line in toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            break; // entered a section
+        }
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        if key.trim() == "name" {
+            let v = value.trim().trim_matches('"').trim_matches('\'');
+            if !v.is_empty() {
+                return Some(v.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Recursively collect all .nex files under a directory.
+fn collect_nex_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_nex_files(&path, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("nex") {
+            out.push(path);
+        }
+    }
+}
+
 fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
     let source_text = match fs::read_to_string(source_path) {
         Ok(text) => text,
         Err(err) => {
-            eprintln!("aur run: cannot read {}: {err}", source_path.display());
+            eprintln!("nex run: cannot read {}: {err}", source_path.display());
             return 1;
         }
     };
@@ -408,11 +574,10 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
         .map(|root| discover_lib_names(root, &mut sink).into_iter().collect())
         .unwrap_or_default();
 
-    // Collect native library paths from project deps + std natives.
-    let mut native_libs: Vec<PathBuf> = project_root.as_ref()
+    // Collect native library paths from project dependencies.
+    let native_libs: Vec<PathBuf> = project_root.as_ref()
         .map(|root| discover_native_libs(root, &mut sink))
         .unwrap_or_default();
-    native_libs.extend(discover_std_native_libs());
 
     for d in sink.diagnostics() {
         if matches!(d.severity, Severity::Error) {
@@ -471,7 +636,7 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
         return match jit_run(&source_text, options, args) {
             Ok(code) => code,
             Err(e) => {
-                eprintln!("aur run: {e}");
+                eprintln!("nex run: {e}");
                 1
             }
         };
@@ -496,7 +661,7 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {
-                eprintln!("aur run: cannot read {}: {err}", path.display());
+                eprintln!("nex run: cannot read {}: {err}", path.display());
                 return 1;
             }
         };
@@ -550,7 +715,7 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
     match jit_run_multi(&compile_sources, args, &native_libs) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("aur run: {e}");
+            eprintln!("nex run: {e}");
             1
         }
     }
@@ -576,19 +741,19 @@ fn print_warnings(diagnostics: &[Diagnostic], source_map: &SourceMap) {
 }
 
 // ---------------------------------------------------------------------------
-// aur new
+// nex new
 // ---------------------------------------------------------------------------
 
 fn new_project(name: &str, is_lib: bool) -> i32 {
     let root = PathBuf::from(name);
     if root.exists() {
-        eprintln!("aur new: directory `{name}` already exists");
+        eprintln!("nex new: directory `{name}` already exists");
         return 1;
     }
 
     let src_dir = root.join("src");
     if let Err(e) = fs::create_dir_all(&src_dir) {
-        eprintln!("aur new: cannot create directories: {e}");
+        eprintln!("nex new: cannot create directories: {e}");
         return 1;
     }
 
@@ -603,7 +768,7 @@ fn new_project(name: &str, is_lib: bool) -> i32 {
     };
 
     if let Err(e) = fs::write(root.join("project.toml"), &project_toml) {
-        eprintln!("aur new: cannot write project.toml: {e}");
+        eprintln!("nex new: cannot write project.toml: {e}");
         return 1;
     }
 
@@ -629,7 +794,7 @@ fn new_project(name: &str, is_lib: bool) -> i32 {
     };
 
     if let Err(e) = fs::write(&source_file.0, &source_file.1) {
-        eprintln!("aur new: cannot write {}: {e}", source_file.0.display());
+        eprintln!("nex new: cannot write {}: {e}", source_file.0.display());
         return 1;
     }
 
@@ -641,7 +806,7 @@ fn new_project(name: &str, is_lib: bool) -> i32 {
     println!("      {}", source_file.0.file_name().unwrap().to_string_lossy());
 
     if !is_lib {
-        println!("\nrun it with:  cd {name} && aur run");
+        println!("\nrun it with:  cd {name} && nex run");
     }
 
     0
@@ -1225,7 +1390,7 @@ fn install_toolchain() -> i32 {
     let workspace_root = match find_workspace_root() {
         Some(r) => r,
         None => {
-            eprintln!("aur install: cannot locate workspace root (Cargo.toml)");
+            eprintln!("nex install: cannot locate workspace root (Cargo.toml)");
             return 1;
         }
     };
@@ -1246,11 +1411,11 @@ fn install_toolchain() -> i32 {
     match status {
         Ok(s) if s.success() => {}
         Ok(s) => {
-            eprintln!("aur install: cargo build failed (exit {})", s);
+            eprintln!("nex install: cargo build failed (exit {})", s);
             return 1;
         }
         Err(e) => {
-            eprintln!("aur install: cannot run cargo: {e}");
+            eprintln!("nex install: cannot run cargo: {e}");
             return 1;
         }
     }
@@ -1259,16 +1424,16 @@ fn install_toolchain() -> i32 {
 
     let exe_ext = if cfg!(windows) { ".exe" } else { "" };
     let binaries: Vec<(&str, String)> = vec![
-        ("aur", format!("aur{exe_ext}")),
-        ("aurc", format!("aurc{exe_ext}")),
-        ("aur-lsp", format!("aur-lsp{exe_ext}")),
+        ("nex", format!("nex{exe_ext}")),
+        ("nexc", format!("nexc{exe_ext}")),
+        ("nex-lsp", format!("nex-lsp{exe_ext}")),
     ];
 
     // Verify all binaries exist
     for (_, filename) in &binaries {
         let src = release_dir.join(filename);
         if !src.exists() {
-            eprintln!("aur install: expected binary not found: {}", src.display());
+            eprintln!("nex install: expected binary not found: {}", src.display());
             return 1;
         }
     }
@@ -1285,7 +1450,7 @@ fn install_toolchain() -> i32 {
         if has_files {
             println!("backing up nex/bin/ -> nex/{old_version}/bin/");
             if let Err(e) = copy_dir_recursive(&bin_dir, &backup_dir) {
-                eprintln!("aur install: backup failed: {e}");
+                eprintln!("nex install: backup failed: {e}");
                 return 1;
             }
         }
@@ -1293,7 +1458,7 @@ fn install_toolchain() -> i32 {
 
     // 3. Copy new binaries into nex/bin/
     if let Err(e) = fs::create_dir_all(&bin_dir) {
-        eprintln!("aur install: cannot create nex/bin/: {e}");
+        eprintln!("nex install: cannot create nex/bin/: {e}");
         return 1;
     }
 
@@ -1305,7 +1470,7 @@ fn install_toolchain() -> i32 {
             Ok(bytes) => println!("ok ({} KB)", bytes / 1024),
             Err(e) => {
                 println!("FAILED");
-                eprintln!("aur install: cannot copy {}: {e}", src.display());
+                eprintln!("nex install: cannot copy {}: {e}", src.display());
                 return 1;
             }
         }
@@ -1316,7 +1481,7 @@ fn install_toolchain() -> i32 {
         if let Ok(contents) = fs::read_to_string(&config_path) {
             let updated = update_toml_version(&contents, &new_version);
             if let Err(e) = fs::write(&config_path, &updated) {
-                eprintln!("aur install: cannot update config: {e}");
+                eprintln!("nex install: cannot update config: {e}");
             }
         }
     }

@@ -25,16 +25,16 @@
 
   <h3>Usage</h3>
   <div class="signature">
-    aur fmt &lt;file&gt;
+    nex fmt &lt;file&gt;
   </div>
 
   <p>The formatter parses an Nex source file and reprints it in canonical format. It normalizes whitespace, indentation, brace placement, and line breaks while preserving ASI (Automatic Semicolon Insertion) semantics.</p>
 
   <pre><code><span class="cmt"># Format a single file</span>
-$ aur fmt src/main.nex
+$ nex fmt src/main.nex
 
 <span class="cmt"># Format a utility module</span>
-$ aur fmt src/utils.nex</code></pre>
+$ nex fmt src/utils.nex</code></pre>
 
   <h3>What the Formatter Does</h3>
 
@@ -57,7 +57,7 @@ $ aur fmt src/utils.nex</code></pre>
 <span class="fn">println</span>(result)
 }</code></pre>
 
-  <p>After <code>aur fmt</code>:</p>
+  <p>After <code>nex fmt</code>:</p>
   <pre><code><span class="kw">def</span> <span class="fn">add</span>(a: <span class="typ">Int</span>, b: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span> {
     <span class="kw">return</span> a <span class="op">+</span> b
 }
@@ -71,12 +71,12 @@ $ aur fmt src/utils.nex</code></pre>
 
   <h3>Usage</h3>
   <div class="signature">
-    aur lint &lt;file&gt;
+    nex lint &lt;file&gt;
   </div>
 
   <p>The linter performs static analysis on Nex source files and reports warnings for common issues. It does not modify the source code.</p>
 
-  <pre><code>$ aur lint src/main.nex
+  <pre><code>$ nex lint src/main.nex
 src/main.nex:5: warning: unused import 'std.time'
 src/main.nex:18: warning: Var in public API parameter 'data' — add @allow_var_api to suppress
 src/main.nex:30: warning: unreachable code after return statement</code></pre>
@@ -126,7 +126,7 @@ src/main.nex:30: warning: unreachable code after return statement</code></pre>
 
   <h3>Example Lint Output</h3>
 
-  <pre><code>$ aur lint src/server.nex
+  <pre><code>$ nex lint src/server.nex
 src/server.nex:3: warning: unused import 'std.json'
 src/server.nex:15: warning: Var in public API return type — add @allow_var_api to suppress
 src/server.nex:28: warning: ambiguous member 'start' — consider self.TcpServer::start() or alias

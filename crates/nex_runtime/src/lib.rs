@@ -12,12 +12,9 @@ pub mod collections_ext;
 pub mod io_ext;
 pub mod path;
 pub mod json;
-pub mod regex_ext;
 pub mod process;
 pub mod net;
-pub mod http;
 pub mod threading;
-pub mod crypto;
 pub mod logging;
 pub mod testing;
 
@@ -30,19 +27,11 @@ pub use collections_ext::*;
 pub use io_ext::*;
 pub use path::*;
 pub use json::*;
-pub use regex_ext::*;
 pub use process::*;
 pub use net::*;
-pub use http::*;
 pub use threading::*;
-pub use crypto::*;
 pub use logging::*;
 pub use testing::*;
-
-#[cfg(feature = "torch")]
-pub mod torch;
-#[cfg(feature = "torch")]
-pub use torch::*;
 
 #[repr(C)]
 pub struct NexType {

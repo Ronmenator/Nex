@@ -1,0 +1,23 @@
+// torch.model — Model save/load and TorchScript inference.
+
+// Saves model weights to a file.
+public def save(module: Int64, path: String) {
+    model_save(module, path)
+    return
+}
+
+// Loads model weights from a file.
+public def load(module: Int64, path: String) {
+    model_load(module, path)
+    return
+}
+
+// Loads a TorchScript (.pt) model. Returns a module handle.
+public def jit_load(path: String) -> Int64 {
+    return jit_load(path)
+}
+
+// Runs a forward pass on a TorchScript model.
+public def jit_forward(module: Int64, input: Int64) -> Int64 {
+    return jit_forward(module, input)
+}

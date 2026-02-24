@@ -1,0 +1,22 @@
+// regex.pattern — Regular expression matching and replacement.
+
+public def compile(pattern: String) -> Int64 {
+    return regex_new(pattern)
+}
+
+public def is_match(handle: Int64, text: String) -> Bool {
+    return regex_is_match(handle, text) != 0
+}
+
+public def find(handle: Int64, text: String) -> String {
+    return regex_find(handle, text)
+}
+
+public def replace_all(handle: Int64, text: String, replacement: String) -> String {
+    return regex_replace(handle, text, replacement)
+}
+
+public def free(handle: Int64) {
+    regex_free(handle)
+    return
+}

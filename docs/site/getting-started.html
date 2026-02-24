@@ -34,15 +34,15 @@
 
   <h2>Directory Layout</h2>
 
-  <p>After building, the toolchain is installed under the <code>aurum/</code> directory:</p>
+  <p>After building, the toolchain is installed under the <code>nex/</code> directory:</p>
 
-  <pre><code>aurum/
+  <pre><code>nex/
 ├── bin/
-│   ├── aur.exe          <span class="cmt">// Main CLI (build, run, fmt, lint, repl)</span>
-│   ├── aurc.exe         <span class="cmt">// Standalone compiler frontend</span>
-│   └── aur-lsp.exe      <span class="cmt">// Language server (LSP)</span>
+│   ├── nex.exe          <span class="cmt">// Main CLI (build, run, fmt, lint, repl)</span>
+│   ├── nexc.exe         <span class="cmt">// Standalone compiler frontend</span>
+│   └── nex-lsp.exe      <span class="cmt">// Language server (LSP)</span>
 ├── config/
-│   ├── aurum.toml       <span class="cmt">// Toolchain configuration</span>
+│   ├── nex.toml         <span class="cmt">// Toolchain configuration</span>
 │   └── project.toml     <span class="cmt">// Template for new projects</span>
 └── examples/
     ├── hello/
@@ -52,29 +52,29 @@
 
   <h3>Windows (PowerShell)</h3>
   <pre><code><span class="cmt"># Current session only</span>
-$env:PATH += <span class="str">";C:\path\to\aurum\bin"</span>
+$env:PATH += <span class="str">";C:\path\to\nex\bin"</span>
 
 <span class="cmt"># Permanent: add via System Environment Variables dialog</span></code></pre>
 
   <h3>Linux / macOS</h3>
   <pre><code><span class="cmt"># Add to ~/.bashrc or ~/.zshrc</span>
-export PATH=<span class="str">"$PATH:/path/to/aurum/bin"</span></code></pre>
+export PATH=<span class="str">"$PATH:/path/to/nex/bin"</span></code></pre>
 
   <h2>Verify Installation</h2>
 
-  <pre><code>aur --help</code></pre>
+  <pre><code>nex --help</code></pre>
 
   <p>You should see the available commands:</p>
 
   <pre><code>Nex compiler toolchain
 
-Usage: aur &lt;command&gt; [args]
+Usage: nex &lt;command&gt; [args]
 
 Commands:
   new &lt;name&gt; [--lib]    Create a new project
   build [path]          Compile to a native executable (AOT)
   run [path] [-- args]  JIT compile and execute
-  &lt;file&gt;.nex [args]      Shorthand for: aur run &lt;file&gt;.nex
+  &lt;file&gt;.nex [args]      Shorthand for: nex run &lt;file&gt;.nex
   install               Build release binaries
   fmt &lt;file&gt;            Format source code
   lint &lt;file&gt;           Run linter
@@ -83,7 +83,7 @@ Commands:
 
   <h2>Create Your First Project</h2>
 
-  <pre><code>aur new my_project
+  <pre><code>nex new my_project
 cd my_project</code></pre>
 
   <p>This creates a project with the following structure:</p>
@@ -97,17 +97,17 @@ cd my_project</code></pre>
 
   <div class="callout tip">
     <div class="callout-title">Tip</div>
-    <p>Use <code>aur run</code> for fast iteration (JIT) and <code>aur build</code> when you need a standalone binary.</p>
+    <p>Use <code>nex run</code> for fast iteration (JIT) and <code>nex build</code> when you need a standalone binary.</p>
   </div>
 
   <pre><code><span class="cmt"># JIT compile and execute immediately</span>
-aur run
+nex run
 
 <span class="cmt"># Or use the shorthand for a single file</span>
-aur src/main.nex
+nex src/main.nex
 
 <span class="cmt"># Compile to native executable</span>
-aur build</code></pre>
+nex build</code></pre>
 
   <h2>Execution Modes</h2>
 

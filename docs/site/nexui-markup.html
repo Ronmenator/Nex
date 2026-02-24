@@ -16,10 +16,10 @@
 <nav class="sidebar"></nav>
 <main class="main-content">
 
-  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-ui.html">std.ui</a><span class="sep">/</span>.nexui Markup</div>
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-ui.html">nex_ui</a><span class="sep">/</span>.nexui Markup</div>
 
   <h1>.nexui Declarative Markup</h1>
-  <p class="page-subtitle">XAML-style declarative UI markup with code-behind, data binding, and MVVM support. Compiles down to the imperative <code>std.ui</code> API.</p>
+  <p class="page-subtitle">XAML-style declarative UI markup with code-behind, data binding, and MVVM support. Compiles down to the imperative <code>nex_ui</code> API.</p>
 
   <div class="callout info">
     <div class="callout-title">File Convention</div>
@@ -41,7 +41,7 @@
   <h2>Markup Format</h2>
 
   <h3>Basic Window</h3>
-  <pre><code>&lt;Window xmlns="std.ui" Title="My App" Width="800" Height="600"&gt;
+  <pre><code>&lt;Window xmlns="nex_ui" Title="My App" Width="800" Height="600"&gt;
   &lt;Column Gap="10" Padding="20"&gt;
     &lt;Text Text="Hello, World!" FontSize="24" /&gt;
     &lt;Button Label="Click Me" Click="OnClick" /&gt;
@@ -78,7 +78,7 @@
   <p>A base widget provides a shared layout container. The compiler generates a <code>_create_container() -&gt; Int64</code> method that builds the widget tree and returns the root handle, plus a <code>virtual _build_widget() -&gt; Int64</code> that delegates to it.</p>
 
   <pre><code><span class="cmt">&lt;!-- BaseWidget.nexui --&gt;</span>
-&lt;Widget xmlns="std.ui"&gt;
+&lt;Widget xmlns="nex_ui"&gt;
   &lt;Column Gap="16" Padding="24" FlexGrow="1"&gt;
   &lt;/Column&gt;
 &lt;/Widget&gt;</code></pre>
@@ -91,7 +91,7 @@
   </ul>
 
   <pre><code><span class="cmt">&lt;!-- CounterWidget.nexui — inherits BaseWidget's Column --&gt;</span>
-&lt;Widget xmlns="std.ui" Extends="BaseWidget"&gt;
+&lt;Widget xmlns="nex_ui" Extends="BaseWidget"&gt;
   &lt;Text Text="Counter" FontSize="28" /&gt;
   &lt;Text Text="{Binding CounterText}" FontSize="22" /&gt;
   &lt;Row Gap="8"&gt;
@@ -101,7 +101,9 @@
 &lt;/Widget&gt;</code></pre>
 
   <pre><code><span class="cmt">// CounterWidget.nex — code-behind with its own state</span>
-<span class="kw">import</span> std.ui
+<span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.event
 
 <span class="kw">public partial class</span> CounterWidget {
     counter = 0
@@ -129,7 +131,7 @@
   </table>
 
   <pre><code><span class="cmt">&lt;!-- MainWindow.nexui --&gt;</span>
-&lt;Window xmlns="std.ui" Title="My App" Width="900" Height="650"&gt;
+&lt;Window xmlns="nex_ui" Title="My App" Width="900" Height="650"&gt;
   &lt;Column Gap="0"&gt;
     &lt;Row Gap="8" Padding="12" BgColor="0x1E293BFF"&gt;
       &lt;Button Label="Home"    Click="on_nav_home"    /&gt;
@@ -143,7 +145,9 @@
 &lt;/Window&gt;</code></pre>
 
   <pre><code><span class="cmt">// MainWindow.nex — orchestrates navigation only</span>
-<span class="kw">import</span> std.ui
+<span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.event
 
 <span class="kw">public partial class</span> MainWindow {
     active_screen = 0
@@ -273,7 +277,9 @@ ui_add_child(_switcher_1, _sw_handle_1)</code></pre>
     </tbody>
   </table>
   <p>Typical <code>main.nex</code> entry point:</p>
-  <pre><code><span class="kw">import</span> std.ui
+  <pre><code><span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.event
 
 <span class="kw">def</span> main() {
     _init_ui()
@@ -299,9 +305,9 @@ ui_add_child(_switcher_1, _sw_handle_1)</code></pre>
   <div class="page-nav">
     <a href="stdlib-ui.html">
       <span class="nav-label">Previous</span>
-      <span class="nav-title">&larr; std.ui (Imperative)</span>
+      <span class="nav-title">&larr; nex_ui (Imperative)</span>
     </a>
-    <a href="tooling-aur.html">
+    <a href="tooling-nex.html">
       <span class="nav-label">Next</span>
       <span class="nav-title">Build Tool &rarr;</span>
     </a>

@@ -1,4 +1,4 @@
-<ResourceDictionary xmlns="std.ui">
+<ResourceDictionary xmlns="nex_ui">
 
   <!-- Navigation button used in the header bar -->
   <Style Name="NavButton" TargetType="Button">

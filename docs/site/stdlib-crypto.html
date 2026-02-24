@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>std.crypto - Nex Docs</title>
+  <title>crypto - Nex Docs</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -16,12 +16,20 @@
 <nav class="sidebar"></nav>
 <main class="main-content">
 
-  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.crypto</div>
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="lib-overview.html">Standard Libraries</a><span class="sep">/</span>crypto</div>
 
-  <h1>std.crypto</h1>
+  <h1>crypto</h1>
   <p class="page-subtitle">Cryptographic hashing, encoding, and random byte generation.</p>
 
-  <pre><code><span class="kw">import</span> std.crypto</code></pre>
+  <h2>Setup</h2>
+  <p>Add to your <code>project.toml</code>:</p>
+  <pre><code>[libs]
+crypto = { path = "../libs/crypto" }</code></pre>
+
+  <pre><code><span class="kw">import</span> crypto.hash
+<span class="kw">import</span> crypto.encode
+<span class="kw">import</span> crypto.hmac
+<span class="kw">import</span> crypto.random</code></pre>
 
   <h2>Hashing</h2>
 
@@ -31,7 +39,7 @@
   </div>
   <p>Returns the hex-encoded SHA-256 hash of the input string. Produces a 64-character lowercase hex string.</p>
 
-  <pre><code><span class="kw">import</span> std.crypto
+  <pre><code><span class="kw">import</span> crypto.hash
 
 hash <span class="op">=</span> <span class="fn">sha256</span>(<span class="str">"hello"</span>)
 <span class="fn">println</span>(hash)   <span class="cmt">// 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824</span></code></pre>
@@ -78,7 +86,10 @@ hash <span class="op">=</span> <span class="fn">sha256</span>(<span class="str">
 
   <h2>Complete Example</h2>
 
-  <pre><code><span class="kw">import</span> std.crypto
+  <pre><code><span class="kw">import</span> crypto.hash
+<span class="kw">import</span> crypto.encode
+<span class="kw">import</span> crypto.hmac
+<span class="kw">import</span> crypto.random
 
 <span class="cmt">// Hash a password with SHA-256</span>
 password <span class="op">=</span> <span class="str">"my_secret_password"</span>
@@ -114,13 +125,13 @@ salt <span class="op">=</span> <span class="fn">random_bytes</span>(<span class=
 <span class="fn">println</span>(salt)</code></pre>
 
   <div class="page-nav">
-    <a href="stdlib-threading.html">
+    <a href="lib-overview.html">
       <span class="nav-label">Previous</span>
-      <span class="nav-title">&larr; std.threading</span>
+      <span class="nav-title">&larr; Standard Libraries Overview</span>
     </a>
-    <a href="stdlib-logging.html">
+    <a href="stdlib-http.html">
       <span class="nav-label">Next</span>
-      <span class="nav-title">std.logging &rarr;</span>
+      <span class="nav-title">http &rarr;</span>
     </a>
   </div>
 

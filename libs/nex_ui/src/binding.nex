@@ -1,0 +1,12 @@
+// nex_ui.binding — MVVM data binding support.
+// Wraps nex_ui_bind_* native functions from nex_ui_native DLL.
+
+public def bind(property: String, callback: Int64) {
+    nex_ui_bind(property, callback)
+    return
+}
+
+public def notify_changed(property: String) {
+    nex_ui_notify_changed(property)
+    return
+}

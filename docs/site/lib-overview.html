@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standard Libraries Overview - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="lib-overview.html">Standard Libraries</a><span class="sep">/</span>Overview</div>
+
+  <h1>Standard Libraries</h1>
+  <p class="page-subtitle">Nex ships with a collection of standalone libraries for cryptography, networking, regular expressions, machine learning, UI, and 3D graphics. Unlike the built-in standard library (<code>std.*</code>), these are opt-in &mdash; add them to your <code>project.toml</code> and import them by name.</p>
+
+  <h2>How Libraries Work</h2>
+
+  <p>Each standard library is a self-contained package in the <code>libs/</code> directory. A library consists of:</p>
+
+  <ul>
+    <li><strong>project.toml</strong> &mdash; declares the library name, version, and optional native DLL</li>
+    <li><strong>src/*.nex</strong> &mdash; Nex source modules that wrap the native functions with a clean API</li>
+    <li><strong>Native DLL</strong> (optional) &mdash; a compiled shared library (<code>.dll</code> / <code>.so</code>) containing the low-level implementation</li>
+  </ul>
+
+  <h2>Adding a Library to Your Project</h2>
+
+  <p>Reference the library in your <code>project.toml</code>:</p>
+
+  <pre><code>[libs]
+crypto = { path = "../libs/crypto" }
+http   = { path = "../libs/http" }</code></pre>
+
+  <p>Then import individual modules:</p>
+
+  <pre><code><span class="kw">import</span> crypto.hash
+<span class="kw">import</span> http.client
+
+hash <span class="op">=</span> <span class="fn">sha256</span>(<span class="str">"hello"</span>)
+<span class="kw">var</span> resp <span class="op">=</span> <span class="fn">get</span>(<span class="str">"https://api.example.com/status"</span>)</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Standard Library vs Standard Libraries</div>
+    <p>The <strong>Standard Library</strong> (<code>std.*</code>) is always available &mdash; it provides core functions like math, strings, I/O, collections, and more. <strong>Standard Libraries</strong> are standalone packages that you add to your project when needed. They ship with Nex but are not loaded unless referenced in <code>project.toml</code>.</p>
+  </div>
+
+  <h2>Library Index</h2>
+
+  <div class="feature-grid">
+
+    <div class="feature-card">
+      <h4><a href="stdlib-crypto.html">crypto</a></h4>
+      <p>SHA-256, SHA-512, MD5, HMAC-SHA256, Base64 encode/decode, cryptographically secure random bytes.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-http.html">http</a></h4>
+      <p>HTTP client for GET and POST requests with response status, body, and header access.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-regex.html">regex</a></h4>
+      <p>Regular expression compilation, matching, searching, and replacement.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-torch.html">torch</a></h4>
+      <p>PyTorch integration: tensors, neural network layers, loss functions, optimizers, model I/O, CUDA support.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-ui.html">nex_ui</a></h4>
+      <p>Cross-platform UI: desktop windows (WGPU), terminal TUI, widgets, flexbox layout, canvas drawing, dialogs.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="lib-nex3d.html">nex3d</a></h4>
+      <p>3D game engine with vector math (Vec2, Vec3, Vec4), window management, and GPU-accelerated rendering.</p>
+    </div>
+
+  </div>
+
+  <h2>Creating Your Own Library</h2>
+
+  <p>You can create libraries following the same pattern. Create a directory with a <code>project.toml</code> and <code>src/</code> folder:</p>
+
+  <pre><code>my_lib/
+  project.toml
+  src/
+    main.nex
+    utils.nex</code></pre>
+
+  <p>The <code>project.toml</code> declares your library:</p>
+
+  <pre><code>[project]
+name = "my_lib"
+version = "0.1.0"
+
+# Optional: point to a native DLL for FFI functions
+# native = "my_lib_native"</code></pre>
+
+  <p>Other projects reference it with a relative path in their <code>[libs]</code> section.</p>
+
+  <div class="page-nav">
+    <a href="stdlib-testing.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; std.testing</span>
+    </a>
+    <a href="stdlib-crypto.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">crypto &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

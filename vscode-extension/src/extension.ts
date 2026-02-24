@@ -120,6 +120,14 @@ export async function activate(context: vscode.ExtensionContext) {
       const name = await vscode.window.showInputBox({ prompt: "Library name", placeHolder: "my_lib" });
       if (name) runNexCommand(`new ${name} --lib`);
     }),
+    vscode.commands.registerCommand("nex.installLib", async () => {
+      const spec = await vscode.window.showInputBox({
+        prompt: "Library to install (user/repo or user/repo:version)",
+        placeHolder: "nexlang/nex3d:0.1.0",
+      });
+      if (spec) runNexCommand(`install ${spec}`);
+    }),
+    vscode.commands.registerCommand("nex.listLibs", () => runNexCommand("list")),
   );
 
   // Hover provider for keywords, types, and stdlib functions

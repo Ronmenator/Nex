@@ -1,0 +1,110 @@
+// nex_ui.style — Widget styling functions.
+
+// ===========================================================================
+// Dimensions
+// ===========================================================================
+
+public def set_width(widget: Int64, width: Float) {
+    ui_set_width(widget, width)
+    return
+}
+
+public def set_height(widget: Int64, height: Float) {
+    ui_set_height(widget, height)
+    return
+}
+
+public def set_min_width(widget: Int64, value: Float) {
+    ui_set_min_width(widget, value)
+    return
+}
+
+public def set_min_height(widget: Int64, value: Float) {
+    ui_set_min_height(widget, value)
+    return
+}
+
+// ===========================================================================
+// Spacing
+// ===========================================================================
+
+public def set_padding(widget: Int64, packed: Int64) {
+    ui_set_padding(widget, packed)
+    return
+}
+
+public def set_padding_all(widget: Int64, value: Float) {
+    ui_set_padding_all(widget, value)
+    return
+}
+
+public def set_margin(widget: Int64, packed: Int64) {
+    ui_set_margin(widget, packed)
+    return
+}
+
+public def set_gap(widget: Int64, gap: Float) {
+    ui_set_gap(widget, gap)
+    return
+}
+
+// ===========================================================================
+// Colors
+// ===========================================================================
+
+public def set_bg_color(widget: Int64, rgba: Int64) {
+    ui_set_bg_color(widget, rgba)
+    return
+}
+
+public def set_fg_color(widget: Int64, rgba: Int64) {
+    ui_set_fg_color(widget, rgba)
+    return
+}
+
+// ===========================================================================
+// Typography
+// ===========================================================================
+
+public def set_font_size(widget: Int64, size: Float) {
+    ui_set_font_size(widget, size)
+    return
+}
+
+// ===========================================================================
+// Borders
+// ===========================================================================
+
+public def set_border(widget: Int64, width: Float, rgba: Int64) {
+    ui_set_border(widget, width, rgba)
+    return
+}
+
+public def set_border_radius(widget: Int64, radius: Float) {
+    ui_set_border_radius(widget, radius)
+    return
+}
+
+// ===========================================================================
+// Flex layout
+// ===========================================================================
+
+public def set_flex_grow(widget: Int64, grow: Float) {
+    ui_set_flex_grow(widget, grow)
+    return
+}
+
+public def set_align_items(widget: Int64, align: Int64) {
+    ui_set_align_items(widget, align)
+    return
+}
+
+public def set_justify_content(widget: Int64, justify: Int64) {
+    ui_set_justify_content(widget, justify)
+    return
+}
+
+public def set_align_self(widget: Int64, align: Int64) {
+    ui_set_align_self(widget, align)
+    return
+}

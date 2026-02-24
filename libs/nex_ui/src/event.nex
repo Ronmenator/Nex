@@ -1,0 +1,41 @@
+// nex_ui.event — Event handling (callbacks and polling).
+
+// ===========================================================================
+// Callback model
+// ===========================================================================
+
+public def on_click(widget: Int64, callback: Int64) {
+    ui_on_click(widget, callback)
+    return
+}
+
+public def on_change(widget: Int64, callback: Int64) {
+    ui_on_change(widget, callback)
+    return
+}
+
+public def on_hover(widget: Int64, callback: Int64) {
+    ui_on_hover(widget, callback)
+    return
+}
+
+public def on_key(widget: Int64, callback: Int64) {
+    ui_on_key(widget, callback)
+    return
+}
+
+// ===========================================================================
+// Polling model
+// ===========================================================================
+
+public def poll_event(app: Int64) -> Int64 {
+    return ui_poll_event(app)
+}
+
+public def event_type(event: Int64) -> Int64 {
+    return ui_event_type(event)
+}
+
+public def event_widget(event: Int64) -> Int64 {
+    return ui_event_widget(event)
+}

@@ -42,7 +42,7 @@
   </ul>
 
   <h3>LSP Integration</h3>
-  <p>The extension launches the Nex language Server (<code>aur-lsp</code>) as a subprocess and communicates via the Language Server Protocol. Capabilities include:</p>
+  <p>The extension launches the Nex Language Server (<code>nex-lsp</code>) as a subprocess and communicates via the Language Server Protocol. Capabilities include:</p>
 
   <table>
     <thead><tr><th>Feature</th><th>Description</th></tr></thead>
@@ -87,10 +87,10 @@
   <table>
     <thead><tr><th>Command</th><th>Description</th></tr></thead>
     <tbody>
-      <tr><td><code>Nex: Build</code></td><td>Runs <code>aur build</code> on the current project.</td></tr>
-      <tr><td><code>Nex: Run</code></td><td>Runs <code>aur run</code> on the current project.</td></tr>
-      <tr><td><code>Nex: Test</code></td><td>Runs <code>aur test</code> on the current project.</td></tr>
-      <tr><td><code>Nex: Format File</code></td><td>Runs <code>aur fmt</code> on the active file.</td></tr>
+      <tr><td><code>Nex: Build</code></td><td>Runs <code>nex build</code> on the current project.</td></tr>
+      <tr><td><code>Nex: Run</code></td><td>Runs <code>nex run</code> on the current project.</td></tr>
+      <tr><td><code>Nex: Test</code></td><td>Runs <code>nex test</code> on the current project.</td></tr>
+      <tr><td><code>Nex: Format File</code></td><td>Runs <code>nex fmt</code> on the active file.</td></tr>
     </tbody>
   </table>
 
@@ -124,15 +124,15 @@
   <p>After creating the link, run <strong>Developer: Reload Window</strong> in VS Code.</p>
 
   <h3>LSP Server</h3>
-  <p>The extension expects the <code>aur-lsp</code> binary to be on your system PATH. Build it from the Nex repository:</p>
+  <p>The extension expects the <code>nex-lsp</code> binary to be on your system PATH. Build it from the Nex repository:</p>
 
-  <pre><code>$ cargo build --release -p aur_lsp
-$ cp target/release/aur-lsp ~/.local/bin/</code></pre>
+  <pre><code>$ cargo build --release -p nex_lsp
+$ cp target/release/nex-lsp ~/.local/bin/</code></pre>
 
   <p>Alternatively, the extension will search for the binary at the path configured in VS Code settings:</p>
 
   <pre><code>{
-  "aurum.lsp.path": "/path/to/aur-lsp"
+  "nex.lspPath": "/path/to/nex-lsp"
 }</code></pre>
 
   <h2>Configuration</h2>
@@ -143,17 +143,17 @@ $ cp target/release/aur-lsp ~/.local/bin/</code></pre>
     <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
     <tbody>
       <tr>
-        <td><code>aurum.lsp.path</code></td>
-        <td><code>"aur-lsp"</code></td>
+        <td><code>nex.lspPath</code></td>
+        <td><code>"nex-lsp"</code></td>
         <td>Path to the Nex LSP server binary.</td>
       </tr>
       <tr>
-        <td><code>aurum.formatOnSave</code></td>
+        <td><code>nex.formatOnSave</code></td>
         <td><code>false</code></td>
-        <td>Automatically run <code>aur fmt</code> when saving <code>.nex</code> files.</td>
+        <td>Automatically run <code>nex fmt</code> when saving <code>.nex</code> files.</td>
       </tr>
       <tr>
-        <td><code>aurum.lintOnSave</code></td>
+        <td><code>nex.lintOnSave</code></td>
         <td><code>true</code></td>
         <td>Run linter diagnostics when saving <code>.nex</code> files.</td>
       </tr>

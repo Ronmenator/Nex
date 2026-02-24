@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build Tool (nex) - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Tooling<span class="sep">/</span>Build Tool (nex)</div>
+
+  <h1>Build Tool (nex)</h1>
+  <p class="page-subtitle">The Nex build tool for compiling, running, and managing projects.</p>
+
+  <p>The <code>nex</code> command is the primary interface for building, running, testing, and managing Nex projects. It handles project scaffolding, JIT execution, AOT compilation, formatting, linting, and more.</p>
+
+  <h2>Commands</h2>
+
+  <h3>nex new</h3>
+  <div class="signature">
+    nex new &lt;name&gt; [--lib]
+  </div>
+  <p>Creates a new Nex project with the given name. Generates a <code>project.toml</code>, a <code>src/</code> directory, and a starter <code>main.nex</code> file. Pass <code>--lib</code> to create a library project instead of an executable.</p>
+
+  <pre><code><span class="cmt"># Create an executable project</span>
+$ nex new my_app
+
+<span class="cmt"># Create a library project</span>
+$ nex new my_lib --lib</code></pre>
+
+  <p>Generated project structure:</p>
+  <pre><code>my_app/
+  project.toml
+  src/
+    main.nex</code></pre>
+
+  <h3>nex build</h3>
+  <div class="signature">
+    nex build [path]
+  </div>
+  <p>Compiles the project (or a single file) to a native executable using Ahead-of-Time (AOT) compilation via Cranelift. If no path is specified, the current project is compiled based on <code>project.toml</code>. The output binary is placed in the <code>build/</code> directory.</p>
+
+  <pre><code><span class="cmt"># Build the current project</span>
+$ nex build
+Compiling my_app v0.1.0
+  Finished release target in 1.2s
+  Output: build/my_app
+
+<span class="cmt"># Build a single file</span>
+$ nex build src/main.nex</code></pre>
+
+  <h3>nex run</h3>
+  <div class="signature">
+    nex run [path] [-- args]
+  </div>
+  <p>JIT-compiles and immediately executes the project or a single source file using Cranelift JIT. If no path is given, the default entry point is <code>src/main.nex</code>. Arguments after <code>--</code> are passed to the running program.</p>
+
+  <pre><code><span class="cmt"># Run the current project</span>
+$ nex run
+Hello, Nex!
+
+<span class="cmt"># Run with arguments</span>
+$ nex run -- --verbose input.txt
+
+<span class="cmt"># Run a specific file</span>
+$ nex run examples/demo.nex</code></pre>
+
+  <h3>nex &lt;file&gt;.nex</h3>
+  <div class="signature">
+    nex &lt;file&gt;.nex [args]
+  </div>
+  <p>Shorthand for <code>nex run &lt;file&gt;.nex</code>. Directly executes a single Nex source file.</p>
+
+  <pre><code>$ nex hello.nex
+Hello, world!</code></pre>
+
+  <h3>nex fmt</h3>
+  <div class="signature">
+    nex fmt &lt;file&gt;
+  </div>
+  <p>Formats an Nex source file to canonical style. See <a href="tooling-formatter.html">Formatter &amp; Linter</a> for details.</p>
+
+  <pre><code>$ nex fmt src/main.nex</code></pre>
+
+  <h3>nex lint</h3>
+  <div class="signature">
+    nex lint &lt;file&gt;
+  </div>
+  <p>Runs static analysis on an Nex source file. See <a href="tooling-formatter.html">Formatter &amp; Linter</a> for details on lint rules.</p>
+
+  <pre><code>$ nex lint src/main.nex
+src/main.nex:12: warning: unused import 'std.math'
+src/main.nex:24: warning: Var in public API — consider @allow_var_api</code></pre>
+
+  <h3>nex repl</h3>
+  <div class="signature">
+    nex repl
+  </div>
+  <p>Starts the interactive Read-Eval-Print Loop. See <a href="tooling-repl.html">REPL</a> for details.</p>
+
+  <pre><code>$ nex repl
+Nex REPL v0.1.0
+&gt;&gt;&gt; x = 42
+&gt;&gt;&gt; println(x)
+42</code></pre>
+
+  <h3>nex test</h3>
+  <div class="signature">
+    nex test
+  </div>
+  <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.0.)</em></p>
+
+  <h3>nex install &lt;user/repo[:version]&gt;</h3>
+  <div class="signature">
+    nex install &lt;user/repo&gt; &nbsp; | &nbsp; nex install &lt;user/repo:version&gt;
+  </div>
+  <p>Installs a library from GitHub. Downloads the library source to the global cache at <code>~/.nex/libs/</code>, checks for native DLL assets in GitHub release artifacts, and adds the dependency to the current project's <code>project.toml</code>.</p>
+
+  <pre><code><span class="cmt"># Install the latest tagged version</span>
+$ nex install nexlang/nex3d
+querying tags for nexlang/nex3d ...
+  latest tag: v0.1.0
+  cloning nexlang/nex3d @ v0.1.0 ...
+  cached at ~/.nex/libs/nex3d/0.1.0
+installed nex3d v0.1.0 from nexlang/nex3d
+
+<span class="cmt"># Install a specific version</span>
+$ nex install nexlang/nex3d:0.2.0</code></pre>
+
+  <p>If the library's <code>project.toml</code> declares a <code>native</code> field, the installer automatically looks for prebuilt DLL/SO files in the GitHub release assets for the target platform.</p>
+
+  <h3>nex uninstall &lt;name&gt;</h3>
+  <div class="signature">
+    nex uninstall &lt;name&gt;
+  </div>
+  <p>Removes a library entry from the current project's <code>project.toml</code>. Cached files in <code>~/.nex/libs/</code> are retained since other projects may depend on them.</p>
+
+  <pre><code>$ nex uninstall nex3d
+removed `nex3d` from project.toml</code></pre>
+
+  <h3>nex list</h3>
+  <div class="signature">
+    nex list
+  </div>
+  <p>Lists all library dependencies declared in the current project's <code>project.toml</code>.</p>
+
+  <pre><code>$ nex list
+dependencies:
+  nex3d v0.1.0  (git: nexlang/nex3d)
+  graphics  (path: ../graphics)</code></pre>
+
+  <h3>nex install <em>(no arguments)</em></h3>
+  <div class="signature">
+    nex install
+  </div>
+  <p>When invoked without arguments, builds the toolchain in release mode and installs the resulting binaries to <code>nex/bin/</code>.</p>
+
+  <h3>nex clean</h3>
+  <div class="signature">
+    nex clean
+  </div>
+  <p>Removes the <code>build/</code> directory and all compiled artifacts.</p>
+
+  <pre><code>$ nex clean
+Removed build/</code></pre>
+
+  <h2>Toolchain Deployment (Developers)</h2>
+  <p>Internal toolchain deployment is handled by <code>cargo xtask deploy</code> from the Nex workspace.</p>
+
+  <div class="signature">
+    cargo xtask deploy [--release] [--major | --minor | --patch]
+  </div>
+  <p>The deploy task discovers the workspace root at runtime (current directory + executable ancestry), reads <code>nex/config/nex.toml</code>, bumps versions, archives the current toolchain snapshot, and copies updated binaries into <code>nex/bin/</code>.</p>
+  <p>Run from the workspace root (or any subdirectory inside it) so root discovery can resolve the repository correctly.</p>
+
+  <h2>JIT vs AOT</h2>
+
+  <p>Nex supports two compilation modes:</p>
+
+  <table>
+    <thead><tr><th>Mode</th><th>Command</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>JIT</strong></td>
+        <td><code>nex run</code></td>
+        <td>Uses Cranelift JIT to compile and execute in-memory. Fast iteration during development — no output binary is written to disk.</td>
+      </tr>
+      <tr>
+        <td><strong>AOT</strong></td>
+        <td><code>nex build</code></td>
+        <td>Compiles to a native executable via Cranelift. Produces a standalone binary suitable for distribution and deployment.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Use <code>nex run</code> during development for rapid feedback. Use <code>nex build</code> when you need a distributable binary or want to measure production performance.</p>
+
+  <h2>Example Workflow</h2>
+
+  <pre><code><span class="cmt"># Start a new project</span>
+$ nex new calculator
+$ cd calculator
+
+<span class="cmt"># Edit src/main.nex, then run immediately</span>
+$ nex run
+Result: 42
+
+<span class="cmt"># Format and lint before committing</span>
+$ nex fmt src/main.nex
+$ nex lint src/main.nex
+
+<span class="cmt"># Build a release binary</span>
+$ nex build
+  Output: build/calculator
+
+<span class="cmt"># Install globally</span>
+$ nex install</code></pre>
+
+  <div class="page-nav">
+    <a href="lib-nex3d.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; nex3d</span>
+    </a>
+    <a href="tooling-project.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Project Configuration &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

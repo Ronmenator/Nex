@@ -157,7 +157,7 @@ fn deploy(args: &[String]) {
     let profile = if release { "release" } else { "debug" };
     println!("building  ({profile})...");
     let mut cmd = Command::new("cargo");
-    cmd.args(["build", "--features", "nex/ui,nexc/ui"])
+    cmd.args(["build"])
         .current_dir(&root);
     if release {
         cmd.arg("--release");
@@ -217,10 +217,13 @@ fn deploy(args: &[String]) {
         }
     }
 
-    // 6. Ensure configs are in place (they stay in nex/config/, already updated)
+    // 6. Deploy native DLLs into their corresponding libs/ directories
+    deploy_native_libs(&root, &target_dir);
+
+    // 7. Ensure configs are in place (they stay in nex/config/, already updated)
     println!("configs   nex/config/nex.toml (v{next})");
 
-    // 7. Symlink vscode-extension into VS Code and Cursor extension directories
+    // 8. Symlink vscode-extension into VS Code and Cursor extension directories
     let ext_source = root.join("vscode-extension");
     if ext_source.exists() {
         symlink_extension(&ext_source, "nex-language");
@@ -236,6 +239,85 @@ fn deploy(args: &[String]) {
         eprintln!("hint: close any process using those files (e.g. nex-lsp via VS Code) and retry");
         process::exit(1);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Native library deployment
+// ---------------------------------------------------------------------------
+
+/// Scan `libs/` for directories with a `project.toml` containing a `native` field,
+/// then copy the corresponding built DLL/so/dylib from `target_dir` into the lib root.
+fn deploy_native_libs(root: &Path, target_dir: &Path) {
+    let libs_dir = root.join("libs");
+    let Ok(entries) = fs::read_dir(&libs_dir) else {
+        return;
+    };
+
+    let (dll_prefix, dll_ext) = if cfg!(target_os = "windows") {
+        ("", "dll")
+    } else if cfg!(target_os = "macos") {
+        ("lib", "dylib")
+    } else {
+        ("lib", "so")
+    };
+
+    for entry in entries.flatten() {
+        let lib_root = entry.path();
+        if !lib_root.is_dir() {
+            continue;
+        }
+        let toml_path = lib_root.join("project.toml");
+        let Ok(toml_text) = fs::read_to_string(&toml_path) else {
+            continue;
+        };
+        let Some(native_name) = parse_native_field(&toml_text) else {
+            continue;
+        };
+
+        let filename = format!("{dll_prefix}{native_name}.{dll_ext}");
+        let src = target_dir.join(&filename);
+        if !src.exists() {
+            continue;
+        }
+
+        let dst = lib_root.join(&filename);
+        let lib_name = entry.file_name();
+        match fs::copy(&src, &dst) {
+            Ok(_) => println!(
+                "deployed  {filename} -> libs/{}/{}",
+                lib_name.to_string_lossy(),
+                filename,
+            ),
+            Err(e) => eprintln!(
+                "warning:  failed to copy {filename} to libs/{}/: {e}",
+                lib_name.to_string_lossy(),
+            ),
+        }
+    }
+}
+
+/// Parse the `native = "..."` field from a project.toml string (top-level only).
+fn parse_native_field(toml: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once('=') {
+            if key.trim() == "native" {
+                let v = value.trim().trim_matches('"').trim_matches('\'');
+                if !v.is_empty() {
+                    return Some(v.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------

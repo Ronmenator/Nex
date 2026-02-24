@@ -1,0 +1,13 @@
+// crypto.hash — Cryptographic hash functions.
+
+public def sha256(input: String) -> String {
+    return crypto_sha256(input)
+}
+
+public def sha512(input: String) -> String {
+    return crypto_sha512(input)
+}
+
+public def md5(input: String) -> String {
+    return crypto_md5(input)
+}

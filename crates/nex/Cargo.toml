@@ -5,9 +5,6 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
-[features]
-default = []
-torch = ["nexc_driver/torch"]
 
 [dependencies]
 nexc_ast = { path = "../nexc_ast" }

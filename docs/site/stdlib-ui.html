@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>std.ui - Nex Docs</title>
+  <title>nex_ui - Nex Docs</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -16,17 +16,22 @@
 <nav class="sidebar"></nav>
 <main class="main-content">
 
-  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.ui</div>
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="lib-overview.html">Standard Libraries</a><span class="sep">/</span>nex_ui</div>
 
-  <h1>std.ui</h1>
+  <h1>nex_ui</h1>
   <p class="page-subtitle">Cross-platform UI framework with GPU-accelerated desktop rendering (WGPU) and a terminal (TUI) backend. Build desktop apps, terminal interfaces, and custom-drawn canvases from a single API.</p>
 
-  <div class="callout warning">
-    <div class="callout-title">Build Requirement</div>
-    <p>This module is optional and requires the <code>ui</code> feature flag. Build the Nex toolchain with <code>cargo build --features ui</code> to enable it. The feature pulls in <code>winit</code>, <code>wgpu</code>, <code>cosmic-text</code>, <code>taffy</code>, and <code>crossterm</code>.</p>
-  </div>
+  <h2>Setup</h2>
+  <p>Add to your <code>project.toml</code>:</p>
+  <pre><code>[libs]
+nex_ui = { path = "../libs/nex_ui" }</code></pre>
 
-  <pre><code><span class="kw">import</span> std.ui</code></pre>
+  <pre><code><span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.style
+<span class="kw">import</span> nex_ui.event
+<span class="kw">import</span> nex_ui.canvas
+<span class="kw">import</span> nex_ui.dialog</code></pre>
 
   <h2>Architecture</h2>
 
@@ -428,7 +433,12 @@
 
   <h2>Complete Example: Desktop App</h2>
 
-  <pre><code><span class="kw">import</span> std.ui
+  <pre><code><span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.style
+<span class="kw">import</span> nex_ui.event
+<span class="kw">import</span> nex_ui.canvas
+<span class="kw">import</span> nex_ui.dialog
 
 <span class="cmt">// ---- Build the widget tree ----</span>
 app <span class="op">=</span> <span class="fn">ui_app_create</span>(<span class="str">"Todo App"</span>, <span class="num">480</span>, <span class="num">640</span>)
@@ -480,7 +490,12 @@ status <span class="op">=</span> <span class="fn">ui_text</span>(<span class="st
 
   <h2>Complete Example: Terminal App</h2>
 
-  <pre><code><span class="kw">import</span> std.ui
+  <pre><code><span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.style
+<span class="kw">import</span> nex_ui.event
+<span class="kw">import</span> nex_ui.canvas
+<span class="kw">import</span> nex_ui.dialog
 
 app <span class="op">=</span> <span class="fn">ui_app_create</span>(<span class="str">"TUI Demo"</span>, <span class="num">80</span>, <span class="num">24</span>)
 <span class="fn">ui_app_set_backend</span>(app, <span class="num">1</span>)  <span class="cmt">// Terminal backend</span>
@@ -496,7 +511,12 @@ root <span class="op">=</span> <span class="fn">ui_column</span>()
 
   <h2>Complete Example: Canvas Drawing</h2>
 
-  <pre><code><span class="kw">import</span> std.ui
+  <pre><code><span class="kw">import</span> nex_ui.app
+<span class="kw">import</span> nex_ui.widget
+<span class="kw">import</span> nex_ui.style
+<span class="kw">import</span> nex_ui.event
+<span class="kw">import</span> nex_ui.canvas
+<span class="kw">import</span> nex_ui.dialog
 
 app <span class="op">=</span> <span class="fn">ui_app_create</span>(<span class="str">"Canvas"</span>, <span class="num">600</span>, <span class="num">400</span>)
 root <span class="op">=</span> <span class="fn">ui_column</span>()
@@ -519,17 +539,17 @@ canvas <span class="op">=</span> <span class="fn">ui_canvas</span>(<span class="
   <p>For runtime UI diagnostics (text input flow and callback dispatch), set <code>NEX_UI_DEBUG_LOG</code> before launch. If not set, logs go to <code>debug-ui.log</code> in the current working directory.</p>
   <pre><code># PowerShell
 $env:NEX_UI_DEBUG_LOG = "D:\temp\nex-ui-debug.log"
-aur run
+nex run
 </code></pre>
 
   <div class="page-nav">
     <a href="stdlib-torch.html">
       <span class="nav-label">Previous</span>
-      <span class="nav-title">&larr; std.torch</span>
+      <span class="nav-title">&larr; torch</span>
     </a>
-    <a href="tooling-aur.html">
+    <a href="nexui-markup.html">
       <span class="nav-label">Next</span>
-      <span class="nav-title">Build Tool (aur) &rarr;</span>
+      <span class="nav-title">.nexui Markup &rarr;</span>
     </a>
   </div>
 

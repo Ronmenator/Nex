@@ -19,7 +19,7 @@
   <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>Overview</div>
 
   <h1>Standard Library Overview</h1>
-  <p class="page-subtitle">Nex ships with 21 standard library modules covering everything from math and string manipulation to networking, cryptography, machine learning, and cross-platform UI.</p>
+  <p class="page-subtitle">Nex ships with a built-in standard library of 15 modules covering math, strings, I/O, collections, networking, threading, and more. These are always available without any project configuration.</p>
 
   <h2>Importing Modules</h2>
 
@@ -36,7 +36,12 @@
 
   <div class="callout info">
     <div class="callout-title">Note</div>
-    <p><code>std.core</code> is automatically imported in Every Nex program. You never need to explicitly import <code>print</code>, <code>println</code>, or <code>Object</code>.</p>
+    <p><code>std.core</code> is automatically imported in every Nex program. You never need to explicitly import <code>print</code>, <code>println</code>, or <code>Object</code>.</p>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">Looking for crypto, http, regex, torch, or UI?</div>
+    <p>These have been moved to standalone <a href="lib-overview.html">Standard Libraries</a>. Add them to your <code>project.toml</code> and import by library name (e.g. <code>import crypto.hash</code>, <code>import http.client</code>).</p>
   </div>
 
   <h2>Module Index</h2>
@@ -99,11 +104,6 @@
     </div>
 
     <div class="feature-card">
-      <h4><a href="stdlib-regex.html">std.regex</a></h4>
-      <p><code>new</code>, <code>is_match</code>, <code>find</code>, <code>replace</code>, <code>free</code> &mdash; regular expression support.</p>
-    </div>
-
-    <div class="feature-card">
       <h4><a href="stdlib-process.html">std.process</a></h4>
       <p><code>exec</code>, <code>exec_output</code>, <code>exit</code>, <code>pid</code>, <code>spawn</code>, <code>wait</code> &mdash; process management.</p>
     </div>
@@ -114,18 +114,8 @@
     </div>
 
     <div class="feature-card">
-      <h4><a href="stdlib-http.html">std.http</a></h4>
-      <p><code>get</code>, <code>post</code>, <code>response_status</code>, <code>response_body</code>, <code>response_header</code>, <code>response_free</code></p>
-    </div>
-
-    <div class="feature-card">
       <h4><a href="stdlib-threading.html">std.threading</a></h4>
       <p><code>spawn</code>, <code>join</code>, <code>sleep</code>, <code>current_id</code>, mutex: <code>new</code>, <code>lock</code>, <code>unlock</code>, <code>free</code></p>
-    </div>
-
-    <div class="feature-card">
-      <h4><a href="stdlib-crypto.html">std.crypto</a></h4>
-      <p><code>sha256</code>, <code>sha512</code>, <code>md5</code>, <code>hmac_sha256</code>, <code>base64_encode</code>, <code>base64_decode</code>, <code>random_bytes</code></p>
     </div>
 
     <div class="feature-card">
@@ -136,16 +126,6 @@
     <div class="feature-card">
       <h4><a href="stdlib-testing.html">std.testing</a></h4>
       <p><code>assert</code>, <code>assert_eq</code>, <code>assert_ne</code>, <code>assert_true</code> &mdash; unit test assertions.</p>
-    </div>
-
-    <div class="feature-card">
-      <h4><a href="stdlib-torch.html">std.torch</a> <span class="badge">Optional</span></h4>
-      <p>Tensor ops, neural network layers, optimizers. Requires <code>--features torch</code> at build time.</p>
-    </div>
-
-    <div class="feature-card">
-      <h4><a href="stdlib-ui.html">std.ui</a> <span class="badge">Optional</span></h4>
-      <p>Cross-platform UI: desktop windows (WGPU), terminal TUI, widgets, flexbox layout, canvas drawing. Requires <code>--features ui</code>.</p>
     </div>
 
   </div>

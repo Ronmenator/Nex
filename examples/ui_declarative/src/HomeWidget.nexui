@@ -1,4 +1,4 @@
-<Widget xmlns="std.ui" Extends="BaseWidget">
+<Widget xmlns="nex_ui" Extends="BaseWidget">
   <!-- Content + popup overlay inside a Stack so the overlay covers the home area. -->
   <Stack FlexGrow="1">
 

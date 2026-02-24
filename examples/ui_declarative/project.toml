@@ -1,3 +1,6 @@
 name = "ui_declarative"
 version = "0.1.0"
 entry = "src/main.nex"
+
+[libs]
+nex_ui = { path = "../../libs/nex_ui" }

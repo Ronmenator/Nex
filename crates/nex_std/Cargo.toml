@@ -5,10 +5,5 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
-[features]
-default = []
-torch = ["nex_runtime/torch"]
-
 [dependencies]
 nex_runtime = { path = "../nex_runtime" }
-

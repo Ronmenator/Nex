@@ -8,7 +8,7 @@
 //   - Frame timing (delta time)
 //   - UI overlay (HUD) on top of 3D scene
 //
-// Requires: nex3d_native.dll in libs/nex3d/ and nex_ui_native.dll next to nex.exe
+// Requires: nex3d_native.dll and nex_ui_native.dll
 // Run:      nex run   (from this directory)
 
 import nex3d.math
@@ -17,7 +17,9 @@ import nex3d.color
 import nex3d.input
 import nex3d.time
 import nex3d.draw
-import std.ui
+import nex_ui.app
+import nex_ui.widget
+import nex_ui.style
 
 // Camera orbit state
 cam_angle = 0.0f

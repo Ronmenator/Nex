@@ -1,0 +1,3 @@
+name = "regex"
+version = "0.1.0"
+native = "nex_regex_native"

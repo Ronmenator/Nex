@@ -1,0 +1,48 @@
+// nex_ui.app — Application lifecycle and event loop.
+
+// Creates a new application with the given title and dimensions.
+// Returns an application handle.
+public def create(title: String, width: Int64, height: Int64) -> Int64 {
+    return ui_app_create(title, width, height)
+}
+
+// Sets the rendering backend: 0 = WGPU (default), 1 = Terminal.
+public def set_backend(app: Int64, backend: Int64) {
+    ui_app_set_backend(app, backend)
+    return
+}
+
+// Sets the root widget of the application.
+public def set_root(app: Int64, root: Int64) {
+    ui_app_set_root(app, root)
+    return
+}
+
+// Starts the event loop. Blocks until the window is closed.
+public def run(app: Int64) {
+    ui_app_run(app)
+    return
+}
+
+// Signals the event loop to stop.
+public def quit(app: Int64) {
+    ui_app_quit(app)
+    return
+}
+
+// Releases all resources. Call after run() returns.
+public def destroy(app: Int64) {
+    ui_app_destroy(app)
+    return
+}
+
+// Returns true while the application is running.
+public def is_running(app: Int64) -> Bool {
+    return ui_is_running(app) != 0
+}
+
+// Triggers an immediate render of the widget tree.
+public def render(app: Int64) {
+    ui_app_render(app)
+    return
+}

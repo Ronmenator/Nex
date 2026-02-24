@@ -1,4 +1,4 @@
-<Widget xmlns="std.ui" Extends="BaseWidget">
+<Widget xmlns="nex_ui" Extends="BaseWidget">
   <Text Text="Counter" FontSize="28" />
   <Text Text="{Binding StatusText}" FontSize="14" />
   <Text Text="{Binding CounterText}" FontSize="22" />

@@ -1,0 +1,6 @@
+// crypto.random — Cryptographically secure random bytes.
+
+public def random_bytes(buf: Int64, len: Int64) {
+    crypto_random_bytes(buf, len)
+    return
+}

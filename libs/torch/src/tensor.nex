@@ -1,0 +1,195 @@
+// torch.tensor — Tensor creation, operations, and data access.
+
+// ===========================================================================
+// Tensor creation
+// ===========================================================================
+
+public def zeros(shape: Int64, ndims: Int64) -> Int64 {
+    return tensor_zeros(shape, ndims)
+}
+
+public def ones(shape: Int64, ndims: Int64) -> Int64 {
+    return tensor_ones(shape, ndims)
+}
+
+public def rand(shape: Int64, ndims: Int64) -> Int64 {
+    return tensor_rand(shape, ndims)
+}
+
+public def randn(shape: Int64, ndims: Int64) -> Int64 {
+    return tensor_randn(shape, ndims)
+}
+
+public def from_float_data(data: Int64, shape: Int64, ndims: Int64) -> Int64 {
+    return tensor_from_float_data(data, shape, ndims)
+}
+
+public def arange(start: Float, end_val: Float, step: Float) -> Int64 {
+    return tensor_arange(start, end_val, step)
+}
+
+public def eye(n: Int64) -> Int64 {
+    return tensor_eye(n)
+}
+
+public def free(t: Int64) {
+    tensor_free(t)
+    return
+}
+
+// ===========================================================================
+// Tensor operations
+// ===========================================================================
+
+public def add(a: Int64, b: Int64) -> Int64 {
+    return tensor_add(a, b)
+}
+
+public def sub(a: Int64, b: Int64) -> Int64 {
+    return tensor_sub(a, b)
+}
+
+public def mul(a: Int64, b: Int64) -> Int64 {
+    return tensor_mul(a, b)
+}
+
+public def div(a: Int64, b: Int64) -> Int64 {
+    return tensor_div(a, b)
+}
+
+public def matmul(a: Int64, b: Int64) -> Int64 {
+    return tensor_matmul(a, b)
+}
+
+public def neg(t: Int64) -> Int64 {
+    return tensor_neg(t)
+}
+
+public def exp(t: Int64) -> Int64 {
+    return tensor_exp(t)
+}
+
+public def log(t: Int64) -> Int64 {
+    return tensor_log(t)
+}
+
+public def sum(t: Int64) -> Int64 {
+    return tensor_sum(t)
+}
+
+public def mean(t: Int64) -> Int64 {
+    return tensor_mean(t)
+}
+
+// ===========================================================================
+// Tensor shape
+// ===========================================================================
+
+public def reshape(t: Int64, shape: Int64, ndims: Int64) -> Int64 {
+    return tensor_reshape(t, shape, ndims)
+}
+
+public def transpose(t: Int64, dim0: Int64, dim1: Int64) -> Int64 {
+    return tensor_transpose(t, dim0, dim1)
+}
+
+public def squeeze(t: Int64) -> Int64 {
+    return tensor_squeeze(t)
+}
+
+public def unsqueeze(t: Int64, dim: Int64) -> Int64 {
+    return tensor_unsqueeze(t, dim)
+}
+
+public def shape_dim(t: Int64, dim: Int64) -> Int64 {
+    return tensor_shape_dim(t, dim)
+}
+
+public def ndim(t: Int64) -> Int64 {
+    return tensor_ndim(t)
+}
+
+public def numel(t: Int64) -> Int64 {
+    return tensor_numel(t)
+}
+
+// ===========================================================================
+// Tensor data access
+// ===========================================================================
+
+public def get_float(t: Int64, index: Int64) -> Float {
+    return tensor_get_float(t, index)
+}
+
+public def item_float(t: Int64) -> Float {
+    return tensor_item_float(t)
+}
+
+public def to_string(t: Int64) -> String {
+    return tensor_to_string(t)
+}
+
+public def print(t: Int64) {
+    tensor_print(t)
+    return
+}
+
+// ===========================================================================
+// Device management
+// ===========================================================================
+
+public def cuda_is_available() -> Bool {
+    return cuda_is_available() != 0
+}
+
+public def cuda_device_count() -> Int64 {
+    return cuda_device_count()
+}
+
+public def to_device(t: Int64, device: String) -> Int64 {
+    return tensor_to_device(t, device)
+}
+
+public def set_num_threads(n: Int64) {
+    set_num_threads(n)
+    return
+}
+
+// ===========================================================================
+// Autograd
+// ===========================================================================
+
+public def requires_grad(t: Int64, requires: Bool) -> Int64 {
+    flag = 0
+    if (requires) { flag = 1 }
+    return tensor_requires_grad(t, flag)
+}
+
+public def backward(t: Int64) {
+    tensor_backward(t)
+    return
+}
+
+public def grad(t: Int64) -> Int64 {
+    return tensor_grad(t)
+}
+
+public def no_grad(flag: Bool) {
+    v = 0
+    if (flag) { v = 1 }
+    torch_no_grad(v)
+    return
+}
+
+// ===========================================================================
+// Utility
+// ===========================================================================
+
+public def manual_seed(seed: Int64) {
+    torch_manual_seed(seed)
+    return
+}
+
+public def version() -> String {
+    return torch_version()
+}

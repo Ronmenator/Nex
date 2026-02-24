@@ -2,7 +2,7 @@
 //
 // popup_mode: 0 = hidden | 1 = info (OK) | 2 = confirm (Yes / No)
 
-import std.ui
+import nex_ui.binding
 
 public partial class HomeWidget {
     dialog_result = ""

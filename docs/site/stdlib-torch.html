@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>std.torch - Nex Docs</title>
+  <title>torch - Nex Docs</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -16,17 +16,25 @@
 <nav class="sidebar"></nav>
 <main class="main-content">
 
-  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.torch</div>
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="lib-overview.html">Standard Libraries</a><span class="sep">/</span>torch</div>
 
-  <h1>std.torch</h1>
+  <h1>torch</h1>
   <p class="page-subtitle">PyTorch integration for tensor operations, neural networks, and deep learning.</p>
 
+  <h2>Setup</h2>
+  <p>Add to your <code>project.toml</code>:</p>
+  <pre><code>[libs]
+torch = { path = "../libs/torch" }</code></pre>
   <div class="callout warning">
-    <div class="callout-title">Build Requirement</div>
-    <p>This module is optional and requires the <code>torch</code> feature flag. Build the Nex runtime with <code>cargo build --features torch</code> to enable it. The feature auto-downloads libtorch via <code>download-libtorch</code>.</p>
+    <div class="callout-title">Requires libtorch</div>
+    <p>The torch library requires libtorch to be installed on your system. The native DLL (<code>nex_torch_native</code>) links against libtorch at runtime.</p>
   </div>
 
-  <pre><code><span class="kw">import</span> std.torch</code></pre>
+  <pre><code><span class="kw">import</span> torch.tensor  <span class="cmt">// tensor creation, operations, data access</span>
+<span class="kw">import</span> torch.nn      <span class="cmt">// neural network layers</span>
+<span class="kw">import</span> torch.loss    <span class="cmt">// loss functions</span>
+<span class="kw">import</span> torch.optim   <span class="cmt">// optimizers</span>
+<span class="kw">import</span> torch.model   <span class="cmt">// model save/load, TorchScript</span></code></pre>
 
   <h2>Tensor Creation</h2>
 
@@ -422,7 +430,11 @@
 
   <h2>Complete Training Example</h2>
 
-  <pre><code><span class="kw">import</span> std.torch
+  <pre><code><span class="kw">import</span> torch.tensor
+<span class="kw">import</span> torch.nn
+<span class="kw">import</span> torch.loss
+<span class="kw">import</span> torch.optim
+<span class="kw">import</span> torch.model
 
 <span class="cmt">// Seed for reproducibility</span>
 <span class="fn">torch_manual_seed</span>(<span class="num">42</span>)
@@ -505,13 +517,13 @@ result <span class="op">=</span> <span class="fn">nn_forward</span>(model, test_
 <span class="fn">nn_free</span>(model)</code></pre>
 
   <div class="page-nav">
-    <a href="stdlib-testing.html">
+    <a href="stdlib-regex.html">
       <span class="nav-label">Previous</span>
-      <span class="nav-title">&larr; std.testing</span>
+      <span class="nav-title">&larr; regex</span>
     </a>
     <a href="stdlib-ui.html">
       <span class="nav-label">Next</span>
-      <span class="nav-title">std.ui &rarr;</span>
+      <span class="nav-title">nex_ui &rarr;</span>
     </a>
   </div>
 

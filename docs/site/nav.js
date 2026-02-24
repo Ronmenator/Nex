@@ -53,31 +53,32 @@ const NAV_HTML = `
     <li><a href="stdlib-env.html">std.env</a></li>
     <li><a href="stdlib-path.html">std.path</a></li>
     <li><a href="stdlib-json.html">std.json</a></li>
-    <li><a href="stdlib-regex.html">std.regex</a></li>
     <li><a href="stdlib-process.html">std.process</a></li>
     <li><a href="stdlib-net.html">std.net</a></li>
-    <li><a href="stdlib-http.html">std.http</a></li>
     <li><a href="stdlib-threading.html">std.threading</a></li>
-    <li><a href="stdlib-crypto.html">std.crypto</a></li>
     <li><a href="stdlib-logging.html">std.logging</a></li>
     <li><a href="stdlib-testing.html">std.testing</a></li>
-    <li><a href="stdlib-torch.html">std.torch <span class="badge">Optional</span></a></li>
-    <li><a href="stdlib-ui.html">std.ui <span class="badge">Optional</span></a></li>
-    <li><a href="nexui-markup.html">.nexui Markup <span class="badge">New</span></a></li>
   </ul>
 </div>
 
 <div class="nav-section">
-  <div class="nav-section-header"><span class="chevron">&#9662;</span> Libraries</div>
+  <div class="nav-section-header"><span class="chevron">&#9662;</span> Standard Libraries</div>
   <ul class="nav-links">
-    <li><a href="lib-nex3d.html">nex3d <span class="badge">Optional</span></a></li>
+    <li><a href="lib-overview.html">Overview</a></li>
+    <li><a href="stdlib-crypto.html">crypto</a></li>
+    <li><a href="stdlib-http.html">http</a></li>
+    <li><a href="stdlib-regex.html">regex</a></li>
+    <li><a href="stdlib-torch.html">torch</a></li>
+    <li><a href="stdlib-ui.html">nex_ui</a></li>
+    <li><a href="nexui-markup.html">.nexui Markup</a></li>
+    <li><a href="lib-nex3d.html">nex3d</a></li>
   </ul>
 </div>
 
 <div class="nav-section">
   <div class="nav-section-header"><span class="chevron">&#9662;</span> Tooling</div>
   <ul class="nav-links">
-    <li><a href="tooling-aur.html">Build Tool (aur)</a></li>
+    <li><a href="tooling-nex.html">Build Tool (nex)</a></li>
     <li><a href="tooling-project.html">Project Configuration</a></li>
     <li><a href="tooling-repl.html">REPL</a></li>
     <li><a href="tooling-formatter.html">Formatter &amp; Linter</a></li>

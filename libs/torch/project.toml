@@ -1,0 +1,3 @@
+name = "torch"
+version = "0.1.0"
+native = "nex_torch_native"

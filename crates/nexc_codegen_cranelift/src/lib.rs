@@ -19,7 +19,16 @@ use nexc_type::Type;
 
 /// AOT compilation: IrModule -> object file bytes (.o / .obj).
 pub fn generate_object(ir: &IrModule) -> Result<Vec<u8>, String> {
-    let flag_builder = build_settings();
+    generate_object_impl(ir, false)
+}
+
+/// AOT compilation for shared libraries: IrModule -> PIC object file bytes.
+pub fn generate_shared_object(ir: &IrModule) -> Result<Vec<u8>, String> {
+    generate_object_impl(ir, true)
+}
+
+fn generate_object_impl(ir: &IrModule, pic: bool) -> Result<Vec<u8>, String> {
+    let flag_builder = build_settings(pic);
     let isa_builder = cranelift_codegen::isa::lookup(target_lexicon::Triple::host())
         .map_err(|e| format!("ISA lookup: {e}"))?;
     let isa = isa_builder
@@ -51,7 +60,7 @@ pub fn jit_execute(
 ) -> Result<i32, String> {
     use cranelift_jit::{JITBuilder, JITModule};
 
-    let flag_builder = build_settings();
+    let flag_builder = build_settings(false);
     let isa_builder = cranelift_codegen::isa::lookup(target_lexicon::Triple::host())
         .map_err(|e| format!("ISA lookup: {e}"))?;
     let isa = isa_builder
@@ -100,10 +109,10 @@ pub fn jit_execute(
 // Settings
 // ---------------------------------------------------------------------------
 
-fn build_settings() -> settings::Builder {
+fn build_settings(pic: bool) -> settings::Builder {
     let mut b = settings::builder();
     b.set("opt_level", "speed").unwrap();
-    b.set("is_pic", "false").unwrap();
+    b.set("is_pic", if pic { "true" } else { "false" }).unwrap();
     b
 }
 
@@ -244,13 +253,6 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_json_get_float);
     sym!(nex_json_get_bool);
 
-    // std.regex
-    sym!(nex_regex_new);
-    sym!(nex_regex_is_match);
-    sym!(nex_regex_find);
-    sym!(nex_regex_replace);
-    sym!(nex_regex_free);
-
     // std.process
     sym!(nex_process_exec);
     sym!(nex_process_exec_output);
@@ -271,14 +273,6 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_net_udp_send);
     sym!(nex_net_udp_recv);
 
-    // std.http
-    sym!(nex_http_get);
-    sym!(nex_http_post);
-    sym!(nex_http_response_status);
-    sym!(nex_http_response_body);
-    sym!(nex_http_response_header);
-    sym!(nex_http_response_free);
-
     // std.threading
     sym!(nex_thread_spawn);
     sym!(nex_thread_join);
@@ -288,15 +282,6 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_mutex_lock);
     sym!(nex_mutex_unlock);
     sym!(nex_mutex_free);
-
-    // std.crypto
-    sym!(nex_crypto_sha256);
-    sym!(nex_crypto_sha512);
-    sym!(nex_crypto_md5);
-    sym!(nex_crypto_random_bytes);
-    sym!(nex_crypto_base64_encode);
-    sym!(nex_crypto_base64_decode);
-    sym!(nex_crypto_hmac_sha256);
 
     // std.logging
     sym!(nex_log_debug);
@@ -316,71 +301,8 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_assert_ne_str);
     sym!(nex_assert_true);
 
-    #[cfg(feature = "torch")]
-    {
-        sym!(nex_torch_tensor_zeros);
-        sym!(nex_torch_tensor_ones);
-        sym!(nex_torch_tensor_rand);
-        sym!(nex_torch_tensor_randn);
-        sym!(nex_torch_tensor_from_float_data);
-        sym!(nex_torch_tensor_arange);
-        sym!(nex_torch_tensor_eye);
-        sym!(nex_torch_tensor_free);
-        sym!(nex_torch_tensor_add);
-        sym!(nex_torch_tensor_sub);
-        sym!(nex_torch_tensor_mul);
-        sym!(nex_torch_tensor_div);
-        sym!(nex_torch_tensor_matmul);
-        sym!(nex_torch_tensor_neg);
-        sym!(nex_torch_tensor_exp);
-        sym!(nex_torch_tensor_log);
-        sym!(nex_torch_tensor_sum);
-        sym!(nex_torch_tensor_mean);
-        sym!(nex_torch_tensor_reshape);
-        sym!(nex_torch_tensor_transpose);
-        sym!(nex_torch_tensor_squeeze);
-        sym!(nex_torch_tensor_unsqueeze);
-        sym!(nex_torch_tensor_print);
-        sym!(nex_torch_tensor_shape_dim);
-        sym!(nex_torch_tensor_get_float);
-        sym!(nex_torch_tensor_item_float);
-        sym!(nex_torch_tensor_ndim);
-        sym!(nex_torch_tensor_numel);
-        sym!(nex_torch_cuda_is_available);
-        sym!(nex_torch_cuda_device_count);
-        sym!(nex_torch_tensor_to_device);
-        sym!(nex_torch_set_num_threads);
-        sym!(nex_torch_tensor_requires_grad);
-        sym!(nex_torch_tensor_backward);
-        sym!(nex_torch_tensor_grad);
-        sym!(nex_torch_no_grad);
-        sym!(nex_torch_nn_sequential_new);
-        sym!(nex_torch_nn_linear);
-        sym!(nex_torch_nn_conv2d);
-        sym!(nex_torch_nn_relu);
-        sym!(nex_torch_nn_sigmoid);
-        sym!(nex_torch_nn_tanh);
-        sym!(nex_torch_nn_softmax);
-        sym!(nex_torch_nn_dropout);
-        sym!(nex_torch_nn_batch_norm);
-        sym!(nex_torch_nn_forward);
-        sym!(nex_torch_nn_free);
-        sym!(nex_torch_loss_mse);
-        sym!(nex_torch_loss_cross_entropy);
-        sym!(nex_torch_loss_bce);
-        sym!(nex_torch_optim_sgd);
-        sym!(nex_torch_optim_adam);
-        sym!(nex_torch_optim_step);
-        sym!(nex_torch_optim_zero_grad);
-        sym!(nex_torch_optim_free);
-        sym!(nex_torch_model_save);
-        sym!(nex_torch_model_load);
-        sym!(nex_torch_jit_load);
-        sym!(nex_torch_jit_forward);
-        sym!(nex_torch_manual_seed);
-        sym!(nex_torch_version);
-        sym!(nex_torch_tensor_to_string);
-    }
+    // NOTE: torch, crypto, http, regex symbols are loaded dynamically via
+    // register_native_libs() from their respective native DLLs.
 }
 
 // ---------------------------------------------------------------------------
@@ -1615,12 +1537,19 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
             if let Some(n) = engine_function_name(name) {
                 return Some(n);
             }
-            #[cfg(feature = "torch")]
-            {
-                return torch_function_name(name);
+            if let Some(n) = torch_function_name(name) {
+                return Some(n);
             }
-            #[cfg(not(feature = "torch"))]
-            { None }
+            if let Some(n) = crypto_function_name(name) {
+                return Some(n);
+            }
+            if let Some(n) = http_function_name(name) {
+                return Some(n);
+            }
+            if let Some(n) = regex_function_name(name) {
+                return Some(n);
+            }
+            None
         }
     }
 }
@@ -1760,7 +1689,6 @@ fn engine_function_name(name: &str) -> Option<&'static str> {
     }
 }
 
-#[cfg(feature = "torch")]
 fn torch_function_name(name: &str) -> Option<&'static str> {
     match name {
         // Tensor creation
@@ -1835,6 +1763,42 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "torch_manual_seed" => Some("nex_torch_manual_seed"),
         "torch_version" => Some("nex_torch_version"),
         "tensor_to_string" => Some("nex_torch_tensor_to_string"),
+        _ => None,
+    }
+}
+
+fn crypto_function_name(name: &str) -> Option<&'static str> {
+    match name {
+        "crypto_sha256" => Some("nex_crypto_sha256"),
+        "crypto_sha512" => Some("nex_crypto_sha512"),
+        "crypto_md5" => Some("nex_crypto_md5"),
+        "crypto_random_bytes" => Some("nex_crypto_random_bytes"),
+        "crypto_base64_encode" => Some("nex_crypto_base64_encode"),
+        "crypto_base64_decode" => Some("nex_crypto_base64_decode"),
+        "crypto_hmac_sha256" => Some("nex_crypto_hmac_sha256"),
+        _ => None,
+    }
+}
+
+fn http_function_name(name: &str) -> Option<&'static str> {
+    match name {
+        "http_get" => Some("nex_http_get"),
+        "http_post" => Some("nex_http_post"),
+        "http_response_status" => Some("nex_http_response_status"),
+        "http_response_body" => Some("nex_http_response_body"),
+        "http_response_header" => Some("nex_http_response_header"),
+        "http_response_free" => Some("nex_http_response_free"),
+        _ => None,
+    }
+}
+
+fn regex_function_name(name: &str) -> Option<&'static str> {
+    match name {
+        "regex_new" => Some("nex_regex_new"),
+        "regex_is_match" => Some("nex_regex_is_match"),
+        "regex_find" => Some("nex_regex_find"),
+        "regex_replace" => Some("nex_regex_replace"),
+        "regex_free" => Some("nex_regex_free"),
         _ => None,
     }
 }
@@ -2339,7 +2303,6 @@ fn declare_runtime_imports<M: Module>(
         ("nex_engine_enable_ui_overlay", &sig_void),
     ];
 
-    #[cfg(feature = "torch")]
     let torch_imports: Vec<(&str, &Signature)> = vec![
         // Tensor creation
         ("nex_torch_tensor_zeros", &sig_ptr_ptr2),
@@ -2385,7 +2348,7 @@ fn declare_runtime_imports<M: Module>(
         // NN layers
         ("nex_torch_nn_sequential_new", &sig_ret_ptr),
         ("nex_torch_nn_linear", &sig_void_ptr3),
-        ("nex_torch_nn_conv2d", &sig_void_ptr3),     // technically 4 args but close enough
+        ("nex_torch_nn_conv2d", &sig_void_ptr4),
         ("nex_torch_nn_relu", &sig_void_ptr),
         ("nex_torch_nn_sigmoid", &sig_void_ptr),
         ("nex_torch_nn_tanh", &sig_void_ptr),
@@ -2442,13 +2405,50 @@ fn declare_runtime_imports<M: Module>(
         }
     }
 
-    #[cfg(feature = "torch")]
     for (name, sig) in torch_imports {
         if !func_ids.contains_key(name) {
             let id = module
                 .declare_function(name, Linkage::Import, sig)
                 .map_err(|e| format!("declare import {name}: {e}"))?;
             func_ids.insert(name.to_string(), id);
+        }
+    }
+
+    let crypto_imports: Vec<(&str, &Signature)> = vec![
+        ("nex_crypto_sha256", &sig_ptr_ptr),
+        ("nex_crypto_sha512", &sig_ptr_ptr),
+        ("nex_crypto_md5", &sig_ptr_ptr),
+        ("nex_crypto_random_bytes", &sig_void_ptr2),
+        ("nex_crypto_base64_encode", &sig_ptr_ptr),
+        ("nex_crypto_base64_decode", &sig_ptr_ptr),
+        ("nex_crypto_hmac_sha256", &sig_ptr_ptr2),
+    ];
+
+    let http_imports: Vec<(&str, &Signature)> = vec![
+        ("nex_http_get", &sig_ptr_ptr),
+        ("nex_http_post", &sig_ptr_ptr3),
+        ("nex_http_response_status", &sig_ptr_ptr),
+        ("nex_http_response_body", &sig_ptr_ptr),
+        ("nex_http_response_header", &sig_ptr_ptr2),
+        ("nex_http_response_free", &sig_void_ptr),
+    ];
+
+    let regex_imports: Vec<(&str, &Signature)> = vec![
+        ("nex_regex_new", &sig_ptr_ptr),
+        ("nex_regex_is_match", &sig_ptr_ptr2),
+        ("nex_regex_find", &sig_ptr_ptr2),
+        ("nex_regex_replace", &sig_ptr_ptr3),
+        ("nex_regex_free", &sig_void_ptr),
+    ];
+
+    for imports_list in [crypto_imports, http_imports, regex_imports] {
+        for (name, sig) in imports_list {
+            if !func_ids.contains_key(name) {
+                let id = module
+                    .declare_function(name, Linkage::Import, sig)
+                    .map_err(|e| format!("declare import {name}: {e}"))?;
+                func_ids.insert(name.to_string(), id);
+            }
         }
     }
 

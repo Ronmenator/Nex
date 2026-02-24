@@ -12,6 +12,12 @@ use std::process::Command;
 
 pub use nexc_ir::IrModule;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputKind {
+    Executable,
+    SharedLib,
+}
+
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
     pub source_path: String,
@@ -20,6 +26,7 @@ pub struct CompileOptions {
     pub lib_names: HashSet<String>,
     /// Paths to native dynamic libraries (.dll / .so) to load for JIT.
     pub native_libs: Vec<PathBuf>,
+    pub output_kind: OutputKind,
 }
 
 impl Default for CompileOptions {
@@ -30,6 +37,7 @@ impl Default for CompileOptions {
             output_dir: None,
             lib_names: HashSet::new(),
             native_libs: Vec::new(),
+            output_kind: OutputKind::Executable,
         }
     }
 }
@@ -81,7 +89,7 @@ pub fn compile_module(source: &str, options: CompileOptions) -> CompileResult {
     let lowered = run_lower(&typed_mod, &mut sink, &stage_layouts, &mut ir);
 
     if !sink.has_errors() {
-        run_codegen(&lowered, &mut sink, &mut object);
+        run_codegen(&lowered, &mut sink, &mut object, options.output_kind);
     }
 
     typed = Some(typed_mod);
@@ -170,6 +178,76 @@ pub fn link_native(result: &mut CompileResult, out_dir: &Path, stem: &str) -> Re
 
     result.executable = Some(exe_path.clone());
     Ok(exe_path)
+}
+
+/// Link object file bytes into a shared library (DLL / .so / .dylib).
+pub fn link_shared_lib(result: &mut CompileResult, out_dir: &Path, stem: &str) -> Result<PathBuf, String> {
+    let object_bytes = match &result.object {
+        Some(b) => b.clone(),
+        None => return Err("no object code generated".into()),
+    };
+
+    std::fs::create_dir_all(out_dir)
+        .map_err(|e| format!("cannot create output directory: {e}"))?;
+
+    let obj_ext = if cfg!(windows) { "obj" } else { "o" };
+    let obj_path = out_dir.join(format!("{stem}.{obj_ext}"));
+    std::fs::write(&obj_path, &object_bytes)
+        .map_err(|e| format!("cannot write {}: {e}", obj_path.display()))?;
+
+    let lib_name = if cfg!(windows) {
+        format!("{stem}.dll")
+    } else if cfg!(target_os = "macos") {
+        format!("lib{stem}.dylib")
+    } else {
+        format!("lib{stem}.so")
+    };
+    let lib_path = out_dir.join(&lib_name);
+
+    let runtime_lib = find_runtime_library();
+
+    let linker = find_linker()
+        .ok_or_else(|| "no linker found. Install a C toolchain (gcc, clang, or MSVC Build Tools).".to_string())?;
+
+    let output = invoke_linker_shared(&linker, &obj_path, &lib_path, runtime_lib.as_deref())?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("linker failed (exit {}):\n{stdout}{stderr}", output.status));
+    }
+
+    result.executable = Some(lib_path.clone());
+    Ok(lib_path)
+}
+
+/// Link multiple object files into a shared library (DLL / .so / .dylib).
+pub fn link_shared_lib_multi(obj_paths: &[PathBuf], out_dir: &Path, stem: &str) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(out_dir)
+        .map_err(|e| format!("cannot create output directory: {e}"))?;
+
+    let lib_name = if cfg!(windows) {
+        format!("{stem}.dll")
+    } else if cfg!(target_os = "macos") {
+        format!("lib{stem}.dylib")
+    } else {
+        format!("lib{stem}.so")
+    };
+    let lib_path = out_dir.join(&lib_name);
+
+    let runtime_lib = find_runtime_library();
+    let linker = find_linker()
+        .ok_or_else(|| "no linker found. Install a C toolchain (gcc, clang, or MSVC Build Tools).".to_string())?;
+
+    let output = invoke_linker_multi_shared(&linker, obj_paths, &lib_path, runtime_lib.as_deref())?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("linker failed (exit {}):\n{stdout}{stderr}", output.status));
+    }
+
+    Ok(lib_path)
 }
 
 /// Link multiple object files into a single native executable.
@@ -463,8 +541,12 @@ fn run_lower(
     lowered
 }
 
-fn run_codegen(ir: &IrModule, sink: &mut DiagnosticSink, out_object: &mut Option<Vec<u8>>) {
-    match nexc_codegen_cranelift::generate_object(ir) {
+fn run_codegen(ir: &IrModule, sink: &mut DiagnosticSink, out_object: &mut Option<Vec<u8>>, output_kind: OutputKind) {
+    let gen_result = match output_kind {
+        OutputKind::SharedLib => nexc_codegen_cranelift::generate_shared_object(ir),
+        OutputKind::Executable => nexc_codegen_cranelift::generate_object(ir),
+    };
+    match gen_result {
         Ok(bytes) => *out_object = Some(bytes),
         Err(msg) => {
             let (span, file) = extract_function_location(&msg, ir);
@@ -805,6 +887,185 @@ fn invoke_linker_multi(
                 vcvarsall.display(),
                 arch,
                 exe_path.display(),
+                obj_args,
+                rt_arg,
+                win_libs,
+            );
+            std::fs::write(&bat_path, &bat_content)
+                .map_err(|e| format!("cannot write link script: {e}"))?;
+
+            let result = Command::new("cmd")
+                .args(["/C", &bat_path.to_string_lossy()])
+                .output()
+                .map_err(|e| format!("failed to invoke MSVC linker: {e}"));
+
+            let _ = std::fs::remove_file(&bat_path);
+            result
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Linker – shared library variants (-shared / /DLL)
+// ---------------------------------------------------------------------------
+
+fn invoke_linker_shared(
+    linker: &Linker,
+    obj_path: &Path,
+    lib_path: &Path,
+    runtime_lib: Option<&Path>,
+) -> Result<std::process::Output, String> {
+    match linker {
+        Linker::Cc(cmd) if cmd == "cl" => {
+            let mut args: Vec<String> = vec![
+                obj_path.to_string_lossy().into_owned(),
+                format!("/Fe:{}", lib_path.to_string_lossy()),
+                "/nologo".into(),
+                "/LD".into(),
+            ];
+            if let Some(rt) = runtime_lib {
+                args.push(rt.to_string_lossy().into_owned());
+            }
+            args.extend([
+                "/link".into(),
+                "/DLL".into(),
+                "ws2_32.lib".into(),
+                "advapi32.lib".into(),
+                "userenv.lib".into(),
+                "ntdll.lib".into(),
+                "bcrypt.lib".into(),
+                "kernel32.lib".into(),
+                "msvcrt.lib".into(),
+                "/DEFAULTLIB:libcmt".into(),
+            ]);
+            Command::new(cmd)
+                .args(&args)
+                .output()
+                .map_err(|e| format!("failed to run cl: {e}"))
+        }
+        Linker::Cc(cmd) => {
+            let mut args: Vec<String> = vec![
+                "-shared".into(),
+                obj_path.to_string_lossy().into_owned(),
+                "-o".into(),
+                lib_path.to_string_lossy().into_owned(),
+            ];
+            if let Some(rt) = runtime_lib {
+                args.push(rt.to_string_lossy().into_owned());
+            }
+            Command::new(cmd)
+                .args(&args)
+                .output()
+                .map_err(|e| format!("failed to run {cmd}: {e}"))
+        }
+        Linker::Msvc { vcvarsall } => {
+            let arch = if cfg!(target_arch = "x86_64") { "x64" }
+                       else if cfg!(target_arch = "x86") { "x86" }
+                       else { "x64" };
+
+            let obj_dir = obj_path.parent().unwrap_or(Path::new("."));
+            let bat_path = obj_dir.join("_nex_link_dll.bat");
+
+            let rt_arg = runtime_lib
+                .map(|p| format!(" \"{}\"", p.display()))
+                .unwrap_or_default();
+
+            let win_libs = " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib ole32.lib oleaut32.lib";
+
+            let bat_content = format!(
+                "@echo off\r\ncall \"{}\" {} >nul 2>&1\r\nif errorlevel 1 exit /b 1\r\nlink /nologo /DLL /OUT:\"{}\" \"{}\"{}{}\r\n",
+                vcvarsall.display(),
+                arch,
+                lib_path.display(),
+                obj_path.display(),
+                rt_arg,
+                win_libs,
+            );
+            std::fs::write(&bat_path, &bat_content)
+                .map_err(|e| format!("cannot write link script: {e}"))?;
+
+            let result = Command::new("cmd")
+                .args(["/C", &bat_path.to_string_lossy()])
+                .output()
+                .map_err(|e| format!("failed to invoke MSVC linker: {e}"));
+
+            let _ = std::fs::remove_file(&bat_path);
+            result
+        }
+    }
+}
+
+fn invoke_linker_multi_shared(
+    linker: &Linker,
+    obj_paths: &[PathBuf],
+    lib_path: &Path,
+    runtime_lib: Option<&Path>,
+) -> Result<std::process::Output, String> {
+    match linker {
+        Linker::Cc(cmd) if cmd == "cl" => {
+            let mut args: Vec<String> = obj_paths
+                .iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+            args.push(format!("/Fe:{}", lib_path.to_string_lossy()));
+            args.push("/nologo".into());
+            args.push("/LD".into());
+            if let Some(rt) = runtime_lib {
+                args.push(rt.to_string_lossy().into_owned());
+            }
+            args.extend([
+                "/link".into(),
+                "/DLL".into(),
+                "ws2_32.lib".into(),
+                "advapi32.lib".into(),
+                "userenv.lib".into(),
+                "ntdll.lib".into(),
+                "bcrypt.lib".into(),
+                "kernel32.lib".into(),
+                "msvcrt.lib".into(),
+                "/DEFAULTLIB:libcmt".into(),
+            ]);
+            Command::new(cmd)
+                .args(&args)
+                .output()
+                .map_err(|e| format!("failed to run cl: {e}"))
+        }
+        Linker::Cc(cmd) => {
+            let mut args: Vec<String> = vec!["-shared".into()];
+            args.extend(obj_paths.iter().map(|p| p.to_string_lossy().into_owned()));
+            args.push("-o".into());
+            args.push(lib_path.to_string_lossy().into_owned());
+            if let Some(rt) = runtime_lib {
+                args.push(rt.to_string_lossy().into_owned());
+            }
+            Command::new(cmd)
+                .args(&args)
+                .output()
+                .map_err(|e| format!("failed to run {cmd}: {e}"))
+        }
+        Linker::Msvc { vcvarsall } => {
+            let arch = if cfg!(target_arch = "x86_64") { "x64" }
+                       else if cfg!(target_arch = "x86") { "x86" }
+                       else { "x64" };
+
+            let out_dir = lib_path.parent().unwrap_or(Path::new("."));
+            let bat_path = out_dir.join("_nex_link_dll.bat");
+
+            let obj_args: String = obj_paths
+                .iter()
+                .map(|p| format!(" \"{}\"", p.display()))
+                .collect();
+            let rt_arg = runtime_lib
+                .map(|p| format!(" \"{}\"", p.display()))
+                .unwrap_or_default();
+
+            let win_libs = " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib ole32.lib oleaut32.lib";
+
+            let bat_content = format!(
+                "@echo off\r\ncall \"{}\" {} >nul 2>&1\r\nif errorlevel 1 exit /b 1\r\nlink /nologo /DLL /OUT:\"{}\"{}{}{}\r\n",
+                vcvarsall.display(),
+                arch,
+                lib_path.display(),
                 obj_args,
                 rt_arg,
                 win_libs,

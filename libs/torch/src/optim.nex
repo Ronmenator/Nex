@@ -1,0 +1,29 @@
+// torch.optim — Optimizers for training neural networks.
+
+// Creates an SGD optimizer for the given module.
+public def sgd(module: Int64, lr: Float) -> Int64 {
+    return optim_sgd(module, lr)
+}
+
+// Creates an Adam optimizer for the given module.
+public def adam(module: Int64, lr: Float) -> Int64 {
+    return optim_adam(module, lr)
+}
+
+// Performs one optimization step (updates weights).
+public def step(optimizer: Int64) {
+    optim_step(optimizer)
+    return
+}
+
+// Zeroes all gradients before the next backward pass.
+public def zero_grad(optimizer: Int64) {
+    optim_zero_grad(optimizer)
+    return
+}
+
+// Frees an optimizer.
+public def free(optimizer: Int64) {
+    optim_free(optimizer)
+    return
+}

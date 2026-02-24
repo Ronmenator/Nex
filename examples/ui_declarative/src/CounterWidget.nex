@@ -1,6 +1,6 @@
 // CounterWidget code-behind — standalone counter with its own state.
 
-import std.ui
+import nex_ui.binding
 
 public partial class CounterWidget {
     counter = 0

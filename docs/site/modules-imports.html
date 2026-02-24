@@ -64,21 +64,34 @@ src/utils/helpers.nex <span class="cmt">→ utils.helpers</span></code></pre>
 
   <h2>Library Dependencies</h2>
 
-  <p>External libraries are declared in <code>project.toml</code> under the <code>[libs]</code> section:</p>
+  <p>External libraries are declared in <code>project.toml</code> under the <code>[libs]</code> section. Libraries can come from GitHub, the global cache, or a local path:</p>
 
   <pre><code>[libs]
+nex3d <span class="op">=</span> { git <span class="op">=</span> <span class="str">"nexlang/nex3d"</span>, version <span class="op">=</span> <span class="str">"0.1.0"</span> }
+utils <span class="op">=</span> <span class="str">"1.2.0"</span>
 graphics <span class="op">=</span> { path <span class="op">=</span> <span class="str">"../graphics"</span> }</code></pre>
 
   <p>The library name becomes the import namespace prefix:</p>
 
-  <pre><code><span class="kw">import</span> graphics.shapes    <span class="cmt">// imports graphics/src/shapes.nex</span></code></pre>
+  <pre><code><span class="kw">import</span> nex3d.engine       <span class="cmt">// imports nex3d/src/engine.nex</span>
+<span class="kw">import</span> graphics.shapes    <span class="cmt">// imports graphics/src/shapes.nex</span></code></pre>
+
+  <h3>Installing Libraries</h3>
+
+  <p>Install libraries from GitHub using <code>nex install</code>:</p>
+
+  <pre><code>$ nex install user/repo            <span class="cmt"># latest tag</span>
+$ nex install user/repo:0.1.0      <span class="cmt"># specific version</span></code></pre>
+
+  <p>This downloads the library to the global cache at <code>~/.nex/libs/</code> and adds an entry to your <code>project.toml</code>. See <a href="tooling-nex.html">Build Tool</a> for full details.</p>
 
   <h3>Library Rules</h3>
   <ul>
     <li>A library is a Nex project with its own <code>project.toml</code> and <code>src/</code> directory</li>
     <li>Library sources are compiled alongside the main project and linked into a single executable</li>
-    <li>v1 supports local paths only (no package registry, no git URLs)</li>
+    <li>GitHub is the only remote source in v1 (no central registry)</li>
     <li>v1 uses flat resolution &mdash; libraries cannot declare their own <code>[libs]</code> dependencies</li>
+    <li>If a library declares <code>native = "name"</code> in its <code>project.toml</code>, the installer downloads prebuilt DLLs from GitHub release assets</li>
   </ul>
 
   <h2>Standard Library Imports</h2>
@@ -88,10 +101,15 @@ graphics <span class="op">=</span> { path <span class="op">=</span> <span class=
   <pre><code><span class="kw">import</span> std.math
 <span class="kw">import</span> std.io
 <span class="kw">import</span> std.json
-<span class="kw">import</span> std.collections
-<span class="kw">import</span> std.torch          <span class="cmt">// requires --features torch</span></code></pre>
+<span class="kw">import</span> std.collections</code></pre>
 
   <p>The <code>std.core</code> module (<code>print</code>, <code>println</code>, <code>Object</code>) is available without import.</p>
+
+  <p>Standalone <a href="lib-overview.html">standard libraries</a> (crypto, http, regex, torch, nex_ui, nex3d) are imported by their library name after adding them to <code>project.toml</code>:</p>
+
+  <pre><code><span class="kw">import</span> crypto.hash        <span class="cmt">// from the crypto library</span>
+<span class="kw">import</span> http.client         <span class="cmt">// from the http library</span>
+<span class="kw">import</span> torch.tensor        <span class="cmt">// from the torch library</span></code></pre>
 
   <h2>Project Structure</h2>
 

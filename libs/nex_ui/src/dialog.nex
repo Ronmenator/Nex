@@ -1,0 +1,18 @@
+// nex_ui.dialog — Dialog boxes (message, confirm, file pickers).
+
+public def message(title: String, msg: String) {
+    ui_dialog_message(title, msg)
+    return
+}
+
+public def confirm(title: String, msg: String) -> Bool {
+    return ui_dialog_confirm(title, msg) != 0
+}
+
+public def open_file(title: String, filter: String) -> String {
+    return ui_dialog_open_file(title, filter)
+}
+
+public def save_file(title: String, filter: String) -> String {
+    return ui_dialog_save_file(title, filter)
+}

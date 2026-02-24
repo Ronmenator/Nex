@@ -1,0 +1,65 @@
+// torch.nn — Neural network layers and modules.
+
+// Creates a new Sequential module for building neural networks.
+public def sequential() -> Int64 {
+    return nn_sequential_new()
+}
+
+// Adds a fully-connected (linear) layer to the module.
+public def linear(module: Int64, in_features: Int64, out_features: Int64) {
+    nn_linear(module, in_features, out_features)
+    return
+}
+
+// Adds a 2D convolution layer to the module.
+public def conv2d(module: Int64, in_channels: Int64, out_channels: Int64, kernel_size: Int64) {
+    nn_conv2d(module, in_channels, out_channels, kernel_size)
+    return
+}
+
+// Adds a ReLU activation layer.
+public def relu(module: Int64) {
+    nn_relu(module)
+    return
+}
+
+// Adds a sigmoid activation layer.
+public def sigmoid(module: Int64) {
+    nn_sigmoid(module)
+    return
+}
+
+// Adds a tanh activation layer.
+public def tanh(module: Int64) {
+    nn_tanh(module)
+    return
+}
+
+// Adds a softmax activation layer along the given dimension.
+public def softmax(module: Int64, dim: Int64) {
+    nn_softmax(module, dim)
+    return
+}
+
+// Adds a dropout layer with probability p.
+public def dropout(module: Int64, p: Float) {
+    nn_dropout(module, p)
+    return
+}
+
+// Adds a 1D batch normalization layer.
+public def batch_norm(module: Int64, features: Int64) {
+    nn_batch_norm(module, features)
+    return
+}
+
+// Runs a forward pass through the module.
+public def forward(module: Int64, input: Int64) -> Int64 {
+    return nn_forward(module, input)
+}
+
+// Frees a neural network module.
+public def free(module: Int64) {
+    nn_free(module)
+    return
+}

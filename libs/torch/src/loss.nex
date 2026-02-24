@@ -1,0 +1,16 @@
+// torch.loss — Loss functions for training.
+
+// Computes mean squared error between predictions and targets.
+public def mse(predictions: Int64, targets: Int64) -> Int64 {
+    return loss_mse(predictions, targets)
+}
+
+// Computes cross-entropy loss for classification (logits input).
+public def cross_entropy(predictions: Int64, targets: Int64) -> Int64 {
+    return loss_cross_entropy(predictions, targets)
+}
+
+// Computes binary cross-entropy loss with logits.
+public def bce(predictions: Int64, targets: Int64) -> Int64 {
+    return loss_bce(predictions, targets)
+}

@@ -1,0 +1,26 @@
+// http.client — HTTP client for GET and POST requests.
+
+public def get(url: String) -> Int64 {
+    return http_get(url)
+}
+
+public def post(url: String, body: String, content_type: String) -> Int64 {
+    return http_post(url, body, content_type)
+}
+
+public def response_status(handle: Int64) -> Int64 {
+    return http_response_status(handle)
+}
+
+public def response_body(handle: Int64) -> String {
+    return http_response_body(handle)
+}
+
+public def response_header(handle: Int64, name: String) -> String {
+    return http_response_header(handle, name)
+}
+
+public def response_free(handle: Int64) {
+    http_response_free(handle)
+    return
+}

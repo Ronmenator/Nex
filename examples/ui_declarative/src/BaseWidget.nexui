@@ -1,4 +1,4 @@
-<Widget xmlns="std.ui">
+<Widget xmlns="nex_ui">
   <!-- Shared container for all screen widgets.
        Derived widgets append their content to this column. -->
   <Column Gap="16" Padding="24" FlexGrow="1">

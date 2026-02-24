@@ -1,0 +1,31 @@
+// nex_ui.canvas — Canvas drawing API.
+
+public def fill_rect(canvas: Int64, x: Float, y: Float, w: Float, h: Float, rgba: Int64) {
+    ui_canvas_fill_rect(canvas, x, y, w, h, rgba)
+    return
+}
+
+public def stroke_rect(canvas: Int64, x: Float, y: Float, w: Float, h: Float, line_width: Float, rgba: Int64) {
+    ui_canvas_stroke_rect(canvas, x, y, w, h, line_width, rgba)
+    return
+}
+
+public def fill_circle(canvas: Int64, cx: Float, cy: Float, radius: Float, rgba: Int64) {
+    ui_canvas_fill_circle(canvas, cx, cy, radius, rgba)
+    return
+}
+
+public def draw_line(canvas: Int64, x1: Float, y1: Float, x2: Float, y2: Float, line_width: Float, rgba: Int64) {
+    ui_canvas_draw_line(canvas, x1, y1, x2, y2, line_width, rgba)
+    return
+}
+
+public def draw_text(canvas: Int64, text: String, x: Float, y: Float, size: Float, rgba: Int64) {
+    ui_canvas_draw_text(canvas, text, x, y, size, rgba)
+    return
+}
+
+public def clear(canvas: Int64, rgba: Int64) {
+    ui_canvas_clear(canvas, rgba)
+    return
+}

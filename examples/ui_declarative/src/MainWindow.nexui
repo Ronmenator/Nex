@@ -1,4 +1,4 @@
-<Window xmlns="std.ui" Title="Nex MVVM Demo" Width="900" Height="650" Background="0x11181CFF">
+<Window xmlns="nex_ui" Title="Nex MVVM Demo" Width="900" Height="650" Background="0x11181CFF">
 
   <Window.Resources>
     <ResourceDictionary Source="Styles/AppStyles.nexuistyle"/>

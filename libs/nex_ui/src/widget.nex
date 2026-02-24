@@ -1,0 +1,112 @@
+// nex_ui.widget — Widget creation and tree management.
+
+// ===========================================================================
+// Widget creation
+// ===========================================================================
+
+public def text(label: String) -> Int64 {
+    return ui_text(label)
+}
+
+public def button(label: String) -> Int64 {
+    return ui_button(label)
+}
+
+public def text_input(placeholder: String) -> Int64 {
+    return ui_text_input(placeholder)
+}
+
+public def image(path: String) -> Int64 {
+    return ui_image(path)
+}
+
+public def checkbox(label: String) -> Int64 {
+    return ui_checkbox(label)
+}
+
+public def slider(min: Float, max: Float) -> Int64 {
+    return ui_slider(min, max)
+}
+
+// ===========================================================================
+// Container widgets
+// ===========================================================================
+
+public def row() -> Int64 {
+    return ui_row()
+}
+
+public def column() -> Int64 {
+    return ui_column()
+}
+
+public def stack() -> Int64 {
+    return ui_stack()
+}
+
+public def scroll() -> Int64 {
+    return ui_scroll()
+}
+
+public def grid(cols: Int64) -> Int64 {
+    return ui_grid(cols)
+}
+
+public def canvas(width: Int64, height: Int64) -> Int64 {
+    return ui_canvas(width, height)
+}
+
+// ===========================================================================
+// Widget tree
+// ===========================================================================
+
+public def add_child(parent: Int64, child: Int64) {
+    ui_add_child(parent, child)
+    return
+}
+
+public def remove_child(parent: Int64, child: Int64) {
+    ui_remove_child(parent, child)
+    return
+}
+
+// ===========================================================================
+// Widget properties
+// ===========================================================================
+
+public def set_text(widget: Int64, label: String) {
+    ui_set_text(widget, label)
+    return
+}
+
+public def get_text(widget: Int64) -> String {
+    return ui_get_text(widget)
+}
+
+public def set_visible(widget: Int64, visible: Int64) {
+    ui_set_visible(widget, visible)
+    return
+}
+
+public def set_enabled(widget: Int64, enabled: Int64) {
+    ui_set_enabled(widget, enabled)
+    return
+}
+
+public def set_id(widget: Int64, id: String) {
+    ui_set_id(widget, id)
+    return
+}
+
+public def get_id(widget: Int64) -> String {
+    return ui_get_id(widget)
+}
+
+public def get_value_float(widget: Int64) -> Float {
+    return ui_get_value_float(widget)
+}
+
+public def set_value_float(widget: Int64, value: Float) {
+    ui_set_value_float(widget, value)
+    return
+}
