@@ -120,8 +120,8 @@
   <p>For local development, you can enable the extension directly from the workspace by creating a symlink in your VS Code extensions directory:</p>
   <pre><code>New-Item -ItemType SymbolicLink `
   -Path "$env:USERPROFILE\.vscode\extensions\nex.nex-language" `
-  -Target "D:\Development\Personal\Nex\vscode-extension"</code></pre>
-  <p>After creating the link, run <strong>Developer: Reload Window</strong> in VS Code.</p>
+  -Target "C:\path\to\nex\vscode-extension"</code></pre>
+  <p>Replace the <code>-Target</code> path with the actual location of the <code>vscode-extension</code> directory in your Nex repository clone. After creating the link, run <strong>Developer: Reload Window</strong> in VS Code.</p>
 
   <h3>LSP Server</h3>
   <p>The extension expects the <code>nex-lsp</code> binary to be on your system PATH. Build it from the Nex repository:</p>

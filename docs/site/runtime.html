@@ -127,22 +127,22 @@
   <p>The runtime is implemented as a set of C ABI functions. Key categories:</p>
 
   <h3>Allocation &amp; GC</h3>
-  <pre><code>aur_gc_alloc(type, size) <span class="op">-></span> Object    <span class="cmt">// allocate GC-managed object</span>
-aur_gc_collect()                       <span class="cmt">// trigger collection</span>
-aur_gc_safepoint()                     <span class="cmt">// GC safepoint check</span>
-aur_gc_write_barrier(obj)              <span class="cmt">// write barrier (v1: no-op)</span></code></pre>
+  <pre><code>nex_gc_alloc(type, size) <span class="op">-></span> Object    <span class="cmt">// allocate GC-managed object</span>
+nex_gc_collect()                       <span class="cmt">// trigger collection</span>
+nex_gc_safepoint()                     <span class="cmt">// GC safepoint check</span>
+nex_gc_write_barrier(obj)              <span class="cmt">// write barrier (v1: no-op)</span></code></pre>
 
   <h3>Exceptions</h3>
-  <pre><code>aur_throw(exception)                   <span class="cmt">// throw exception (noreturn)</span>
-aur_new_exception(message) <span class="op">-></span> Object   <span class="cmt">// create exception object</span></code></pre>
+  <pre><code>nex_throw(exception)                   <span class="cmt">// throw exception (noreturn)</span>
+nex_new_exception(message) <span class="op">-></span> Object   <span class="cmt">// create exception object</span></code></pre>
 
   <h3>Var Operations</h3>
-  <pre><code>aur_var_from_i64(value) <span class="op">-></span> Var         <span class="cmt">// box integer</span>
-aur_var_from_f64(value) <span class="op">-></span> Var         <span class="cmt">// box float</span>
-aur_var_from_obj(obj) <span class="op">-></span> Var           <span class="cmt">// wrap object reference</span>
-aur_var_add(a, b) <span class="op">-></span> Var               <span class="cmt">// runtime addition</span>
-aur_var_eq(a, b) <span class="op">-></span> Var                <span class="cmt">// runtime equality check</span>
-aur_var_typeof(v) <span class="op">-></span> Type              <span class="cmt">// get type descriptor</span></code></pre>
+  <pre><code>nex_var_from_i64(value) <span class="op">-></span> Var         <span class="cmt">// box integer</span>
+nex_var_from_f64(value) <span class="op">-></span> Var         <span class="cmt">// box float</span>
+nex_var_from_obj(obj) <span class="op">-></span> Var           <span class="cmt">// wrap object reference</span>
+nex_var_add(a, b) <span class="op">-></span> Var               <span class="cmt">// runtime addition</span>
+nex_var_eq(a, b) <span class="op">-></span> Var                <span class="cmt">// runtime equality check</span>
+nex_var_typeof(v) <span class="op">-></span> Type              <span class="cmt">// get type descriptor</span></code></pre>
 
   <h2>Compiler Pipeline</h2>
 

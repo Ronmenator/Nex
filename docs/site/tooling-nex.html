@@ -58,6 +58,26 @@ Compiling my_app v0.1.0
 <span class="cmt"># Build a single file</span>
 $ nex build src/main.nex</code></pre>
 
+  <h3>nex build --lib</h3>
+  <div class="signature">
+    nex build --lib [path]
+  </div>
+  <p>Compiles a library project to a shared library (DLL on Windows, <code>.so</code> on Linux, <code>.dylib</code> on macOS). Each <code>.nex</code> source file under the library's <code>src/</code> directory is compiled to a position-independent object file, and all objects are linked into a single shared library. The output is placed in the library's root directory.</p>
+
+  <pre><code><span class="cmt"># Build a library</span>
+$ nex build --lib libs/crypto
+  compiled crypto.encode
+  compiled crypto.hash
+  compiled crypto.hmac
+  compiled crypto.random
+linked -> libs/crypto/crypto.dll
+
+<span class="cmt"># Build from within the library directory</span>
+$ cd libs/crypto
+$ nex build --lib .</code></pre>
+
+  <p>The library name is derived from the <code>name</code> field in the library's <code>project.toml</code>. All public functions are exported as symbols in the shared library, using dot-separated module-qualified names (e.g. <code>crypto.hash.sha256_hash</code>).</p>
+
   <h3>nex run</h3>
   <div class="signature">
     nex run [path] [-- args]
@@ -195,14 +215,19 @@ Removed build/</code></pre>
         <td>Uses Cranelift JIT to compile and execute in-memory. Fast iteration during development — no output binary is written to disk.</td>
       </tr>
       <tr>
-        <td><strong>AOT</strong></td>
+        <td><strong>AOT (exe)</strong></td>
         <td><code>nex build</code></td>
         <td>Compiles to a native executable via Cranelift. Produces a standalone binary suitable for distribution and deployment.</td>
+      </tr>
+      <tr>
+        <td><strong>AOT (lib)</strong></td>
+        <td><code>nex build --lib</code></td>
+        <td>Compiles to a shared library (DLL/.so/.dylib) with position-independent code. Used for building reusable library packages.</td>
       </tr>
     </tbody>
   </table>
 
-  <p>Use <code>nex run</code> during development for rapid feedback. Use <code>nex build</code> when you need a distributable binary or want to measure production performance.</p>
+  <p>Use <code>nex run</code> during development for rapid feedback. Use <code>nex build</code> when you need a distributable binary. Use <code>nex build --lib</code> to compile a library to a shared library that other projects can import.</p>
 
   <h2>Example Workflow</h2>
 
