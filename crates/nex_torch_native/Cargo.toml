@@ -10,4 +10,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
-tch = "0.22"
+tch = "0.23"
