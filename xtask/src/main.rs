@@ -51,6 +51,7 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("deploy") => deploy(&args[1..]),
+        Some("release") => release(&args[1..]),
         Some(cmd) => {
             eprintln!("error: unknown xtask command `{cmd}`");
             print_usage();
@@ -64,12 +65,20 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("usage: cargo xtask deploy [--release] [--major | --minor | --patch]");
+    eprintln!("usage: cargo xtask <command> [options]");
     eprintln!();
+    eprintln!("commands:");
+    eprintln!("  deploy    Build and deploy locally");
+    eprintln!("  release   Package and publish a GitHub release");
+    eprintln!();
+    eprintln!("deploy options:");
     eprintln!("  --patch   bump patch version (default): 0.1.0 -> 0.1.1");
     eprintln!("  --minor   bump minor version:           0.1.0 -> 0.2.0");
     eprintln!("  --major   bump major version:           0.1.0 -> 1.0.0");
     eprintln!("  --release build in release mode");
+    eprintln!();
+    eprintln!("release options:");
+    eprintln!("  --draft   create as draft release");
 }
 
 #[derive(Clone, Copy)]
@@ -249,6 +258,214 @@ fn deploy(args: &[String]) {
         eprintln!("deployed with errors. locked files: {}", failed.join(", "));
         eprintln!("hint: close any process using those files (e.g. nex-lsp via VS Code) and retry");
         process::exit(1);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Release packaging
+// ---------------------------------------------------------------------------
+
+fn release(args: &[String]) {
+    let draft = args.iter().any(|a| a == "--draft");
+
+    let root = project_root();
+    let nex_dir = root.join("nex");
+    let toolchain_config = nex_dir.join("config").join("nex.toml");
+
+    // 1. Read version
+    let config_text = fs::read_to_string(&toolchain_config).unwrap_or_else(|e| {
+        panic!("failed to read {}: {e}", toolchain_config.display());
+    });
+    let version = parse_toolchain_version(&config_text)
+        .expect("failed to parse version from nex/config/nex.toml");
+
+    let tag = format!("v{version}");
+    let archive_name = format!("nex-{tag}-windows-x86_64");
+    let staging_root = root.join("target").join("release-staging");
+    let staging = staging_root.join(&archive_name);
+
+    println!("packaging {tag}...");
+    println!();
+
+    // 2. Clean & create staging directory
+    if staging.exists() {
+        fs::remove_dir_all(&staging).expect("failed to clean staging directory");
+    }
+
+    // 3. Stage bin/
+    let staged_bin = staging.join("bin");
+    fs::create_dir_all(&staged_bin).expect("failed to create staging bin/");
+    let live_bin = nex_dir.join("bin");
+    if !live_bin.exists() {
+        eprintln!("error: nex/bin/ does not exist. Run `cargo xtask deploy` first.");
+        process::exit(1);
+    }
+    for entry in fs::read_dir(&live_bin).expect("failed to read nex/bin/").flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            let name = entry.file_name();
+            fs::copy(&path, staged_bin.join(&name)).unwrap_or_else(|e| {
+                panic!("failed to copy {}: {e}", path.display());
+            });
+            println!("staged    bin/{}", name.to_string_lossy());
+        }
+    }
+
+    // 4. Stage libs/ (*.dll, *.nex, project.toml — skip build/ dirs)
+    let libs_dir = root.join("libs");
+    if libs_dir.exists() {
+        stage_libs(&libs_dir, &staging.join("libs"));
+    }
+
+    // 5. Stage config/
+    let staged_config = staging.join("config");
+    fs::create_dir_all(&staged_config).expect("failed to create staging config/");
+    let config_src = nex_dir.join("config").join("nex.toml");
+    fs::copy(&config_src, staged_config.join("nex.toml")).unwrap_or_else(|e| {
+        panic!("failed to copy nex.toml: {e}");
+    });
+    println!("staged    config/nex.toml");
+
+    println!();
+
+    // 6. Create zip archive
+    let zip_path = staging_root.join(format!("{archive_name}.zip"));
+    if zip_path.exists() {
+        fs::remove_file(&zip_path).ok();
+    }
+
+    println!("creating  {archive_name}.zip ...");
+
+    #[cfg(windows)]
+    {
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "Compress-Archive -Path '{}\\*' -DestinationPath '{}' -Force",
+                    staging.to_string_lossy().replace('/', "\\"),
+                    zip_path.to_string_lossy().replace('/', "\\"),
+                ),
+            ])
+            .status()
+            .expect("failed to run powershell Compress-Archive");
+        if !status.success() {
+            eprintln!("failed to create zip archive");
+            process::exit(1);
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let status = Command::new("zip")
+            .args(["-r", &zip_path.to_string_lossy(), &archive_name])
+            .current_dir(&staging_root)
+            .status()
+            .expect("failed to run zip");
+        if !status.success() {
+            eprintln!("failed to create zip archive");
+            process::exit(1);
+        }
+    }
+
+    let zip_size = fs::metadata(&zip_path).map(|m| m.len()).unwrap_or(0);
+    println!(
+        "created   {} ({:.1} MB)",
+        zip_path
+            .strip_prefix(&root)
+            .unwrap_or(&zip_path)
+            .display(),
+        zip_size as f64 / (1024.0 * 1024.0)
+    );
+    println!();
+
+    // 7. Create GitHub release via gh CLI
+    println!("publishing GitHub release {tag}...");
+
+    let mut gh_args = vec![
+        "release".to_string(),
+        "create".to_string(),
+        tag.clone(),
+        zip_path.to_string_lossy().to_string(),
+        "--title".to_string(),
+        format!("Nex {tag}"),
+        "--generate-notes".to_string(),
+    ];
+    if draft {
+        gh_args.push("--draft".to_string());
+    }
+
+    let status = Command::new("gh")
+        .args(&gh_args)
+        .current_dir(&root)
+        .status()
+        .unwrap_or_else(|e| {
+            eprintln!("failed to run `gh`: {e}");
+            eprintln!("hint: install GitHub CLI: https://cli.github.com/");
+            process::exit(1);
+        });
+
+    if !status.success() {
+        eprintln!("gh release create failed");
+        process::exit(1);
+    }
+
+    // 8. Clean up staging
+    let _ = fs::remove_dir_all(&staging);
+
+    println!();
+    let draft_label = if draft { " (draft)" } else { "" };
+    println!("released {tag}{draft_label}");
+    println!("install:  irm https://raw.githubusercontent.com/Ronmenator/Nex/master/install.ps1 | iex");
+}
+
+/// Copy lib directories into staging, including only .dll, .nex, and project.toml files.
+fn stage_libs(libs_src: &Path, libs_dst: &Path) {
+    let Ok(entries) = fs::read_dir(libs_src) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let src_lib = entry.path();
+        if !src_lib.is_dir() {
+            continue;
+        }
+        let lib_name = entry.file_name();
+        let dst_lib = libs_dst.join(&lib_name);
+        fs::create_dir_all(&dst_lib).expect("failed to create lib staging dir");
+
+        // Copy top-level files (.dll, project.toml)
+        for file in fs::read_dir(&src_lib).into_iter().flatten().flatten() {
+            let path = file.path();
+            if !path.is_file() {
+                continue;
+            }
+            let name = file.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.ends_with(".dll")
+                || name_str.ends_with(".so")
+                || name_str.ends_with(".dylib")
+                || name_str == "project.toml"
+            {
+                fs::copy(&path, dst_lib.join(&name)).ok();
+            }
+        }
+
+        // Copy src/*.nex
+        let src_subdir = src_lib.join("src");
+        if src_subdir.is_dir() {
+            let dst_src = dst_lib.join("src");
+            fs::create_dir_all(&dst_src).ok();
+            for file in fs::read_dir(&src_subdir).into_iter().flatten().flatten() {
+                let path = file.path();
+                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("nex") {
+                    fs::copy(&path, dst_src.join(file.file_name())).ok();
+                }
+            }
+        }
+
+        println!("staged    libs/{}/", lib_name.to_string_lossy());
     }
 }
 
