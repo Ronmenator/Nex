@@ -2,6 +2,14 @@
 
 A compiled, statically-typed programming language with classes, interfaces, multiple inheritance, and native code generation. Designed for both rapid prototyping and production applications.
 
+## Install
+
+```powershell
+irm https://raw.githubusercontent.com/Ronmenator/Nex/master/install.ps1 | iex
+```
+
+This downloads the latest release, extracts it to `~/.nex/`, and adds it to your PATH. After install, restart your terminal and run `nex --version` to verify.
+
 ## Features
 
 - **Static typing** with local type inference
@@ -9,6 +17,8 @@ A compiled, statically-typed programming language with classes, interfaces, mult
 - **Native performance** — compiles to machine code via Cranelift (AOT and JIT)
 - **Garbage collected** with deterministic cleanup via `using` blocks
 - **Rich standard library** — collections, I/O, networking, JSON, crypto, threading, and more
+- **3D game engine** — `nex3d` with sprites, 3D models, animation, audio, lighting, fonts, gamepad input, and more
+- **Machine learning** — `torch` library with tensors, neural networks, CUDA, and training utilities
 - **Declarative UI** — `.nexui` markup for desktop GUI applications
 - **Package manager** — install libraries from GitHub with `nex install`
 - **Tooling** — formatter, linter, REPL, LSP, and VS Code extension
@@ -52,6 +62,19 @@ Commands:
   clean                       Remove build artifacts
 ```
 
+## Standard Libraries
+
+Opt-in libraries that ship with Nex. Add them to your `project.toml` under `[libs]`:
+
+| Library | Description |
+|---------|-------------|
+| **crypto** | SHA-256, SHA-512, MD5, HMAC, Base64, secure random bytes |
+| **http** | HTTP client for GET/POST with response status, body, and headers |
+| **regex** | Regular expression compilation, matching, searching, and replacement |
+| **torch** | PyTorch tensors, neural networks, loss functions, optimizers, CUDA, training utilities |
+| **nex_ui** | Desktop GUI (WGPU) and terminal TUI with flexbox layout, canvas, and dialogs |
+| **nex3d** | 3D game engine — sprites, models, animation, audio, lighting, fonts, gamepad, render targets |
+
 ## Project Structure
 
 A Nex project uses a `project.toml` manifest:
@@ -69,13 +92,15 @@ Source files use the `.nex` extension. Declarative UI markup uses `.nexui`.
 Requires Rust 1.75+ and Cargo.
 
 ```
-cargo build --release -p nex -p nexc -p nex_lsp
+cargo xtask deploy
 ```
 
-Or use the built-in install command to build and copy binaries to `nex/bin/`:
+This builds all binaries (`nex`, `nexc`, `nex-lsp`) and native DLLs, then copies them to `nex/bin/` and `libs/`.
+
+To create a GitHub release:
 
 ```
-nex install
+cargo xtask release [--draft]
 ```
 
 ## Examples
@@ -87,6 +112,11 @@ See the [examples/](examples/) directory:
 - **game_showcase** — 3D engine with window, camera, keyboard input, and HUD
 - **ui_declarative** — desktop GUI with `.nexui` markup and styling
 - **gpt2_transformer** — GPT-2 language model using the `torch` library
+- **cuda_test** — CUDA device detection and GPU tensor operations
+
+## Documentation
+
+Full docs at [docs/site/](docs/site/index.html) covering the language, standard library, tooling, and all libraries.
 
 ## License
 

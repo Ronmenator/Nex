@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -34,7 +34,17 @@ torch = { path = "../libs/torch" }</code></pre>
 <span class="kw">import</span> torch.nn      <span class="cmt">// neural network layers</span>
 <span class="kw">import</span> torch.loss    <span class="cmt">// loss functions</span>
 <span class="kw">import</span> torch.optim   <span class="cmt">// optimizers</span>
-<span class="kw">import</span> torch.model   <span class="cmt">// model save/load, TorchScript</span></code></pre>
+<span class="kw">import</span> torch.model   <span class="cmt">// model save/load, TorchScript</span>
+<span class="kw">import</span> torch.train   <span class="cmt">// high-level training utilities</span></code></pre>
+
+  <h2>Device Constants</h2>
+
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">CPU</span>() <span class="op">-&gt;</span> <span class="typ">String</span> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <span class="kw">def</span> <span class="fn">CUDA</span>() <span class="op">-&gt;</span> <span class="typ">String</span> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <span class="kw">def</span> <span class="fn">best_device</span>() <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p><code>CPU()</code> returns <code>"cpu"</code>, <code>CUDA()</code> returns <code>"cuda"</code>. <code>best_device()</code> returns <code>"cuda"</code> if a CUDA device is available, otherwise <code>"cpu"</code>.</p>
 
   <h2>Tensor Creation</h2>
 
@@ -148,6 +158,121 @@ torch = { path = "../libs/torch" }</code></pre>
   </div>
   <p>Returns a scalar tensor containing the mean of all elements.</p>
 
+  <h2>Scalar Arithmetic</h2>
+
+  <h4>tensor_add_scalar</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_add_scalar</span>(t: <span class="typ">Var</span>, scalar: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Adds a scalar value to every element of the tensor.</p>
+
+  <h4>tensor_mul_scalar</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_mul_scalar</span>(t: <span class="typ">Var</span>, scalar: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Multiplies every element by a scalar.</p>
+
+  <h4>tensor_div_scalar</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_div_scalar</span>(t: <span class="typ">Var</span>, scalar: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Divides every element by a scalar.</p>
+
+  <h4>tensor_pow_scalar</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_pow_scalar</span>(t: <span class="typ">Var</span>, exponent: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Raises every element to the given power.</p>
+
+  <h2>Element-wise Math (Extended)</h2>
+
+  <h4>tensor_sqrt</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_sqrt</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise square root.</p>
+
+  <h4>tensor_abs</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_abs</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise absolute value.</p>
+
+  <h4>tensor_clamp</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_clamp</span>(t: <span class="typ">Var</span>, min_val: <span class="typ">Float</span>, max_val: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Clamps all elements to the range <code>[min_val, max_val]</code>.</p>
+
+  <h4>tensor_softmax</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_softmax</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Applies softmax along the given dimension. This is a tensor-level operation (not an nn module layer).</p>
+
+  <h2>Comparison</h2>
+
+  <h4>tensor_eq_scalar / tensor_gt_scalar / tensor_lt_scalar</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_eq_scalar</span>(t: <span class="typ">Var</span>, value: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_gt_scalar</span>(t: <span class="typ">Var</span>, value: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_lt_scalar</span>(t: <span class="typ">Var</span>, value: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise comparison against a scalar. Returns a boolean (uint8) tensor. <code>eq</code> tests equality, <code>gt</code> tests greater-than, <code>lt</code> tests less-than.</p>
+
+  <h2>Masking and Triangular</h2>
+
+  <h4>tensor_tril / tensor_triu</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_tril</span>(t: <span class="typ">Var</span>, diagonal: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_triu</span>(t: <span class="typ">Var</span>, diagonal: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p><code>tril</code> returns the lower triangular part (elements above the diagonal are zeroed). <code>triu</code> returns the upper triangular part. The <code>diagonal</code> parameter offsets which diagonal to use (0 = main diagonal).</p>
+
+  <h4>tensor_masked_fill</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_masked_fill</span>(t: <span class="typ">Var</span>, mask: <span class="typ">Var</span>, value: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Fills elements where <code>mask</code> is non-zero with <code>value</code>. Commonly used with comparison results to mask out values (e.g. causal attention masks).</p>
+
+  <h4>tensor_where_self</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_where_self</span>(condition: <span class="typ">Var</span>, x: <span class="typ">Var</span>, y: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Element-wise conditional: selects from <code>x</code> where condition is true, from <code>y</code> otherwise.</p>
+
+  <h2>Reduction with Dimension</h2>
+
+  <h4>tensor_sum_dim / tensor_mean_dim</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_sum_dim</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>, keepdim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_mean_dim</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>, keepdim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Reduces along a specific dimension. Pass <code>keepdim = 1</code> to retain the reduced dimension as size 1.</p>
+
+  <h4>tensor_argmax</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_argmax</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns the indices of the maximum values along dimension <code>dim</code>.</p>
+
+  <h4>tensor_max_dim / tensor_min_dim</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_max_dim</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_min_dim</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns the maximum/minimum values along the given dimension.</p>
+
   <h4>tensor_reshape</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">tensor_reshape</span>(t: <span class="typ">Var</span>, shape: <span class="typ">Var</span>, ndims: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
@@ -171,6 +296,44 @@ torch = { path = "../libs/torch" }</code></pre>
     <span class="kw">def</span> <span class="fn">tensor_unsqueeze</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
   </div>
   <p>Inserts a dimension of size 1 at position <code>dim</code>.</p>
+
+  <h4>tensor_cat</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_cat</span>(a: <span class="typ">Var</span>, b: <span class="typ">Var</span>, dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Concatenates two tensors along the given dimension.</p>
+
+  <h4>tensor_narrow</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_narrow</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>, start: <span class="typ">Int</span>, length: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Returns a narrowed view: a slice of <code>length</code> elements starting at <code>start</code> along the given dimension.</p>
+
+  <h4>tensor_index_select</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_index_select</span>(t: <span class="typ">Var</span>, dim: <span class="typ">Int</span>, index: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Selects elements along <code>dim</code> using an index tensor.</p>
+
+  <h4>tensor_flatten</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_flatten</span>(t: <span class="typ">Var</span>, start_dim: <span class="typ">Int</span>, end_dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Flattens dimensions from <code>start_dim</code> to <code>end_dim</code> (inclusive) into a single dimension.</p>
+
+  <h2>Creation Helpers</h2>
+
+  <h4>tensor_ones_like / tensor_zeros_like / tensor_full_like</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_ones_like</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_zeros_like</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_full_like</span>(t: <span class="typ">Var</span>, value: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Create tensors with the same shape and device as the input. <code>ones_like</code> fills with 1, <code>zeros_like</code> with 0, <code>full_like</code> with the given value.</p>
 
   <h2>Tensor Info</h2>
 
@@ -427,6 +590,101 @@ torch = { path = "../libs/torch" }</code></pre>
     <span class="kw">def</span> <span class="fn">tensor_to_string</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
   </div>
   <p>Returns a string representation of the tensor including its values, shape, and dtype.</p>
+
+  <h2>Utility (Extended)</h2>
+
+  <h4>tensor_clone / tensor_detach / tensor_contiguous</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_clone</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_detach</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_contiguous</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p><code>clone</code> creates a deep copy. <code>detach</code> removes from the computation graph (useful before inference). <code>contiguous</code> returns a contiguous memory layout.</p>
+
+  <h4>tensor_to_dtype_float / tensor_to_dtype_long</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_to_dtype_float</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">tensor_to_dtype_long</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Casts the tensor to float (f32) or long (int64) dtype.</p>
+
+  <h4>print_shape</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">print_shape</span>(t: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Prints the tensor shape to stdout (e.g. <code>shape: [3, 4]</code>). Supports up to 4 dimensions.</p>
+
+  <h2>Neural Network Layers (Extended)</h2>
+
+  <h4>nn_layer_norm</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_layer_norm</span>(module: <span class="typ">Var</span>, normalized_shape: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a layer normalization layer. Normalizes across the feature dimension.</p>
+
+  <h4>nn_gelu</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_gelu</span>(module: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds a GELU (Gaussian Error Linear Unit) activation layer. Commonly used in transformer architectures.</p>
+
+  <h4>nn_embedding</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_embedding</span>(module: <span class="typ">Var</span>, num_embeddings: <span class="typ">Int</span>, embedding_dim: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds an embedding layer that maps integer indices to dense vectors. Input tensors are cast to int64 internally.</p>
+
+  <h4>nn_to_device</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">nn_to_device</span>(module: <span class="typ">Var</span>, device: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Moves a module and all its parameters to a device (<code>"cpu"</code> or <code>"cuda"</code>).</p>
+
+  <h2>Convenience Builders</h2>
+
+  <h4>linear_relu / linear_sigmoid / linear_tanh</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">linear_relu</span>(module: <span class="typ">Var</span>, in_f: <span class="typ">Int</span>, out_f: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">linear_sigmoid</span>(module: <span class="typ">Var</span>, in_f: <span class="typ">Int</span>, out_f: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">linear_tanh</span>(module: <span class="typ">Var</span>, in_f: <span class="typ">Int</span>, out_f: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Combined layer builders: adds a linear layer followed by an activation in one call.</p>
+
+  <h4>build_mlp</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">build_mlp</span>(in_features: <span class="typ">Int</span>, hidden: <span class="typ">Int</span>, out_features: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Builds a complete 2-layer MLP: Linear(in, hidden) &rarr; ReLU &rarr; Linear(hidden, out). Returns the module handle.</p>
+
+  <h4>build_classifier</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">build_classifier</span>(in_features: <span class="typ">Int</span>, hidden: <span class="typ">Int</span>, num_classes: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Builds a classifier: Linear(in, hidden) &rarr; ReLU &rarr; Linear(hidden, num_classes) &rarr; Softmax. Returns the module handle.</p>
+
+  <h2>Training Utilities</h2>
+
+  <h4>train_step_mse</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">train_step_mse</span>(model: <span class="typ">Var</span>, optimizer: <span class="typ">Var</span>, input: <span class="typ">Var</span>, target: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Performs a single training step with MSE loss: zeros gradients, runs forward pass, computes loss, backpropagates, and updates weights. Returns the loss tensor.</p>
+
+  <h4>train_step_ce</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">train_step_ce</span>(model: <span class="typ">Var</span>, optimizer: <span class="typ">Var</span>, input: <span class="typ">Var</span>, target: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Same as <code>train_step_mse</code> but uses cross-entropy loss. Returns the loss tensor.</p>
 
   <h2>Complete Training Example</h2>
 

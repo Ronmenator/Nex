@@ -11,19 +11,19 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
 
-  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="tooling-project.html">Project</a><span class="sep">/</span>nex3d</div>
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="lib-overview.html">Standard Libraries</a><span class="sep">/</span>nex3d</div>
 
   <h1>nex3d</h1>
-  <p class="page-subtitle">3D Game Engine library for building 2D and 3D games. Provides math types (Vec2, Vec3, Vec4), engine lifecycle (window, run loop), and GPU-accelerated rendering via WGPU.</p>
+  <p class="page-subtitle">3D game engine library for building 2D and 3D games. Provides math types, window management, input handling, rendering primitives, lighting, audio, skeletal animation, and more &mdash; all powered by GPU-accelerated rendering via WGPU.</p>
 
   <div class="callout warning">
     <div class="callout-title">Build Requirement</div>
-    <p>For engine functionality, build the Nex toolchain with <code>cargo build --features engine -p nex</code>. The <code>nex3d.math</code> module works without this feature.</p>
+    <p>Engine modules (everything except <code>nex3d.math</code>, <code>nex3d.color</code>, <code>nex3d.camera</code>, and <code>nex3d.bounds</code>) require the native engine runtime. Build the Nex toolchain with <code>cargo build --features engine -p nex</code> to enable them.</p>
   </div>
 
   <h2>Setup</h2>
@@ -31,59 +31,535 @@
   <pre><code>[libs]
 nex3d = { path = "../libs/nex3d" }</code></pre>
 
-  <h2>Modules</h2>
+  <h2>Module Overview</h2>
 
+  <div class="feature-grid">
+    <div class="feature-card"><h4>math</h4><p>Vec2, Vec3, Vec4, Mat4, Quat, and scalar utilities.</p></div>
+    <div class="feature-card"><h4>engine</h4><p>Window creation, game loop, camera binding, UI overlay.</p></div>
+    <div class="feature-card"><h4>color</h4><p>Color struct with named constants and blending helpers.</p></div>
+    <div class="feature-card"><h4>draw</h4><p>Triangles, quads, lines, cubes, spheres, grids.</p></div>
+    <div class="feature-card"><h4>input</h4><p>Keyboard and mouse input polling.</p></div>
+    <div class="feature-card"><h4>gamepad</h4><p>Gamepad buttons, axes, and sticks (up to 4 players).</p></div>
+    <div class="feature-card"><h4>camera</h4><p>High-level camera struct with view/projection helpers.</p></div>
+    <div class="feature-card"><h4>light</h4><p>Directional, point, and spot lights (up to 8 slots).</p></div>
+    <div class="feature-card"><h4>texture</h4><p>Image loading, texture binding, UV vertex push.</p></div>
+    <div class="feature-card"><h4>sprite</h4><p>XNA-style SpriteBatch for 2D rendering.</p></div>
+    <div class="feature-card"><h4>font</h4><p>Built-in 8x8 bitmap font for debug text.</p></div>
+    <div class="feature-card"><h4>model</h4><p>OBJ model loading and drawing.</p></div>
+    <div class="feature-card"><h4>anim</h4><p>Skeletal animation via glTF (.glb/.gltf).</p></div>
+    <div class="feature-card"><h4>audio</h4><p>Sound loading and playback (WAV, MP3, OGG, FLAC).</p></div>
+    <div class="feature-card"><h4>bounds</h4><p>Bounding boxes, spheres, rays, planes, intersection tests.</p></div>
+    <div class="feature-card"><h4>rendertarget</h4><p>Off-screen render targets for post-processing.</p></div>
+    <div class="feature-card"><h4>states</h4><p>Blend, cull, fill, and depth render state configuration.</p></div>
+    <div class="feature-card"><h4>time</h4><p>Delta time, elapsed time, and frame count.</p></div>
+  </div>
+
+  <!-- ================================================================== -->
+  <h2>Modules</h2>
+  <!-- ================================================================== -->
+
+  <!-- ===== 1. nex3d.math ===== -->
   <h3>nex3d.math</h3>
-  <p>Pure Nex vector and matrix types using std.math. No runtime engine dependency.</p>
+  <p>Pure Nex vector, matrix, and quaternion types built on <code>std.math</code>. No engine dependency &mdash; usable in any Nex project.</p>
   <pre><code><span class="kw">import</span> nex3d.math</code></pre>
 
   <h4>Vec2</h4>
-  <p>2D vector for sprites, UI, and 2D games.</p>
+  <p>2D vector for sprites, UI coordinates, and 2D games.</p>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Vec2</span> { x: <span class="typ">Float</span>, y: <span class="typ">Float</span> }</div>
   <div class="signature"><span class="fn">vec2</span>(x: <span class="typ">Float</span>, y: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Vec2</span></div>
-  <div class="signature"><span class="fn">vec2_add</span>, <span class="fn">vec2_sub</span>, <span class="fn">vec2_mul</span>, <span class="fn">vec2_dot</span>, <span class="fn">vec2_length</span>, <span class="fn">vec2_normalize</span></div>
+  <div class="signature"><span class="fn">vec2_zero</span>() <span class="op">-&gt;</span> <span class="typ">Vec2</span> &nbsp; <span class="fn">vec2_one</span>() <span class="op">-&gt;</span> <span class="typ">Vec2</span></div>
+  <div class="signature"><span class="fn">vec2_add</span>, <span class="fn">vec2_sub</span>, <span class="fn">vec2_mul</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-&gt;</span> <span class="typ">Vec2</span></div>
+  <div class="signature"><span class="fn">vec2_dot</span>(a: <span class="typ">Vec2</span>, b: <span class="typ">Vec2</span>) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">vec2_length</span>(v: <span class="typ">Vec2</span>) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">vec2_normalize</span>(v: <span class="typ">Vec2</span>) <span class="op">-&gt;</span> <span class="typ">Vec2</span></div>
 
   <h4>Vec3</h4>
-  <p>3D vector for positions, directions, RGB colors.</p>
-  <div class="signature"><span class="fn">vec3</span>(x, y, z), <span class="fn">vec3_add</span>, <span class="fn">vec3_sub</span>, <span class="fn">vec3_mul</span>, <span class="fn">vec3_dot</span>, <span class="fn">vec3_length</span>, <span class="fn">vec3_normalize</span></div>
+  <p>3D vector for positions, directions, and RGB colors.</p>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Vec3</span> { x: <span class="typ">Float</span>, y: <span class="typ">Float</span>, z: <span class="typ">Float</span> }</div>
+  <div class="signature"><span class="fn">vec3</span>(x, y, z) <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">vec3_zero</span>() <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">vec3_one</span>() <span class="op">-&gt;</span> <span class="typ">Vec3</span></div>
+  <div class="signature"><span class="fn">vec3_add</span>, <span class="fn">vec3_sub</span>, <span class="fn">vec3_mul</span>(a: <span class="typ">Vec3</span>, b: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Vec3</span></div>
+  <div class="signature"><span class="fn">vec3_dot</span>(a, b) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">vec3_length</span>(v) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">vec3_normalize</span>(v) <span class="op">-&gt;</span> <span class="typ">Vec3</span></div>
+  <div class="signature"><span class="fn">vec3_cross</span>(a, b) <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">vec3_negate</span>(v) <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">vec3_lerp</span>(a, b, t) <span class="op">-&gt;</span> <span class="typ">Vec3</span></div>
 
   <h4>Vec4</h4>
-  <p>4D vector for homogeneous coordinates and RGBA.</p>
-  <div class="signature"><span class="fn">vec4</span>(x, y, z, w), <span class="fn">vec4_from_vec3</span></div>
+  <p>4D vector for homogeneous coordinates and RGBA colors.</p>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Vec4</span> { x: <span class="typ">Float</span>, y: <span class="typ">Float</span>, z: <span class="typ">Float</span>, w: <span class="typ">Float</span> }</div>
+  <div class="signature"><span class="fn">vec4</span>(x, y, z, w) <span class="op">-&gt;</span> <span class="typ">Vec4</span> &nbsp; <span class="fn">vec4_from_vec3</span>(v: <span class="typ">Vec3</span>, w: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Vec4</span></div>
+  <div class="signature"><span class="fn">vec4_zero</span>() <span class="op">-&gt;</span> <span class="typ">Vec4</span> &nbsp; <span class="fn">vec4_one</span>() <span class="op">-&gt;</span> <span class="typ">Vec4</span></div>
+  <div class="signature"><span class="fn">vec4_add</span>, <span class="fn">vec4_sub</span>, <span class="fn">vec4_mul</span>(a: <span class="typ">Vec4</span>, b: <span class="typ">Vec4</span>) <span class="op">-&gt;</span> <span class="typ">Vec4</span></div>
+  <div class="signature"><span class="fn">vec4_dot</span>(a, b) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">vec4_length</span>(v) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">vec4_normalize</span>(v) <span class="op">-&gt;</span> <span class="typ">Vec4</span></div>
 
+  <h4>Mat4</h4>
+  <p>4x4 matrix for transforms, projection, and view matrices.</p>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Mat4</span> { m: <span class="typ">Float</span>[<span class="num">16</span>] }</div>
+  <div class="signature"><span class="fn">mat4_identity</span>() <span class="op">-&gt;</span> <span class="typ">Mat4</span> &nbsp; <span class="fn">mat4_zero</span>() <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature"><span class="fn">mat4_multiply</span>(a: <span class="typ">Mat4</span>, b: <span class="typ">Mat4</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span> &nbsp; <span class="fn">mat4_transpose</span>(m: <span class="typ">Mat4</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature"><span class="fn">mat4_translate</span>(v: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span> &nbsp; <span class="fn">mat4_scale</span>(v: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature"><span class="fn">mat4_rotate_x</span>(rad) <span class="op">-&gt;</span> <span class="typ">Mat4</span> &nbsp; <span class="fn">mat4_rotate_y</span>(rad) <span class="op">-&gt;</span> <span class="typ">Mat4</span> &nbsp; <span class="fn">mat4_rotate_z</span>(rad) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature">
+    <span class="fn">mat4_perspective</span>(fov: <span class="typ">Float</span>, aspect: <span class="typ">Float</span>, near: <span class="typ">Float</span>, far: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span>
+  </div>
+  <div class="signature">
+    <span class="fn">mat4_ortho</span>(left: <span class="typ">Float</span>, right: <span class="typ">Float</span>, bottom: <span class="typ">Float</span>, top: <span class="typ">Float</span>, near: <span class="typ">Float</span>, far: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span>
+  </div>
+  <div class="signature">
+    <span class="fn">mat4_look_at</span>(eye: <span class="typ">Vec3</span>, target: <span class="typ">Vec3</span>, up: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span>
+  </div>
+  <div class="signature"><span class="fn">mat4_mul_vec4</span>(m: <span class="typ">Mat4</span>, v: <span class="typ">Vec4</span>) <span class="op">-&gt;</span> <span class="typ">Vec4</span></div>
+
+  <h4>Quat</h4>
+  <p>Quaternion for smooth, gimbal-lock-free rotations.</p>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Quat</span> { x: <span class="typ">Float</span>, y: <span class="typ">Float</span>, z: <span class="typ">Float</span>, w: <span class="typ">Float</span> }</div>
+  <div class="signature"><span class="fn">quat_identity</span>() <span class="op">-&gt;</span> <span class="typ">Quat</span> &nbsp; <span class="fn">quat_from_axis_angle</span>(axis: <span class="typ">Vec3</span>, angle: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Quat</span></div>
+  <div class="signature"><span class="fn">quat_multiply</span>(a, b) <span class="op">-&gt;</span> <span class="typ">Quat</span> &nbsp; <span class="fn">quat_normalize</span>(q) <span class="op">-&gt;</span> <span class="typ">Quat</span></div>
+  <div class="signature"><span class="fn">quat_rotate_vec3</span>(q: <span class="typ">Quat</span>, v: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">quat_to_mat4</span>(q: <span class="typ">Quat</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature"><span class="fn">quat_slerp</span>(a: <span class="typ">Quat</span>, b: <span class="typ">Quat</span>, t: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Quat</span></div>
+
+  <h4>Scalar Utilities</h4>
+  <div class="signature"><span class="fn">lerp</span>(a: <span class="typ">Float</span>, b: <span class="typ">Float</span>, t: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <div class="signature"><span class="fn">deg_to_rad</span>(deg: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Float</span> &nbsp; <span class="fn">rad_to_deg</span>(rad: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <div class="signature"><span class="fn">clampf</span>(v: <span class="typ">Float</span>, lo: <span class="typ">Float</span>, hi: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+
+  <!-- ===== 2. nex3d.engine ===== -->
   <h3>nex3d.engine</h3>
-  <p>Window creation and game main loop. Requires <code>--features engine</code>.</p>
+  <p>Window creation, game loop lifecycle, engine-level camera binding, and UI overlay. Requires the native engine runtime.</p>
   <pre><code><span class="kw">import</span> nex3d.engine</code></pre>
 
-  <h4>engine_create_window</h4>
+  <h4>Window &amp; Lifecycle</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">engine_create_window</span>(title: <span class="typ">String</span>, width: <span class="typ">Int64</span>, height: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span>
   </div>
-  <p>Creates a game window. Returns a handle (or 0 if engine feature is disabled).</p>
-
-  <h4>engine_run</h4>
+  <p>Creates a game window. Returns a handle (0 if engine feature is disabled).</p>
   <div class="signature">
-    <span class="kw">def</span> <span class="fn">engine_run</span>(handle: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <span class="kw">def</span> <span class="fn">engine_run</span>(handle: <span class="typ">Int64</span>) &nbsp; <span class="kw">def</span> <span class="fn">engine_quit</span>(handle: <span class="typ">Int64</span>) &nbsp; <span class="kw">def</span> <span class="fn">engine_destroy</span>(handle: <span class="typ">Int64</span>)
   </div>
-  <p>Runs the event loop. Blocks until the window is closed.</p>
+  <p>Runs the event loop (blocks until quit), signals quit, and releases resources.</p>
+  <div class="signature"><span class="kw">def</span> <span class="fn">engine_is_running</span>(handle: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="kw">def</span> <span class="fn">engine_set_clear_color</span>(r: <span class="typ">Float</span>, g: <span class="typ">Float</span>, b: <span class="typ">Float</span>, a: <span class="typ">Float</span>)</div>
+  <div class="signature"><span class="kw">def</span> <span class="fn">engine_set_update</span>(callback: <span class="typ">Int64</span>)</div>
+  <p>Registers a function pointer to be called every frame.</p>
+  <div class="signature"><span class="kw">def</span> <span class="fn">engine_get_window_width</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span> &nbsp; <span class="kw">def</span> <span class="fn">engine_get_window_height</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span></div>
 
-  <h4>engine_quit / engine_destroy</h4>
-  <p>Signals quit and releases resources.</p>
+  <h4>Engine Camera</h4>
+  <div class="signature"><span class="fn">engine_camera_position</span>(x, y, z) &nbsp; <span class="fn">engine_camera_target</span>(x, y, z) &nbsp; <span class="fn">engine_camera_up</span>(x, y, z)</div>
+  <div class="signature"><span class="fn">engine_camera_perspective</span>(fov, aspect, near, far)</div>
 
-  <h2>Example</h2>
+  <h4>UI Overlay</h4>
+  <div class="signature"><span class="kw">def</span> <span class="fn">engine_enable_ui</span>()</div>
+  <p>Enables the built-in immediate-mode UI overlay for debug information.</p>
+
+  <!-- ===== 3. nex3d.color ===== -->
+  <h3>nex3d.color</h3>
+  <p>Color type and named constants. Pure Nex &mdash; no engine dependency.</p>
+  <pre><code><span class="kw">import</span> nex3d.color</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Color</span> { r: <span class="typ">Float</span>, g: <span class="typ">Float</span>, b: <span class="typ">Float</span>, a: <span class="typ">Float</span> }</div>
+
+  <h4>Constructors</h4>
+  <div class="signature"><span class="fn">color</span>(r: <span class="typ">Float</span>, g: <span class="typ">Float</span>, b: <span class="typ">Float</span>, a: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Color</span></div>
+  <div class="signature"><span class="fn">color_rgb</span>(r: <span class="typ">Float</span>, g: <span class="typ">Float</span>, b: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Color</span> <span class="cmt">// alpha defaults to 1.0</span></div>
+  <div class="signature"><span class="fn">color_hex</span>(hex: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Color</span> <span class="cmt">// e.g. 0xFF8800</span></div>
+
+  <h4>Operations</h4>
+  <div class="signature"><span class="fn">color_lerp</span>(a: <span class="typ">Color</span>, b: <span class="typ">Color</span>, t: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Color</span></div>
+  <div class="signature"><span class="fn">color_mul_scalar</span>(c: <span class="typ">Color</span>, s: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Color</span></div>
+
+  <h4>Named Constants</h4>
+  <div class="signature">
+    <span class="fn">COLOR_WHITE</span>, <span class="fn">COLOR_BLACK</span>, <span class="fn">COLOR_RED</span>, <span class="fn">COLOR_GREEN</span>, <span class="fn">COLOR_BLUE</span>,
+    <span class="fn">COLOR_YELLOW</span>, <span class="fn">COLOR_CYAN</span>, <span class="fn">COLOR_MAGENTA</span>, <span class="fn">COLOR_ORANGE</span>, <span class="fn">COLOR_GRAY</span>
+  </div>
+
+  <!-- ===== 4. nex3d.draw ===== -->
+  <h3>nex3d.draw</h3>
+  <p>Immediate-mode drawing primitives. Push vertices and flush, or use high-level shape functions.</p>
+  <pre><code><span class="kw">import</span> nex3d.draw</code></pre>
+
+  <h4>Vertex Pushing</h4>
+  <div class="signature"><span class="fn">push_vertex</span>(x, y, z, r, g, b: <span class="typ">Float</span>)</div>
+  <div class="signature"><span class="fn">push_vertex_lit</span>(x, y, z, nx, ny, nz, r, g, b: <span class="typ">Float</span>)</div>
+  <div class="signature"><span class="fn">flush_triangles</span>()</div>
+
+  <h4>Triangles &amp; Quads</h4>
+  <div class="signature"><span class="fn">draw_triangle</span>(p1: <span class="typ">Vec3</span>, c1: <span class="typ">Color</span>, p2: <span class="typ">Vec3</span>, c2: <span class="typ">Color</span>, p3: <span class="typ">Vec3</span>, c3: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">draw_triangle_lit</span>(<span class="cmt">... same with normals</span>)</div>
+  <div class="signature"><span class="fn">draw_quad</span>(p1, c1, p2, c2, p3, c3, p4, c4)</div>
+  <div class="signature"><span class="fn">draw_quad_flat</span>(p1, p2, p3, p4: <span class="typ">Vec3</span>, c: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">draw_quad_flat_lit</span>(<span class="cmt">... same with normals</span>)</div>
+
+  <h4>Shapes</h4>
+  <div class="signature"><span class="fn">draw_line</span>(start: <span class="typ">Vec3</span>, to: <span class="typ">Vec3</span>, c: <span class="typ">Color</span>, thickness: <span class="typ">Float</span>)</div>
+  <div class="signature"><span class="fn">draw_cube</span>(center: <span class="typ">Vec3</span>, size: <span class="typ">Float</span>, c: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">draw_grid</span>(size: <span class="typ">Float</span>, divisions: <span class="typ">Int64</span>, c: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">draw_sphere</span>(center: <span class="typ">Vec3</span>, radius: <span class="typ">Float</span>, c: <span class="typ">Color</span>, segments: <span class="typ">Int64</span>)</div>
+
+  <!-- ===== 5. nex3d.input ===== -->
+  <h3>nex3d.input</h3>
+  <p>Keyboard and mouse input polling. Query key/button state every frame.</p>
+  <pre><code><span class="kw">import</span> nex3d.input</code></pre>
+
+  <h4>Keyboard</h4>
+  <div class="signature"><span class="fn">key_down</span>(key: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> <span class="cmt">// held this frame</span></div>
+  <div class="signature"><span class="fn">key_pressed</span>(key: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> <span class="cmt">// just pressed</span></div>
+  <div class="signature"><span class="fn">key_released</span>(key: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> <span class="cmt">// just released</span></div>
+
+  <h4>Mouse</h4>
+  <div class="signature"><span class="fn">mouse_x</span>(), <span class="fn">mouse_y</span>() <span class="op">-&gt;</span> <span class="typ">Float</span> <span class="cmt">// absolute position</span></div>
+  <div class="signature"><span class="fn">mouse_delta_x</span>(), <span class="fn">mouse_delta_y</span>() <span class="op">-&gt;</span> <span class="typ">Float</span> <span class="cmt">// frame-to-frame delta</span></div>
+  <div class="signature"><span class="fn">mouse_button_down</span>(button: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span> &nbsp; <span class="fn">mouse_button_pressed</span>(button: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">mouse_scroll_delta</span>() <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+
+  <h4>Key Codes</h4>
+  <div class="signature">
+    <span class="fn">KEY_A</span> .. <span class="fn">KEY_Z</span>, <span class="fn">KEY_0</span> .. <span class="fn">KEY_9</span>
+  </div>
+  <div class="signature">
+    <span class="fn">KEY_ESCAPE</span>, <span class="fn">KEY_SPACE</span>, <span class="fn">KEY_ENTER</span>, <span class="fn">KEY_TAB</span>, <span class="fn">KEY_BACKSPACE</span>
+  </div>
+  <div class="signature">
+    <span class="fn">KEY_LEFT</span>, <span class="fn">KEY_RIGHT</span>, <span class="fn">KEY_UP</span>, <span class="fn">KEY_DOWN</span>
+  </div>
+  <div class="signature">
+    <span class="fn">KEY_LEFT_SHIFT</span>, <span class="fn">KEY_LEFT_CTRL</span>, <span class="fn">KEY_LEFT_ALT</span>
+  </div>
+  <div class="signature">
+    <span class="fn">KEY_F1</span> .. <span class="fn">KEY_F12</span>
+  </div>
+
+  <h4>Mouse Codes</h4>
+  <div class="signature">
+    <span class="fn">MOUSE_LEFT</span>, <span class="fn">MOUSE_RIGHT</span>, <span class="fn">MOUSE_MIDDLE</span>
+  </div>
+
+  <!-- ===== 6. nex3d.gamepad ===== -->
+  <h3>nex3d.gamepad</h3>
+  <p>Gamepad input for up to 4 players. Supports buttons, axes, and stick helpers.</p>
+  <pre><code><span class="kw">import</span> nex3d.gamepad</code></pre>
+
+  <h4>Functions</h4>
+  <div class="signature"><span class="fn">gamepad_connected</span>(player: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">gamepad_button</span>(player: <span class="typ">Int64</span>, button: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">gamepad_axis</span>(player: <span class="typ">Int64</span>, axis: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <div class="signature"><span class="fn">gamepad_left_stick</span>(player: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Vec2</span> &nbsp; <span class="fn">gamepad_right_stick</span>(player: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Vec2</span></div>
+
+  <h4>Button Codes</h4>
+  <div class="signature">
+    <span class="fn">GAMEPAD_A</span>, <span class="fn">GAMEPAD_B</span>, <span class="fn">GAMEPAD_X</span>, <span class="fn">GAMEPAD_Y</span>
+  </div>
+  <div class="signature">
+    <span class="fn">GAMEPAD_LB</span>, <span class="fn">GAMEPAD_RB</span>, <span class="fn">GAMEPAD_LT</span>, <span class="fn">GAMEPAD_RT</span>
+  </div>
+  <div class="signature">
+    <span class="fn">GAMEPAD_SELECT</span>, <span class="fn">GAMEPAD_START</span>, <span class="fn">GAMEPAD_L3</span>, <span class="fn">GAMEPAD_R3</span>
+  </div>
+  <div class="signature">
+    <span class="fn">GAMEPAD_DPAD_UP</span>, <span class="fn">GAMEPAD_DPAD_DOWN</span>, <span class="fn">GAMEPAD_DPAD_LEFT</span>, <span class="fn">GAMEPAD_DPAD_RIGHT</span>
+  </div>
+
+  <h4>Axis Codes</h4>
+  <div class="signature">
+    <span class="fn">AXIS_LEFT_X</span>, <span class="fn">AXIS_LEFT_Y</span>, <span class="fn">AXIS_RIGHT_X</span>, <span class="fn">AXIS_RIGHT_Y</span>
+  </div>
+
+  <!-- ===== 7. nex3d.camera ===== -->
+  <h3>nex3d.camera</h3>
+  <p>High-level camera helpers built on <code>nex3d.math</code>. Pure Nex &mdash; generates view and projection matrices.</p>
+  <pre><code><span class="kw">import</span> nex3d.camera</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Camera</span> { pos: <span class="typ">Vec3</span>, target: <span class="typ">Vec3</span>, up: <span class="typ">Vec3</span>, fov: <span class="typ">Float</span>, near: <span class="typ">Float</span>, far: <span class="typ">Float</span> }</div>
+
+  <h4>Constructors</h4>
+  <div class="signature"><span class="fn">camera_default</span>() <span class="op">-&gt;</span> <span class="typ">Camera</span></div>
+  <div class="signature"><span class="fn">camera_new</span>(pos: <span class="typ">Vec3</span>, target: <span class="typ">Vec3</span>, fov: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Camera</span></div>
+
+  <h4>Matrix Generation</h4>
+  <div class="signature"><span class="fn">camera_view_matrix</span>(cam: <span class="typ">Camera</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature"><span class="fn">camera_proj_matrix</span>(cam: <span class="typ">Camera</span>, aspect: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+  <div class="signature"><span class="fn">camera_view_proj</span>(cam: <span class="typ">Camera</span>, aspect: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Mat4</span></div>
+
+  <h4>Engine Binding</h4>
+  <div class="signature"><span class="fn">camera_apply</span>(cam: <span class="typ">Camera</span>)</div>
+  <div class="signature"><span class="fn">camera_apply_perspective</span>(cam: <span class="typ">Camera</span>, aspect: <span class="typ">Float</span>)</div>
+  <p>Pushes the camera position, target, up, and perspective to the engine.</p>
+
+  <!-- ===== 8. nex3d.light ===== -->
+  <h3>nex3d.light</h3>
+  <p>Lighting system supporting directional, point, and spot lights across 8 slots.</p>
+  <pre><code><span class="kw">import</span> nex3d.light</code></pre>
+
+  <h4>Light Type Constants</h4>
+  <div class="signature">
+    <span class="fn">LIGHT_DIRECTIONAL</span>, <span class="fn">LIGHT_POINT</span>, <span class="fn">LIGHT_SPOT</span>
+  </div>
+
+  <h4>Light Creation</h4>
+  <div class="signature">
+    <span class="fn">light_directional</span>(slot: <span class="typ">Int64</span>, dir: <span class="typ">Vec3</span>, c: <span class="typ">Color</span>, intensity: <span class="typ">Float</span>)
+  </div>
+  <div class="signature">
+    <span class="fn">light_point</span>(slot: <span class="typ">Int64</span>, pos: <span class="typ">Vec3</span>, c: <span class="typ">Color</span>, intensity: <span class="typ">Float</span>, range: <span class="typ">Float</span>)
+  </div>
+  <div class="signature">
+    <span class="fn">light_spot</span>(slot: <span class="typ">Int64</span>, pos: <span class="typ">Vec3</span>, dir: <span class="typ">Vec3</span>, c: <span class="typ">Color</span>, intensity: <span class="typ">Float</span>, range: <span class="typ">Float</span>, inner_angle: <span class="typ">Float</span>, outer_angle: <span class="typ">Float</span>)
+  </div>
+
+  <h4>Light Properties</h4>
+  <div class="signature"><span class="fn">light_set_position</span>(slot, pos) &nbsp; <span class="fn">light_set_direction</span>(slot, dir)</div>
+  <div class="signature"><span class="fn">light_set_color</span>(slot, c) &nbsp; <span class="fn">light_set_intensity</span>(slot, intensity)</div>
+  <div class="signature"><span class="fn">light_set_enabled</span>(slot, enabled) &nbsp; <span class="fn">light_set_range</span>(slot, range)</div>
+  <div class="signature"><span class="fn">light_set_spot_angles</span>(slot, inner_angle, outer_angle)</div>
+
+  <h4>Global Lighting</h4>
+  <div class="signature"><span class="fn">set_ambient_color</span>(c: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">clear_lights</span>()</div>
+
+  <!-- ===== 9. nex3d.texture ===== -->
+  <h3>nex3d.texture</h3>
+  <p>Texture loading, binding, and UV-mapped vertex pushing.</p>
+  <pre><code><span class="kw">import</span> nex3d.texture</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Texture2D</span> { handle: <span class="typ">Int64</span>, width: <span class="typ">Int64</span>, height: <span class="typ">Int64</span> }</div>
+
+  <div class="signature"><span class="fn">texture_load</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Texture2D</span></div>
+  <div class="signature"><span class="fn">texture_bind</span>(tex: <span class="typ">Texture2D</span>) &nbsp; <span class="fn">texture_unbind</span>()</div>
+  <div class="signature">
+    <span class="fn">push_vertex_uv</span>(x, y, z, nx, ny, nz, u, v, r, g, b: <span class="typ">Float</span>)
+  </div>
+  <p>Pushes a vertex with position, normal, UV coordinates, and color. Use with <code>flush_triangles()</code> from <code>nex3d.draw</code>.</p>
+
+  <!-- ===== 10. nex3d.sprite ===== -->
+  <h3>nex3d.sprite</h3>
+  <p>XNA-style SpriteBatch for efficient 2D rendering. Batches draw calls between <code>begin</code>/<code>end</code>.</p>
+  <pre><code><span class="kw">import</span> nex3d.sprite</code></pre>
+
+  <div class="signature"><span class="fn">spritebatch_begin</span>() &nbsp; <span class="fn">spritebatch_end</span>()</div>
+  <div class="signature"><span class="fn">spritebatch_draw</span>(tex: <span class="typ">Texture2D</span>, x: <span class="typ">Float</span>, y: <span class="typ">Float</span>, c: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">spritebatch_draw_rect</span>(tex: <span class="typ">Texture2D</span>, x: <span class="typ">Float</span>, y: <span class="typ">Float</span>, w: <span class="typ">Float</span>, h: <span class="typ">Float</span>, c: <span class="typ">Color</span>)</div>
+  <div class="signature">
+    <span class="fn">spritebatch_draw_src</span>(tex: <span class="typ">Texture2D</span>, sx, sy, sw, sh, dx, dy, dw, dh: <span class="typ">Float</span>)
+  </div>
+  <p>Draws a sub-rectangle of the texture (source rect) to a destination rect. Useful for sprite sheets.</p>
+
+  <!-- ===== 11. nex3d.font ===== -->
+  <h3>nex3d.font</h3>
+  <p>Built-in 8x8 pixel bitmap font covering ASCII 32&ndash;126. Great for debug overlays and prototyping.</p>
+  <pre><code><span class="kw">import</span> nex3d.font</code></pre>
+
+  <div class="signature"><span class="fn">draw_text</span>(text: <span class="typ">String</span>, x: <span class="typ">Float</span>, y: <span class="typ">Float</span>, scale: <span class="typ">Float</span>, c: <span class="typ">Color</span>)</div>
+  <div class="signature"><span class="fn">measure_text</span>(text: <span class="typ">String</span>, scale: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <p>Returns the width in pixels of the rendered text at the given scale.</p>
+
+  <!-- ===== 12. nex3d.model ===== -->
+  <h3>nex3d.model</h3>
+  <p>Load and draw static 3D models from OBJ files.</p>
+  <pre><code><span class="kw">import</span> nex3d.model</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Model</span> { handle: <span class="typ">Int64</span> }</div>
+
+  <div class="signature"><span class="fn">model_load</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Model</span></div>
+  <div class="signature"><span class="fn">model_draw</span>(m: <span class="typ">Model</span>)</div>
+  <div class="signature"><span class="fn">model_vertex_count</span>(m: <span class="typ">Model</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span></div>
+  <div class="signature"><span class="fn">model_free</span>(m: <span class="typ">Model</span>)</div>
+
+  <!-- ===== 13. nex3d.anim ===== -->
+  <h3>nex3d.anim</h3>
+  <p>Skeletal animation via glTF. Supports <code>.glb</code> and <code>.gltf</code> files with embedded animations.</p>
+  <pre><code><span class="kw">import</span> nex3d.anim</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">AnimModel</span> { handle: <span class="typ">Int64</span> }</div>
+
+  <h4>Loading &amp; Drawing</h4>
+  <div class="signature"><span class="fn">anim_model_load</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">AnimModel</span></div>
+  <div class="signature"><span class="fn">anim_model_draw</span>(m: <span class="typ">AnimModel</span>)</div>
+  <div class="signature"><span class="fn">anim_model_free</span>(m: <span class="typ">AnimModel</span>)</div>
+
+  <h4>Playback Control</h4>
+  <div class="signature"><span class="fn">anim_play</span>(m: <span class="typ">AnimModel</span>, clip: <span class="typ">Int64</span>) &nbsp; <span class="fn">anim_stop</span>(m: <span class="typ">AnimModel</span>) &nbsp; <span class="fn">anim_pause</span>(m: <span class="typ">AnimModel</span>)</div>
+  <div class="signature"><span class="fn">anim_set_speed</span>(m: <span class="typ">AnimModel</span>, speed: <span class="typ">Float</span>)</div>
+  <div class="signature"><span class="fn">anim_set_looping</span>(m: <span class="typ">AnimModel</span>, looping: <span class="typ">Bool</span>)</div>
+  <div class="signature"><span class="fn">anim_set_time</span>(m: <span class="typ">AnimModel</span>, time: <span class="typ">Float</span>)</div>
+
+  <h4>Queries</h4>
+  <div class="signature"><span class="fn">anim_get_time</span>(m: <span class="typ">AnimModel</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <div class="signature"><span class="fn">anim_clip_count</span>(m: <span class="typ">AnimModel</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span></div>
+  <div class="signature"><span class="fn">anim_clip_duration</span>(m: <span class="typ">AnimModel</span>, clip: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <div class="signature"><span class="fn">anim_joint_count</span>(m: <span class="typ">AnimModel</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span></div>
+
+  <!-- ===== 14. nex3d.audio ===== -->
+  <h3>nex3d.audio</h3>
+  <p>Sound loading and playback supporting WAV, MP3, OGG, and FLAC formats.</p>
+  <pre><code><span class="kw">import</span> nex3d.audio</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Sound</span> { handle: <span class="typ">Int64</span> }</div>
+
+  <div class="signature"><span class="fn">sound_load</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Sound</span></div>
+  <div class="signature"><span class="fn">sound_play</span>(s: <span class="typ">Sound</span>) &nbsp; <span class="fn">sound_play_looped</span>(s: <span class="typ">Sound</span>) &nbsp; <span class="fn">sound_stop</span>(s: <span class="typ">Sound</span>)</div>
+  <div class="signature"><span class="fn">sound_set_volume</span>(s: <span class="typ">Sound</span>, volume: <span class="typ">Float</span>)</div>
+  <div class="signature"><span class="fn">sound_is_playing</span>(s: <span class="typ">Sound</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">sound_free</span>(s: <span class="typ">Sound</span>)</div>
+
+  <!-- ===== 15. nex3d.bounds ===== -->
+  <h3>nex3d.bounds</h3>
+  <p>Bounding volumes, rays, and planes for collision detection and picking. Pure Nex &mdash; uses <code>nex3d.math</code>.</p>
+  <pre><code><span class="kw">import</span> nex3d.bounds</code></pre>
+
+  <h4>BoundingBox</h4>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">BoundingBox</span> { min: <span class="typ">Vec3</span>, max: <span class="typ">Vec3</span> }</div>
+  <div class="signature"><span class="fn">bbox</span>(min: <span class="typ">Vec3</span>, max: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">BoundingBox</span></div>
+  <div class="signature"><span class="fn">bbox_from_center</span>(center: <span class="typ">Vec3</span>, half_extents: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">BoundingBox</span></div>
+  <div class="signature"><span class="fn">bbox_center</span>(b) <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">bbox_extents</span>(b) <span class="op">-&gt;</span> <span class="typ">Vec3</span> &nbsp; <span class="fn">bbox_half_extents</span>(b) <span class="op">-&gt;</span> <span class="typ">Vec3</span></div>
+  <div class="signature"><span class="fn">bbox_contains_point</span>(b, point) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">bbox_intersects_bbox</span>(a, b) <span class="op">-&gt;</span> <span class="typ">Bool</span> &nbsp; <span class="fn">bbox_intersects_sphere</span>(b, s) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">bbox_merge</span>(a: <span class="typ">BoundingBox</span>, b: <span class="typ">BoundingBox</span>) <span class="op">-&gt;</span> <span class="typ">BoundingBox</span></div>
+
+  <h4>BoundingSphere</h4>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">BoundingSphere</span> { center: <span class="typ">Vec3</span>, radius: <span class="typ">Float</span> }</div>
+  <div class="signature"><span class="fn">bsphere</span>(center: <span class="typ">Vec3</span>, radius: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">BoundingSphere</span></div>
+  <div class="signature"><span class="fn">bsphere_contains_point</span>(s, point) <span class="op">-&gt;</span> <span class="typ">Bool</span> &nbsp; <span class="fn">bsphere_intersects_sphere</span>(a, b) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+
+  <h4>Ray</h4>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Ray</span> { origin: <span class="typ">Vec3</span>, direction: <span class="typ">Vec3</span> }</div>
+  <div class="signature"><span class="fn">ray</span>(origin: <span class="typ">Vec3</span>, direction: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Ray</span></div>
+  <div class="signature"><span class="fn">ray_point_at</span>(r: <span class="typ">Ray</span>, t: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Vec3</span></div>
+  <div class="signature"><span class="fn">ray_intersects_bbox</span>(r: <span class="typ">Ray</span>, b: <span class="typ">BoundingBox</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+  <div class="signature"><span class="fn">ray_intersects_sphere</span>(r: <span class="typ">Ray</span>, s: <span class="typ">BoundingSphere</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+
+  <h4>Plane</h4>
+  <div class="signature"><span class="kw">struct</span> <span class="typ">Plane</span> { normal: <span class="typ">Vec3</span>, d: <span class="typ">Float</span> }</div>
+  <div class="signature"><span class="fn">plane</span>(normal: <span class="typ">Vec3</span>, d: <span class="typ">Float</span>) <span class="op">-&gt;</span> <span class="typ">Plane</span></div>
+  <div class="signature"><span class="fn">plane_from_point_normal</span>(point: <span class="typ">Vec3</span>, normal: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Plane</span></div>
+  <div class="signature"><span class="fn">plane_distance</span>(p: <span class="typ">Plane</span>, point: <span class="typ">Vec3</span>) <span class="op">-&gt;</span> <span class="typ">Float</span></div>
+  <div class="signature"><span class="fn">plane_intersects_ray</span>(p: <span class="typ">Plane</span>, r: <span class="typ">Ray</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span></div>
+
+  <!-- ===== 16. nex3d.rendertarget ===== -->
+  <h3>nex3d.rendertarget</h3>
+  <p>Off-screen render targets for post-processing, shadow maps, and multi-pass rendering.</p>
+  <pre><code><span class="kw">import</span> nex3d.rendertarget</code></pre>
+
+  <div class="signature"><span class="kw">struct</span> <span class="typ">RenderTarget</span> { handle: <span class="typ">Int64</span>, width: <span class="typ">Int64</span>, height: <span class="typ">Int64</span> }</div>
+
+  <div class="signature"><span class="fn">rendertarget_create</span>(w: <span class="typ">Int64</span>, h: <span class="typ">Int64</span>) <span class="op">-&gt;</span> <span class="typ">RenderTarget</span></div>
+  <div class="signature"><span class="fn">rendertarget_bind</span>(rt: <span class="typ">RenderTarget</span>) &nbsp; <span class="fn">rendertarget_unbind</span>()</div>
+  <div class="signature"><span class="fn">rendertarget_as_texture</span>(rt: <span class="typ">RenderTarget</span>) <span class="op">-&gt;</span> <span class="typ">Int64</span></div>
+  <p>Returns a texture handle that can be bound for sampling the render target contents.</p>
+  <div class="signature"><span class="fn">rendertarget_width</span>(rt) <span class="op">-&gt;</span> <span class="typ">Int64</span> &nbsp; <span class="fn">rendertarget_height</span>(rt) <span class="op">-&gt;</span> <span class="typ">Int64</span></div>
+  <div class="signature"><span class="fn">rendertarget_free</span>(rt: <span class="typ">RenderTarget</span>)</div>
+
+  <!-- ===== 17. nex3d.states ===== -->
+  <h3>nex3d.states</h3>
+  <p>Render state configuration for blending, culling, fill mode, and depth testing.</p>
+  <pre><code><span class="kw">import</span> nex3d.states</code></pre>
+
+  <h4>Blend Modes</h4>
+  <div class="signature">
+    <span class="fn">BLEND_OPAQUE</span>, <span class="fn">BLEND_ALPHA</span>, <span class="fn">BLEND_ADDITIVE</span>, <span class="fn">BLEND_MULTIPLY</span>
+  </div>
+  <div class="signature"><span class="fn">set_blend_mode</span>(mode: <span class="typ">Int64</span>)</div>
+
+  <h4>Cull Modes</h4>
+  <div class="signature">
+    <span class="fn">CULL_NONE</span>, <span class="fn">CULL_BACK</span>, <span class="fn">CULL_FRONT</span>
+  </div>
+  <div class="signature"><span class="fn">set_cull_mode</span>(mode: <span class="typ">Int64</span>)</div>
+
+  <h4>Fill Modes</h4>
+  <div class="signature">
+    <span class="fn">FILL_SOLID</span>, <span class="fn">FILL_WIREFRAME</span>
+  </div>
+  <div class="signature"><span class="fn">set_fill_mode</span>(mode: <span class="typ">Int64</span>)</div>
+
+  <h4>Depth</h4>
+  <div class="signature"><span class="fn">set_depth_enabled</span>(enabled: <span class="typ">Bool</span>)</div>
+
+  <!-- ===== 18. nex3d.time ===== -->
+  <h3>nex3d.time</h3>
+  <p>Frame timing utilities for frame-rate-independent updates.</p>
+  <pre><code><span class="kw">import</span> nex3d.time</code></pre>
+
+  <div class="signature"><span class="fn">delta_time</span>() <span class="op">-&gt;</span> <span class="typ">Float</span> <span class="cmt">// seconds since last frame</span></div>
+  <div class="signature"><span class="fn">elapsed_time</span>() <span class="op">-&gt;</span> <span class="typ">Float</span> <span class="cmt">// total seconds since engine start</span></div>
+  <div class="signature"><span class="fn">frame_count</span>() <span class="op">-&gt;</span> <span class="typ">Int64</span> <span class="cmt">// total frames rendered</span></div>
+
+  <!-- ================================================================== -->
+  <h2>Complete Example</h2>
+  <!-- ================================================================== -->
+  <p>A game loop demonstrating engine setup, camera, input, lighting, drawing, and frame timing.</p>
+
   <pre><code><span class="kw">import</span> nex3d.math
 <span class="kw">import</span> nex3d.engine
+<span class="kw">import</span> nex3d.color
+<span class="kw">import</span> nex3d.draw
+<span class="kw">import</span> nex3d.input
+<span class="kw">import</span> nex3d.camera
+<span class="kw">import</span> nex3d.light
+<span class="kw">import</span> nex3d.time
+<span class="kw">import</span> nex3d.font
+
+<span class="kw">var</span> cam = camera_new(
+    vec3(<span class="num">0.0</span>f, <span class="num">5.0</span>f, <span class="num">10.0</span>f),
+    vec3_zero(),
+    <span class="num">60.0</span>f
+)
+<span class="kw">var</span> cube_pos = vec3_zero()
+<span class="kw">var</span> angle = <span class="num">0.0</span>f
+
+<span class="kw">def</span> <span class="fn">update</span>() {
+    dt = delta_time()
+
+    <span class="cmt">// Move cube with WASD</span>
+    speed = <span class="num">5.0</span>f <span class="op">*</span> dt
+    <span class="kw">if</span> (key_down(KEY_W)) { cube_pos = vec3_add(cube_pos, vec3(<span class="num">0.0</span>f, <span class="num">0.0</span>f, <span class="op">-</span>speed)) }
+    <span class="kw">if</span> (key_down(KEY_S)) { cube_pos = vec3_add(cube_pos, vec3(<span class="num">0.0</span>f, <span class="num">0.0</span>f, speed)) }
+    <span class="kw">if</span> (key_down(KEY_A)) { cube_pos = vec3_add(cube_pos, vec3(<span class="op">-</span>speed, <span class="num">0.0</span>f, <span class="num">0.0</span>f)) }
+    <span class="kw">if</span> (key_down(KEY_D)) { cube_pos = vec3_add(cube_pos, vec3(speed, <span class="num">0.0</span>f, <span class="num">0.0</span>f)) }
+
+    <span class="cmt">// Quit on Escape</span>
+    <span class="kw">if</span> (key_pressed(KEY_ESCAPE)) { engine_quit(<span class="num">0</span>) }
+
+    <span class="cmt">// Spin the cube</span>
+    angle = angle <span class="op">+</span> <span class="num">1.5</span>f <span class="op">*</span> dt
+
+    <span class="cmt">// Apply camera</span>
+    w = engine_get_window_width()
+    h = engine_get_window_height()
+    aspect = w <span class="op">as</span> <span class="typ">Float</span> <span class="op">/</span> h <span class="op">as</span> <span class="typ">Float</span>
+    camera_apply_perspective(cam, aspect)
+
+    <span class="cmt">// Draw scene</span>
+    draw_grid(<span class="num">20.0</span>f, <span class="num">20</span>, COLOR_GRAY)
+    draw_cube(cube_pos, <span class="num">1.0</span>f, COLOR_CYAN)
+
+    <span class="cmt">// HUD text</span>
+    fps_text = <span class="str">"FPS: "</span> <span class="op">+</span> to_string(<span class="num">1.0</span>f <span class="op">/</span> dt)
+    draw_text(fps_text, <span class="num">10.0</span>f, <span class="num">10.0</span>f, <span class="num">2.0</span>f, COLOR_WHITE)
+}
 
 <span class="kw">def</span> <span class="fn">main</span>() {
-    v = vec2(100.0f, 200.0f)
-    handle = engine_create_window(<span class="str">"My Game"</span>, 800, 600)
-    <span class="kw">if</span> (handle != 0) {
-        engine_run(handle)
-        engine_destroy(handle)
-    }
-    <span class="kw">return</span>
+    handle = engine_create_window(<span class="str">"Nex3D Demo"</span>, <span class="num">1280</span>, <span class="num">720</span>)
+    <span class="kw">if</span> (handle <span class="op">==</span> <span class="num">0</span>) { <span class="kw">return</span> }
+
+    engine_set_clear_color(<span class="num">0.1</span>f, <span class="num">0.1</span>f, <span class="num">0.15</span>f, <span class="num">1.0</span>f)
+
+    <span class="cmt">// Setup lighting</span>
+    light_directional(<span class="num">0</span>, vec3(<span class="num">-0.5</span>f, <span class="num">-1.0</span>f, <span class="num">-0.3</span>f), COLOR_WHITE, <span class="num">0.8</span>f)
+    set_ambient_color(color_rgb(<span class="num">0.2</span>f, <span class="num">0.2</span>f, <span class="num">0.25</span>f))
+
+    engine_set_update(update)
+    engine_run(handle)
+    engine_destroy(handle)
 }</code></pre>
+
+  <div class="page-nav">
+    <a href="lib-overview.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Libraries Overview</span>
+    </a>
+    <a href="tooling-nex.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Build Tool (nex) &rarr;</span>
+    </a>
+  </div>
 
 </main>
 <script src="nav.js"></script>
+<script src="script.js"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -110,7 +110,7 @@
   <h3>From Source</h3>
   <ol>
     <li>Clone the Nex repository.</li>
-    <li>Navigate to the <code>editors/vscode/</code> directory.</li>
+    <li>Navigate to the <code>vscode-extension/</code> directory.</li>
     <li>Run <code>npm install</code> to install dependencies.</li>
     <li>Run <code>npm run package</code> to build the <code>.vsix</code> file.</li>
     <li>Install the generated <code>.vsix</code> via the steps above.</li>
@@ -124,12 +124,15 @@
   <p>Replace the <code>-Target</code> path with the actual location of the <code>vscode-extension</code> directory in your Nex repository clone. After creating the link, run <strong>Developer: Reload Window</strong> in VS Code.</p>
 
   <h3>LSP Server</h3>
-  <p>The extension expects the <code>nex-lsp</code> binary to be on your system PATH. Build it from the Nex repository:</p>
+  <p>The extension searches for the <code>nex-lsp</code> binary in the following locations (in order):</p>
 
-  <pre><code>$ cargo build --release -p nex_lsp
-$ cp target/release/nex-lsp ~/.local/bin/</code></pre>
+  <ol>
+    <li>The path specified in the <code>nex.lspPath</code> VS Code setting.</li>
+    <li><code>~/.nex/bin/nex-lsp</code> &mdash; the default install location when using the <a href="getting-started.html">install script</a>.</li>
+    <li>Your system <code>PATH</code>.</li>
+  </ol>
 
-  <p>Alternatively, the extension will search for the binary at the path configured in VS Code settings:</p>
+  <p>If you installed Nex via the PowerShell install script, the LSP server is already in place. For manual installs, either add the binary to your PATH or configure the setting:</p>
 
   <pre><code>{
   "nex.lspPath": "/path/to/nex-lsp"

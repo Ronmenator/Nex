@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -51,7 +51,7 @@ $ nex new my_lib --lib</code></pre>
 
   <pre><code><span class="cmt"># Build the current project</span>
 $ nex build
-Compiling my_app v0.1.0
+Compiling my_app v0.1.88
   Finished release target in 1.2s
   Output: build/my_app
 
@@ -128,7 +128,7 @@ src/main.nex:24: warning: Var in public API — consider @allow_var_api</code></
   <p>Starts the interactive Read-Eval-Print Loop. See <a href="tooling-repl.html">REPL</a> for details.</p>
 
   <pre><code>$ nex repl
-Nex REPL v0.1.0
+Nex REPL v0.1.88
 &gt;&gt;&gt; x = 42
 &gt;&gt;&gt; println(x)
 42</code></pre>
@@ -137,7 +137,7 @@ Nex REPL v0.1.0
   <div class="signature">
     nex test
   </div>
-  <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.0.)</em></p>
+  <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.88.)</em></p>
 
   <h3>nex install &lt;user/repo[:version]&gt;</h3>
   <div class="signature">
@@ -148,10 +148,10 @@ Nex REPL v0.1.0
   <pre><code><span class="cmt"># Install the latest tagged version</span>
 $ nex install nexlang/nex3d
 querying tags for nexlang/nex3d ...
-  latest tag: v0.1.0
-  cloning nexlang/nex3d @ v0.1.0 ...
+  latest tag: v0.1.88
+  cloning nexlang/nex3d @ v0.1.88 ...
   cached at ~/.nex/libs/nex3d/0.1.0
-installed nex3d v0.1.0 from nexlang/nex3d
+installed nex3d v0.1.88 from nexlang/nex3d
 
 <span class="cmt"># Install a specific version</span>
 $ nex install nexlang/nex3d:0.2.0</code></pre>
@@ -175,7 +175,7 @@ removed `nex3d` from project.toml</code></pre>
 
   <pre><code>$ nex list
 dependencies:
-  nex3d v0.1.0  (git: nexlang/nex3d)
+  nex3d v0.1.88  (git: nexlang/nex3d)
   graphics  (path: ../graphics)</code></pre>
 
   <h3>nex install <em>(no arguments)</em></h3>
@@ -201,6 +201,35 @@ Removed build/</code></pre>
   </div>
   <p>The deploy task discovers the workspace root at runtime (current directory + executable ancestry), reads <code>nex/config/nex.toml</code>, bumps versions, archives the current toolchain snapshot, and copies updated binaries into <code>nex/bin/</code>.</p>
   <p>Run from the workspace root (or any subdirectory inside it) so root discovery can resolve the repository correctly.</p>
+
+  <h2>Release &amp; Packaging</h2>
+
+  <div class="signature">
+    cargo xtask release [--draft]
+  </div>
+  <p>Creates a GitHub Release with a zip archive containing the complete Nex toolchain. The release package includes:</p>
+  <ul>
+    <li><code>bin/</code> &mdash; <code>nex.exe</code>, <code>nexc.exe</code>, <code>nex-lsp.exe</code>, and <code>nex_ui_native.dll</code></li>
+    <li><code>libs/</code> &mdash; all standard libraries with their native DLLs and <code>.nex</code> source files</li>
+    <li><code>config/</code> &mdash; <code>nex.toml</code> toolchain configuration</li>
+  </ul>
+
+  <pre><code><span class="cmt"># Create a release and publish to GitHub</span>
+$ cargo xtask release
+  staging nex-v0.1.88-windows-x86_64 ...
+  zipping ...
+  publishing via gh CLI ...
+  Release: https://github.com/Ronmenator/Nex/releases/tag/v0.1.88
+
+<span class="cmt"># Create as draft (review before publishing)</span>
+$ cargo xtask release --draft</code></pre>
+
+  <p>Pass <code>--draft</code> to create the release as a draft so you can review it on GitHub before publishing. Requires the <code>gh</code> CLI to be installed and authenticated.</p>
+
+  <h2>Install from GitHub</h2>
+  <p>End users can install the latest Nex release with a single PowerShell command:</p>
+  <pre><code>irm https://raw.githubusercontent.com/Ronmenator/Nex/master/install.ps1 | iex</code></pre>
+  <p>This downloads the latest release, extracts it to <code>~/.nex/</code>, and adds <code>~/.nex/bin</code> to the user PATH. See <a href="getting-started.html">Installation &amp; Setup</a> for details.</p>
 
   <h2>JIT vs AOT</h2>
 

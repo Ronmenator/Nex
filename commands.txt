@@ -120,6 +120,19 @@ cargo xtask deploy --minor        # minor bump
 cargo xtask deploy --major        # major bump
 cargo xtask deploy --release      # release build (default)
 
+# --- Release / Packaging ---
+
+# Package current build and publish a GitHub release
+cargo xtask release               # creates zip + publishes via gh CLI
+cargo xtask release --draft       # creates as draft release
+
+# Install Nex from GitHub release (end-user install)
+# PowerShell one-liner:
+irm https://raw.githubusercontent.com/Ronmenator/Nex/master/install.ps1 | iex
+
+# Installs to ~/.nex/ with bin/, libs/, config/
+# Adds ~/.nex/bin to user PATH
+
 # --- Workspace Info ---
 
 # List all workspace crates
@@ -128,6 +141,8 @@ cargo xtask deploy --release      # release build (default)
 #             nexc_codegen_llvm, nexc_codegen_llvm_jit, nexc_meta,
 #             nexc_driver, nexc, nexc_fmt, nexc_lint
 # Runtime:    nex_runtime, nex_std
-# Native DLLs: nex3d_native (cdylib), nex_ui_native (cdylib)
+# Native DLLs: nex3d_native (cdylib), nex_ui_native (cdylib),
+#              nex_crypto_native (cdylib), nex_http_native (cdylib),
+#              nex_regex_native (cdylib), nex_torch_native (cdylib)
 # UI markup:  nexui_parse, nexui_lower
 # Tooling:    nex (CLI), nex_lsp, nex_repl, xtask

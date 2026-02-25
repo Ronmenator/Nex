@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.0</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -20,6 +20,19 @@
 
   <h1>Installation &amp; Setup</h1>
   <p class="page-subtitle">Get the Nex toolchain running on your machine in under five minutes.</p>
+
+  <h2>Quick Install (Windows)</h2>
+
+  <p>Install Nex with a single PowerShell command:</p>
+
+  <pre><code>irm https://raw.githubusercontent.com/Ronmenator/Nex/master/install.ps1 | iex</code></pre>
+
+  <p>This downloads the latest release from GitHub, extracts it to <code>~/.nex/</code>, and adds <code>~/.nex/bin</code> to your PATH. All standard libraries and their native DLLs are included.</p>
+
+  <div class="callout tip">
+    <div class="callout-title">After Install</div>
+    <p>Restart your terminal after installation, then verify with <code>nex --help</code>.</p>
+  </div>
 
   <h2>Prerequisites</h2>
 

@@ -29,16 +29,24 @@ function fileExists(p: string): boolean {
 
 /**
  * Build a list of candidate directories where Nex binaries may live,
- * relative to the workspace root.
+ * relative to the workspace root and well-known install locations.
  */
 function candidateDirs(workspaceRoot: string): string[] {
-  return [
+  const dirs = [
     path.join(workspaceRoot, "nex", "bin"),
     path.join(workspaceRoot, "target", "debug"),
     path.join(workspaceRoot, "target", "release"),
     path.join(workspaceRoot, "bin"),
     workspaceRoot,
   ];
+
+  // Check the standard install location (~/.nex/bin)
+  const home = process.env.USERPROFILE || process.env.HOME;
+  if (home) {
+    dirs.push(path.join(home, ".nex", "bin"));
+  }
+
+  return dirs;
 }
 
 /**
