@@ -208,7 +208,7 @@ fn deploy(args: &[String]) {
         match fs::copy(&src, &dst) {
             Ok(_) => println!("deployed  {filename} -> nex/bin/{filename}"),
             Err(_) => {
-                // File is locked by a running process (e.g. aur-lsp via Cursor).
+                // File is locked by a running process (e.g. nex-lsp via Cursor).
                 // Kill it repeatedly (Cursor may auto-restart) and retry the copy.
                 let bare_name = name.replace('-', "_");
                 let mut copied = false;

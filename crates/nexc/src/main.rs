@@ -6,7 +6,7 @@ use nexc_driver::{compile_module, CompileOptions};
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
     if args.is_empty() {
-        eprintln!("Usage: aurc <input>.au [--emit-metadata]");
+        eprintln!("Usage: nexc <input>.nex [--emit-metadata]");
         return;
     }
 
@@ -14,7 +14,7 @@ fn main() {
     args.retain(|a| a != "--emit-metadata");
 
     if args.len() != 1 {
-        eprintln!("Usage: aurc <input>.au [--emit-metadata]");
+        eprintln!("Usage: nexc <input>.nex [--emit-metadata]");
         return;
     }
 
@@ -22,7 +22,7 @@ fn main() {
     let source_text = match fs::read_to_string(&source_path) {
         Ok(s) => s,
         Err(err) => {
-            eprintln!("aurc: cannot read {}: {err}", source_path);
+            eprintln!("nexc: cannot read {}: {err}", source_path);
             return;
         }
     };
@@ -51,7 +51,7 @@ fn main() {
         let ext = if cfg!(windows) { "obj" } else { "o" };
         let object_path = format!("{source_path}.{ext}");
         if let Err(err) = fs::write(&object_path, bytes) {
-            eprintln!("aurc: cannot write {}: {err}", object_path);
+            eprintln!("nexc: cannot write {}: {err}", object_path);
             std::process::exit(1);
         }
         println!("wrote object file: {} ({} bytes)", object_path, bytes.len());

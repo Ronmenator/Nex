@@ -68,7 +68,7 @@ pub fn run_repl() {
     let _ = writer.flush();
 
     loop {
-        let _ = write!(writer, "aur> ");
+        let _ = write!(writer, "nex> ");
         let _ = writer.flush();
 
         let mut line = String::new();
