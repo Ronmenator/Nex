@@ -1022,6 +1022,7 @@ fn float_lit(v: f64) -> Expr {
 fn call(name: &str, args: Vec<Expr>) -> Expr {
     Expr::Call {
         callee: Box::new(ident(name)),
+        type_args: vec![],
         args,
         span: S,
     }

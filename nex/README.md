@@ -52,6 +52,7 @@ def main() -> Unit {
 ### 4. Build and run
 
 ```bash
+nex --version             # Print version and exit
 nex file.nex              # JIT compile and execute (scripting mode)
 nex run src/main.nex      # JIT compile and execute
 nex build src/main.nex    # Compile to native executable (AOT)
@@ -87,7 +88,7 @@ with the system linker to produce a standalone executable. Requires a linker
 - Control flow: `if` / `else if` / `else`, `while`, `for`
 - `try` / `catch` / `finally` and `using` blocks
 - String concatenation and comparison
-- `print()` and `println()` builtins
+- `print()` and `println()` builtins with multi-argument support (like Python's `print`)
 - Automatic semicolon insertion (ASI)
 - `var` keyword for dynamically-typed variables
 

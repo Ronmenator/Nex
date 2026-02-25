@@ -743,10 +743,10 @@ Engine and UI functions live in separate native DLLs (`nex3d_native`, `nex_ui_na
 ## 15.1 `std.core`
 
 * `Object` class (root)
-* printing:
+* printing (variadic, like Python's `print` — auto-converts each arg to string, joins with spaces):
 
-  * `public def print(x: Var) -> Unit`
-  * `public def println(x: Var) -> Unit`
+  * `public def print(values...) -> Unit`
+  * `public def println(values...) -> Unit`
 
 ## 15.2 `std.runtime`
 

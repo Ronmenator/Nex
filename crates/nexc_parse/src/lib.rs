@@ -552,7 +552,12 @@ impl Parser {
         } else {
             None
         };
-        self.consume_stmt_terminator();
+        // Accept comma as an optional field separator (in addition to
+        // newline/semicolon) so single-line struct definitions work:
+        //   struct Foo { x: Int, y: Int, z: Int }
+        if !self.consume_if(&TokenKind::Comma) {
+            self.consume_stmt_terminator();
+        }
         FieldDecl {
             name,
             ty,
@@ -996,6 +1001,7 @@ impl Parser {
                 Some(TokenKind::Slash) => Some((12, 13, PrattInfix::Binary(BinaryOp::Div))),
                 Some(TokenKind::Percent) => Some((12, 13, PrattInfix::Binary(BinaryOp::Mod))),
                 Some(TokenKind::LParen) => Some((16, 17, PrattInfix::Call)),
+                Some(TokenKind::LBracket) => Some((16, 17, PrattInfix::GenericArgs)),
                 Some(TokenKind::Dot) => Some((16, 17, PrattInfix::Member)),
                 Some(TokenKind::DoubleColon) => Some((16, 17, PrattInfix::QualifiedMember)),
                 _ => None,
@@ -1045,9 +1051,46 @@ impl Parser {
                     let span = Span::new(callee_span.lo, end);
                     lhs = Expr::Call {
                         callee,
+                        type_args: vec![],
                         args,
                         span,
                     };
+                }
+                PrattInfix::GenericArgs => {
+                    let base_span = expr_span(&lhs);
+                    self.advance(); // consume '['
+                    let mut type_args = vec![];
+                    while !matches!(self.peek_kind(), Some(TokenKind::RBracket) | None) {
+                        if let Some(te) = self.parse_type_expr() {
+                            type_args.push(te);
+                        } else {
+                            break;
+                        }
+                        if !self.consume_if(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    if !self.consume_if(&TokenKind::RBracket) {
+                        self.push_error("expected ']' after type arguments");
+                    }
+
+                    // If followed by '(', this is a generic constructor call
+                    if matches!(self.peek_kind(), Some(TokenKind::LParen)) {
+                        self.advance(); // consume '('
+                        let args = self.parse_expr_list(TokenKind::RParen);
+                        let end = self.tokens
+                            .get(self.pos.saturating_sub(1))
+                            .map(|token| token.span.hi)
+                            .unwrap_or(base_span.hi);
+                        lhs = Expr::Call {
+                            callee: Box::new(lhs),
+                            type_args,
+                            args,
+                            span: Span::new(base_span.lo, end),
+                        };
+                    }
+                    // Otherwise it's a subscript/index — for now, leave lhs unchanged
+                    // (the type args are consumed but not used)
                 }
                 PrattInfix::Member => {
                     self.advance();
@@ -1766,6 +1809,7 @@ enum PrattInfix {
     Assign(AssignOp),
     Binary(BinaryOp),
     Call,
+    GenericArgs,
     Member,
     QualifiedMember,
 }

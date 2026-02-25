@@ -38,6 +38,7 @@ This creates a new project with a `main.nex` entry point and runs it via JIT.
 ```
 def main() -> Unit {
     println("hello, world")
+    println("value:", 42, "pi:", 3.14)
     return
 }
 ```
@@ -46,6 +47,9 @@ def main() -> Unit {
 
 ```
 nex <command> [args]
+
+Flags:
+  --version, -V               Print version and exit
 
 Commands:
   new <name> [--lib]          Create a new project (--lib for a library)

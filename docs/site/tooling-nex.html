@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.96</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -22,6 +22,17 @@
   <p class="page-subtitle">The Nex build tool for compiling, running, and managing projects.</p>
 
   <p>The <code>nex</code> command is the primary interface for building, running, testing, and managing Nex projects. It handles project scaffolding, JIT execution, AOT compilation, formatting, linting, and more.</p>
+
+  <h2>Global Flags</h2>
+
+  <h3>nex --version</h3>
+  <div class="signature">
+    nex --version &nbsp; | &nbsp; nex -V
+  </div>
+  <p>Prints the installed Nex version and exits.</p>
+
+  <pre><code>$ nex --version
+nex 0.1.96</code></pre>
 
   <h2>Commands</h2>
 
@@ -51,7 +62,7 @@ $ nex new my_lib --lib</code></pre>
 
   <pre><code><span class="cmt"># Build the current project</span>
 $ nex build
-Compiling my_app v0.1.88
+Compiling my_app v0.1.96
   Finished release target in 1.2s
   Output: build/my_app
 
@@ -128,7 +139,7 @@ src/main.nex:24: warning: Var in public API — consider @allow_var_api</code></
   <p>Starts the interactive Read-Eval-Print Loop. See <a href="tooling-repl.html">REPL</a> for details.</p>
 
   <pre><code>$ nex repl
-Nex REPL v0.1.88
+Nex REPL v0.1.96
 &gt;&gt;&gt; x = 42
 &gt;&gt;&gt; println(x)
 42</code></pre>
@@ -137,7 +148,7 @@ Nex REPL v0.1.88
   <div class="signature">
     nex test
   </div>
-  <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.88.)</em></p>
+  <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.96.)</em></p>
 
   <h3>nex install &lt;user/repo[:version]&gt;</h3>
   <div class="signature">
@@ -148,10 +159,10 @@ Nex REPL v0.1.88
   <pre><code><span class="cmt"># Install the latest tagged version</span>
 $ nex install nexlang/nex3d
 querying tags for nexlang/nex3d ...
-  latest tag: v0.1.88
-  cloning nexlang/nex3d @ v0.1.88 ...
+  latest tag: v0.1.96
+  cloning nexlang/nex3d @ v0.1.96 ...
   cached at ~/.nex/libs/nex3d/0.1.0
-installed nex3d v0.1.88 from nexlang/nex3d
+installed nex3d v0.1.96 from nexlang/nex3d
 
 <span class="cmt"># Install a specific version</span>
 $ nex install nexlang/nex3d:0.2.0</code></pre>
@@ -175,7 +186,7 @@ removed `nex3d` from project.toml</code></pre>
 
   <pre><code>$ nex list
 dependencies:
-  nex3d v0.1.88  (git: nexlang/nex3d)
+  nex3d v0.1.96  (git: nexlang/nex3d)
   graphics  (path: ../graphics)</code></pre>
 
   <h3>nex install <em>(no arguments)</em></h3>
@@ -216,10 +227,10 @@ Removed build/</code></pre>
 
   <pre><code><span class="cmt"># Create a release and publish to GitHub</span>
 $ cargo xtask release
-  staging nex-v0.1.88-windows-x86_64 ...
+  staging nex-v0.1.96-windows-x86_64 ...
   zipping ...
   publishing via gh CLI ...
-  Release: https://github.com/Ronmenator/Nex/releases/tag/v0.1.88
+  Release: https://github.com/Ronmenator/Nex/releases/tag/v0.1.96
 
 <span class="cmt"># Create as draft (review before publishing)</span>
 $ cargo xtask release --draft</code></pre>

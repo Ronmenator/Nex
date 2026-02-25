@@ -1249,8 +1249,19 @@ The standard library is automatically available. Import specific modules as need
 ### 19.1 Core (always available)
 
 ```nex
-print(value)           // Print without newline (accepts Int, String, Double, Bool, Char)
-println(value)         // Print with newline
+print(values...)       // Print without newline; multiple args are space-separated
+println(values...)     // Print with newline; multiple args are space-separated
+println()              // Print a blank line
+
+// Single argument — type is auto-detected (String, Int, Double, Bool, Char)
+println("hello")
+println(42)
+
+// Multiple arguments — each auto-converted to string, joined with spaces
+println("Name:", name, "Age:", age)   // Output: Name: Alice Age: 30
+
+// String concatenation with + also auto-converts non-string values
+println("Count: " + count)
 ```
 
 ### 19.2 std.math
@@ -2573,14 +2584,17 @@ class Model {
 ### 33.4 Printing Mixed Types
 
 ```nex
-// String concatenation auto-converts
+// Multi-argument print — values are auto-converted and space-separated
+println("Name:", name, "Count:", count, "Pi:", 3.14)
+// Output: Name: Alice Count: 10 Pi: 3.14
+
+// String concatenation with + also auto-converts
 println("Name: " + name)
 println("Count: " + count)
 println("Pi: " + 3.14)
 
-// For standalone values, use print/println directly
-print("value = ")
-println(42)
+// Blank line
+println()
 ```
 
 ### 33.5 Iteration with Index
@@ -2766,7 +2780,7 @@ Terminator        = ";" | ASI_NEWLINE ;
 ║  IMPORTS       import mod.path                                   ║
 ║                from mod.path import Name                         ║
 ║                                                                  ║
-║  PRINT         print(val)   println(val)                        ║
+║  PRINT         print(a, b, c)   println(a, b, c)                ║
 ║                "str" + val   // auto-converts                    ║
 ║                                                                  ║
 ║  OPERATORS     + - * / %  == != < <= > >=  && || !              ║

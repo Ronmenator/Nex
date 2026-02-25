@@ -1273,13 +1273,48 @@ fn emit_instruction<M: Module>(
 
         IrInstruction::Call { dst, target, args } => {
             // Intercept print/println and dispatch to typed runtime functions.
-            if (target == "print" || target == "println") && !args.is_empty() {
-                let rt_name = pick_print_runtime(target, &args[0], reg_types);
-                let arg_val = resolve_value(builder, module, &args[0], vars, strings, func_ids, global_data);
-                if let Some(&fid) = func_ids.get(rt_name) {
-                    let func_ref = module.declare_func_in_func(fid, builder.func);
-                    let coerced = coerce_call_args(builder, func_ref, &[arg_val]);
-                    builder.ins().call(func_ref, &coerced);
+            if target == "print" || target == "println" {
+                let is_ln = target == "println";
+                if args.is_empty() {
+                    // print() → no-op; println() → newline
+                    if is_ln {
+                        if let Some(&fid) = func_ids.get("nex_println_str") {
+                            let func_ref = module.declare_func_in_func(fid, builder.func);
+                            let null = builder.ins().iconst(types::I64, 0);
+                            builder.ins().call(func_ref, &[null]);
+                        }
+                    }
+                } else if args.len() == 1 {
+                    // Single arg: dispatch to typed runtime (int, float, bool, str)
+                    let rt_name = pick_print_runtime(target, &args[0], reg_types);
+                    let arg_val = resolve_value(builder, module, &args[0], vars, strings, func_ids, global_data);
+                    if let Some(&fid) = func_ids.get(rt_name) {
+                        let func_ref = module.declare_func_in_func(fid, builder.func);
+                        let coerced = coerce_call_args(builder, func_ref, &[arg_val]);
+                        builder.ins().call(func_ref, &coerced);
+                    }
+                } else {
+                    // Multi-arg: coerce each to string, join with " ", print result
+                    let space = resolve_value(builder, module, &IrValue::StringConst(" ".into()), vars, strings, func_ids, global_data);
+                    let mut accum = {
+                        let v = resolve_value(builder, module, &args[0], vars, strings, func_ids, global_data);
+                        let ty = irvalue_reg_type(&args[0], reg_types);
+                        coerce_to_str(builder, module, v, ty, func_ids)
+                    };
+                    for arg in &args[1..] {
+                        // append space
+                        accum = call_runtime2(builder, module, func_ids, "nex_str_concat", accum, space);
+                        // append next arg as string
+                        let v = resolve_value(builder, module, arg, vars, strings, func_ids, global_data);
+                        let ty = irvalue_reg_type(arg, reg_types);
+                        let s = coerce_to_str(builder, module, v, ty, func_ids);
+                        accum = call_runtime2(builder, module, func_ids, "nex_str_concat", accum, s);
+                    }
+                    let rt_name = if is_ln { "nex_println_str" } else { "nex_print_str" };
+                    if let Some(&fid) = func_ids.get(rt_name) {
+                        let func_ref = module.declare_func_in_func(fid, builder.func);
+                        builder.ins().call(func_ref, &[accum]);
+                    }
                 }
                 if let Some(d) = dst {
                     let z = builder.ins().iconst(types::I64, 0);
@@ -1505,7 +1540,11 @@ fn collect_strings(func: &IrFunction, pool: &mut Vec<String>) {
                 | IrInstruction::Print {
                     value: IrValue::StringConst(s),
                 } => push(s),
-                IrInstruction::Call { args, .. } => {
+                IrInstruction::Call { target, args, .. } => {
+                    // Multi-arg print/println needs a " " separator string.
+                    if (target == "print" || target == "println") && args.len() > 1 {
+                        push(&" ".to_string());
+                    }
                     for a in args {
                         if let IrValue::StringConst(s) = a {
                             push(s);
@@ -2364,7 +2403,7 @@ fn collect_needed_imports(ir: &IrModule) -> std::collections::HashSet<String> {
                             needed.insert(s.to_string());
                         }
                     }
-                    IrInstruction::Call { target, .. } => {
+                    IrInstruction::Call { target, args, .. } => {
                         // print/println route through pick_print_runtime.
                         if target == "print" || target == "println" {
                             for s in &[
@@ -2375,6 +2414,17 @@ fn collect_needed_imports(ir: &IrModule) -> std::collections::HashSet<String> {
                                 "nex_print_char", "nex_println_char",
                             ] {
                                 needed.insert(s.to_string());
+                            }
+                            // Multi-arg print needs string coercion + concat.
+                            if args.len() > 1 {
+                                for s in &[
+                                    "nex_str_concat",
+                                    "nex_int_to_str",
+                                    "nex_double_to_str",
+                                    "nex_bool_to_str",
+                                ] {
+                                    needed.insert(s.to_string());
+                                }
                             }
                         } else if let Some(rt) = stdlib_function_name(target) {
                             needed.insert(rt.to_string());

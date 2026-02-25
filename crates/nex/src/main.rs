@@ -16,6 +16,12 @@ fn main() {
         return;
     }
 
+    // `nex --version` / `nex -V`
+    if args[0] == "--version" || args[0] == "-V" {
+        println!("nex {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
     // `nex -c "code"` — run inline code (like `python -c "..."`)
     if args[0] == "-c" {
         args.remove(0);
@@ -394,6 +400,8 @@ fn usage() {
     println!("Usage: nex <script> [args]");
     println!("       nex -c \"<code>\" [args]");
     println!("       nex <command> [args]\n");
+    println!("Flags:");
+    println!("  --version, -V               Print version and exit\n");
     println!("Run a script:");
     println!("  nex <file>                  Run a .nex script (extension optional)");
     println!("  nex <dir>                   Run src/main.nex inside a project directory");
@@ -512,16 +520,28 @@ fn build_project_modules(root: &PathBuf) -> i32 {
         return 1;
     }
 
-    // Single-module shortcut: if there's only a main.nex and no library modules,
-    // use the simpler single-module build path.
-    let has_lib_modules = modules.keys().any(|k| lib_names.iter().any(|lib| k.starts_with(lib)));
-    if !has_lib_modules {
+    // Single-module shortcut: only use the simpler path when there is truly
+    // just one source file (main.nex) and no library modules.  Previously this
+    // shortcut fired whenever there were no *library* modules, which broke
+    // intra-project imports (e.g. `import helper` from main.nex).
+    let project_only_modules: Vec<&String> = modules.keys()
+        .filter(|k| !lib_names.iter().any(|lib| k.starts_with(lib)))
+        .collect();
+    if project_only_modules.len() <= 1 && lib_names.is_empty() {
         if let Some(main_path) = modules.iter()
             .find(|(_, p)| p.ends_with("main.nex"))
             .map(|(_, p)| p.clone())
         {
             return build_single_module(&main_path);
         }
+    }
+
+    // Build the set of all known module-name prefixes so the import validator
+    // treats intra-project imports (e.g. `import helper`) as known modules.
+    let mut all_known_names = lib_names.clone();
+    for name in modules.keys() {
+        let root_prefix = name.split('.').next().unwrap_or(name);
+        all_known_names.insert(root_prefix.to_string());
     }
 
     let out_dir = root.join("build");
@@ -542,13 +562,23 @@ fn build_project_modules(root: &PathBuf) -> i32 {
         let source_path = path.to_string_lossy().to_string();
         let stem = module.replace('.', "_");
 
+        // Apply module prefix to library modules so identically-named symbols
+        // in different libraries don't collide at link time.
+        let is_lib_module = lib_names.iter().any(|lib| module.starts_with(lib));
+        let module_prefix = if is_lib_module {
+            Some(module.replace('.', "::"))
+        } else {
+            None
+        };
+
         let result = compile_to_native(
             &source_text,
             CompileOptions {
                 source_path: source_path.clone(),
                 emit_metadata: true,
                 output_dir: Some(out_dir.clone()),
-                lib_names: lib_names.clone(),
+                lib_names: all_known_names.clone(),
+                module_prefix,
                 ..Default::default()
             },
         );
@@ -685,6 +715,7 @@ fn build_lib_project(root: &PathBuf) -> i32 {
                 emit_metadata: false,
                 output_dir: Some(out_dir.clone()),
                 output_kind: OutputKind::SharedLib,
+                module_prefix: Some(module.replace('.', "::")),
                 ..Default::default()
             },
         );

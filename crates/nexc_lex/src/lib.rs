@@ -144,13 +144,51 @@ pub fn should_insert_terminator(kind: &TokenKind) -> bool {
     )
 }
 
+/// Returns `true` if `kind` is a binary/infix operator that can continue an
+/// expression from the previous line.  When a newline separates a terminable
+/// token and one of these operators the ASI pass must **not** insert a
+/// semicolon so the multi-line expression stays intact.
+///
+/// Only operators that are **unambiguously binary** (never valid as unary
+/// prefix) are included.  `+` and `-` are excluded because they can be
+/// unary and starting a new statement with `-expr` is a valid pattern.
+fn is_continuation_operator(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::AndAnd
+            | TokenKind::OrOr
+            | TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::Percent
+            | TokenKind::EqEq
+            | TokenKind::NotEq
+            | TokenKind::Lt
+            | TokenKind::LtEq
+            | TokenKind::Gt
+            | TokenKind::GtEq
+            | TokenKind::Eq
+            | TokenKind::PlusEq
+            | TokenKind::MinusEq
+            | TokenKind::StarEq
+            | TokenKind::SlashEq
+            | TokenKind::Dot
+            | TokenKind::Pipe
+            | TokenKind::Amp
+            | TokenKind::Caret
+    )
+}
+
 pub fn asi_normalize(tokens: &[Token]) -> Vec<Token> {
     let mut output = Vec::new();
     let mut paren_depth: isize = 0;
     let mut bracket_depth: isize = 0;
     let mut prev_significant: Option<&TokenKind> = None;
 
-    for token in tokens {
+    let len = tokens.len();
+    let mut i = 0;
+    while i < len {
+        let token = &tokens[i];
+
         match token.kind {
             TokenKind::LParen => paren_depth += 1,
             TokenKind::RParen => paren_depth = paren_depth.saturating_sub(1),
@@ -164,13 +202,28 @@ pub fn asi_normalize(tokens: &[Token]) -> Vec<Token> {
                 && paren_depth == 0
                 && bracket_depth == 0
             {
-                output.push(Token::new(
-                    TokenKind::SyntheticSemicolon,
-                    token.span.lo,
-                    token.span.hi,
-                    ";".to_string(),
-                ));
+                // Look ahead past any further newlines to find the next
+                // significant token.  If it is a continuation operator the
+                // expression spans multiple lines and we must NOT insert a
+                // semicolon.
+                let mut next_significant: Option<&TokenKind> = None;
+                for j in (i + 1)..len {
+                    if !matches!(tokens[j].kind, TokenKind::Newline) {
+                        next_significant = Some(&tokens[j].kind);
+                        break;
+                    }
+                }
+
+                if !matches!(next_significant, Some(k) if is_continuation_operator(k)) {
+                    output.push(Token::new(
+                        TokenKind::SyntheticSemicolon,
+                        token.span.lo,
+                        token.span.hi,
+                        ";".to_string(),
+                    ));
+                }
             }
+            i += 1;
             continue;
         }
 
@@ -190,6 +243,7 @@ pub fn asi_normalize(tokens: &[Token]) -> Vec<Token> {
         if matches!(token.kind, TokenKind::Eof) {
             break;
         }
+        i += 1;
     }
 
     if !matches!(output.last().map(|token| &token.kind), Some(TokenKind::Eof)) {
@@ -1047,5 +1101,68 @@ mod tests {
             "Eof:22..22",
         ];
         assert_eq!(kind_and_span(&tokens), expected);
+    }
+
+    #[test]
+    fn asi_suppresses_semicolon_before_continuation_operator() {
+        // Multi-line && expression: no semicolon should be inserted before &&
+        let source = "a > 5\n    && b < 10";
+        let mut sink = DiagnosticSink::new();
+        let tokens = asi_normalize(&lex(source, Some("input.nex".to_string()), &mut sink));
+
+        let expected: Vec<String> = vec![
+            "Identifier", // a
+            "Gt",         // >
+            "IntLiteral", // 5
+            "AndAnd",     // && (no semicolon before this!)
+            "Identifier", // b
+            "Lt",         // <
+            "IntLiteral", // 10
+            "Eof",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+        assert_eq!(kinds(&tokens), expected);
+    }
+
+    #[test]
+    fn asi_suppresses_semicolon_before_oror() {
+        let source = "x == 1\n    || y == 2";
+        let mut sink = DiagnosticSink::new();
+        let tokens = asi_normalize(&lex(source, Some("input.nex".to_string()), &mut sink));
+
+        let expected: Vec<String> = vec![
+            "Identifier", "EqEq", "IntLiteral",
+            "OrOr",
+            "Identifier", "EqEq", "IntLiteral",
+            "Eof",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+        assert_eq!(kinds(&tokens), expected);
+    }
+
+    #[test]
+    fn asi_still_inserts_semicolon_between_statements() {
+        // Two separate statements — semicolon should still be inserted
+        let source = "x = 1\ny = 2";
+        let mut sink = DiagnosticSink::new();
+        let tokens = asi_normalize(&lex(source, Some("input.nex".to_string()), &mut sink));
+
+        let expected: Vec<String> = vec![
+            "Identifier", "Eq", "IntLiteral",
+            "SyntheticSemicolon",
+            "Identifier", "Eq", "IntLiteral",
+            "Eof",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+        assert_eq!(kinds(&tokens), expected);
     }
 }

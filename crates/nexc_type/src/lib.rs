@@ -480,7 +480,7 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
 
             match op {
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
-                    if lt == Type::String && matches!(op, BinaryOp::Add) {
+                    if (lt == Type::String || rt == Type::String) && matches!(op, BinaryOp::Add) {
                         return Type::String;
                     }
                     if lt.is_numeric() && rt.is_numeric() {

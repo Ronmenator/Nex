@@ -27,6 +27,11 @@ pub struct CompileOptions {
     /// Paths to native dynamic libraries (.dll / .so) to load for JIT.
     pub native_libs: Vec<PathBuf>,
     pub output_kind: OutputKind,
+    /// Canonical module name (e.g. "nex3d.color") used to namespace exported
+    /// symbols so that identically-named functions in different libraries
+    /// don't collide at link time.  When `Some`, all top-level function and
+    /// class/struct method definitions are prefixed with this name.
+    pub module_prefix: Option<String>,
 }
 
 impl Default for CompileOptions {
@@ -38,6 +43,7 @@ impl Default for CompileOptions {
             lib_names: HashSet::new(),
             native_libs: Vec::new(),
             output_kind: OutputKind::Executable,
+            module_prefix: None,
         }
     }
 }
@@ -86,7 +92,7 @@ pub fn compile_module(source: &str, options: CompileOptions) -> CompileResult {
     run_validate_inheritance(&stage_ast, &mut typed_mod, &mut sink);
     run_layout(&typed_mod, &mut sink, &mut stage_layouts);
     run_typecheck(&mut typed_mod, &mut sink);
-    let lowered = run_lower(&typed_mod, &mut sink, &stage_layouts, &mut ir);
+    let lowered = run_lower(&typed_mod, &mut sink, &stage_layouts, &mut ir, options.module_prefix.as_deref());
 
     if !sink.has_errors() {
         run_codegen(&lowered, &mut sink, &mut object, options.output_kind);
@@ -363,6 +369,12 @@ pub fn jit_run_multi(
         return Err("no IR produced".into());
     }
 
+    // Resolve cross-module call targets.  When module prefixes are active,
+    // a caller might reference a bare name (e.g. `COLOR_WHITE`) while the
+    // definition is `nex3d::color::COLOR_WHITE`.  Scan Call instructions
+    // and resolve bare targets to the qualified name found in the merged IR.
+    resolve_cross_module_calls(&mut merged);
+
     nexc_codegen_cranelift::jit_execute(&merged, args, native_libs)
 }
 
@@ -538,8 +550,9 @@ fn run_lower(
     sink: &mut DiagnosticSink,
     layouts: &[ClassLayout],
     out_ir: &mut Option<IrModule>,
+    module_prefix: Option<&str>,
 ) -> IrModule {
-    let lowered = nexc_ir::lower_typed_module(typed, layouts, sink);
+    let lowered = nexc_ir::lower_typed_module_with_prefix(typed, layouts, sink, module_prefix);
     *out_ir = Some(lowered.clone());
     lowered
 }
@@ -580,6 +593,55 @@ fn extract_function_location(
         }
     }
     (None, None)
+}
+
+/// Resolve unqualified Call targets in the merged IR to their module-prefixed
+/// names.  For example, a call to `draw_line` is resolved to
+/// `nex3d::draw::draw_line` if the merged IR contains such a function.
+fn resolve_cross_module_calls(ir: &mut IrModule) {
+    use std::collections::HashMap;
+
+    // Build a map: bare suffix → fully-qualified name.  For `nex3d::color::COLOR_WHITE`,
+    // the suffix `COLOR_WHITE` maps to the full name.  Method names like
+    // `nex3d::color::Foo::bar` have suffix `Foo::bar` AND `bar`.
+    let func_names: Vec<String> = ir.functions.iter().map(|f| f.name.clone()).collect();
+    let mut suffix_map: HashMap<String, String> = HashMap::new();
+    for name in &func_names {
+        // If the name contains `::`, the last component (and multi-component
+        // suffixes) are potential bare call targets.
+        if let Some(pos) = name.rfind("::") {
+            let bare = &name[pos + 2..];
+            suffix_map.entry(bare.to_string()).or_insert_with(|| name.clone());
+        }
+        // Also try the portion after the first `::` (e.g. `Color::init` from
+        // `nex3d::color::Color::init`).
+        if let Some(first_sep) = name.find("::") {
+            let rest = &name[first_sep + 2..];
+            if rest != name {
+                suffix_map.entry(rest.to_string()).or_insert_with(|| name.clone());
+            }
+        }
+    }
+
+    let func_set: std::collections::HashSet<&str> =
+        func_names.iter().map(|s| s.as_str()).collect();
+
+    for func in &mut ir.functions {
+        for block in &mut func.blocks {
+            for inst in &mut block.instructions {
+                if let nexc_ir::IrInstruction::Call { target, .. } = inst {
+                    // Skip targets that already resolve directly.
+                    if func_set.contains(target.as_str()) {
+                        continue;
+                    }
+                    // Try to resolve via suffix map.
+                    if let Some(qualified) = suffix_map.get(target.as_str()) {
+                        *target = qualified.clone();
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn read_previous_meta_if_imported(path: &str, sink: &mut DiagnosticSink) -> Option<NexMeta> {

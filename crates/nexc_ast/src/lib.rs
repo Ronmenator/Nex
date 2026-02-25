@@ -274,6 +274,7 @@ pub enum Expr {
     },
     Call {
         callee: Box<Expr>,
+        type_args: Vec<TypeExpr>,
         args: Vec<Expr>,
         span: Span,
     },

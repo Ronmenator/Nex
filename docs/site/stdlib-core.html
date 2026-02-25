@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.88</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.96</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -28,45 +28,53 @@
 
   <h2>Functions</h2>
 
-  <h3>print(value) &rarr; Unit</h3>
+  <h3>print(values...) &rarr; Unit</h3>
   <div class="signature">
-    <span class="kw">def</span> <span class="fn">print</span>(value: <span class="typ">String</span> | <span class="typ">Int</span> | <span class="typ">Double</span> | <span class="typ">Bool</span> | <span class="typ">Char</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <span class="kw">def</span> <span class="fn">print</span>(values...) <span class="op">-&gt;</span> <span class="typ">Unit</span>
   </div>
-  <p>Prints a value to standard output <strong>without</strong> a trailing newline. Accepts <code>String</code>, <code>Int</code>, <code>Double</code>, <code>Bool</code>, and <code>Char</code> values.</p>
+  <p>Prints one or more values to standard output <strong>without</strong> a trailing newline. Accepts <code>String</code>, <code>Int</code>, <code>Double</code>, <code>Bool</code>, and <code>Char</code> values. When multiple arguments are given, each is auto-converted to a string and joined with spaces (like Python's <code>print</code>).</p>
 
   <pre><code><span class="fn">print</span>(<span class="str">"Hello, "</span>)
 <span class="fn">print</span>(<span class="str">"world!"</span>)
 <span class="cmt">// Output: Hello, world!</span></code></pre>
 
-  <pre><code><span class="fn">print</span>(<span class="num">42</span>)
-<span class="fn">print</span>(<span class="str">" is the answer"</span>)
-<span class="cmt">// Output: 42 is the answer</span></code></pre>
+  <pre><code><span class="fn">print</span>(<span class="str">"value ="</span>, <span class="num">42</span>)
+<span class="cmt">// Output: value = 42</span></code></pre>
 
-  <h3>println(value) &rarr; Unit</h3>
+  <h3>println(values...) &rarr; Unit</h3>
   <div class="signature">
-    <span class="kw">def</span> <span class="fn">println</span>(value: <span class="typ">String</span> | <span class="typ">Int</span> | <span class="typ">Double</span> | <span class="typ">Bool</span> | <span class="typ">Char</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+    <span class="kw">def</span> <span class="fn">println</span>(values...) <span class="op">-&gt;</span> <span class="typ">Unit</span>
   </div>
-  <p>Prints a value to standard output followed by a <strong>newline</strong>. Accepts the same types as <code>print</code>.</p>
+  <p>Prints one or more values to standard output followed by a <strong>newline</strong>. Like <code>print</code>, multiple arguments are auto-converted and space-separated. Called with no arguments, <code>println()</code> prints a blank line.</p>
 
   <pre><code><span class="fn">println</span>(<span class="str">"Hello, world!"</span>)
-<span class="cmt">// Output: Hello, world!\n</span>
+<span class="cmt">// Output: Hello, world!</span>
 
 <span class="fn">println</span>(<span class="num">3.14</span>)
-<span class="cmt">// Output: 3.14\n</span>
+<span class="cmt">// Output: 3.14</span>
 
 <span class="fn">println</span>(<span class="kw">true</span>)
-<span class="cmt">// Output: true\n</span></code></pre>
+<span class="cmt">// Output: true</span></code></pre>
 
-  <h3>Combining print and println</h3>
+  <h3>Multi-argument printing</h3>
+  <p>Pass multiple values separated by commas. Each value is auto-converted to a string and joined with spaces:</p>
 
-  <pre><code><span class="fn">print</span>(<span class="str">"Name: "</span>)
-<span class="fn">println</span>(<span class="str">"Nex"</span>)
-<span class="fn">print</span>(<span class="str">"Version: "</span>)
-<span class="fn">println</span>(<span class="num">1</span>)
+  <pre><code>name <span class="op">=</span> <span class="str">"Nex"</span>
+version <span class="op">=</span> <span class="num">1</span>
+pi <span class="op">=</span> <span class="num">3.14</span>
+
+<span class="fn">println</span>(<span class="str">"Name:"</span>, name, <span class="str">"Version:"</span>, version, <span class="str">"Pi:"</span>, pi)
+<span class="cmt">// Output: Name: Nex Version: 1 Pi: 3.14</span></code></pre>
+
+  <h3>String concatenation with +</h3>
+  <p>You can also build strings manually with the <code>+</code> operator, which auto-converts non-string values:</p>
+
+  <pre><code><span class="fn">println</span>(<span class="str">"Name: "</span> <span class="op">+</span> name)
+<span class="fn">println</span>(<span class="str">"Count: "</span> <span class="op">+</span> <span class="num">42</span>)
 
 <span class="cmt">// Output:</span>
 <span class="cmt">// Name: Nex</span>
-<span class="cmt">// Version: 1</span></code></pre>
+<span class="cmt">// Count: 42</span></code></pre>
 
   <h2>Object</h2>
 

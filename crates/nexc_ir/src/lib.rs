@@ -1237,6 +1237,19 @@ pub fn lower_typed_module(
     layouts: &[ClassLayout],
     _sink: &mut DiagnosticSink,
 ) -> IrModule {
+    lower_typed_module_with_prefix(typed, layouts, _sink, None)
+}
+
+/// Like `lower_typed_module` but prefixes all top-level function, class method,
+/// and struct method names with `module_prefix::` when provided.  This prevents
+/// symbol collisions when multiple libraries export identically-named symbols
+/// (e.g. `nex3d::color::COLOR_WHITE` vs `nex_ui::style::COLOR_WHITE`).
+pub fn lower_typed_module_with_prefix(
+    typed: &TypedModule,
+    layouts: &[ClassLayout],
+    _sink: &mut DiagnosticSink,
+    module_prefix: Option<&str>,
+) -> IrModule {
     let mut lowering = IrLowering::new();
     let mut functions = Vec::new();
     let mut globals = Vec::new();
@@ -1420,11 +1433,25 @@ pub fn lower_typed_module(
         }
     }
 
+    // Helper: apply module prefix to a function/method name when provided.
+    // The entry point `main` is never prefixed.
+    let prefix_name = |name: String| -> String {
+        if let Some(pfx) = module_prefix {
+            if name == "main" {
+                return name;
+            }
+            format!("{pfx}::{name}")
+        } else {
+            name
+        }
+    };
+
     for item in &typed.file.items {
         match item {
             nexc_ast::Item::Function(func) => {
                 lowering.current_class = None;
                 let mut ir_fn = lowering.lower_function(func);
+                ir_fn.name = prefix_name(ir_fn.name);
                 ir_fn.file = Some(file_path.clone());
                 functions.push(ir_fn);
             }
@@ -1432,7 +1459,7 @@ pub fn lower_typed_module(
                 lowering.current_class = Some(class.name.clone());
                 for method in &class.methods {
                     let mut ir_fn = lowering.lower_function(method);
-                    ir_fn.name = format!("{}::{}", class.name, ir_fn.name);
+                    ir_fn.name = prefix_name(format!("{}::{}", class.name, ir_fn.name));
                     ir_fn.file = Some(file_path.clone());
                     functions.push(ir_fn);
                 }
@@ -1441,7 +1468,7 @@ pub fn lower_typed_module(
                 lowering.current_class = Some(s.name.clone());
                 for method in &s.methods {
                     let mut ir_fn = lowering.lower_function(method);
-                    ir_fn.name = format!("{}::{}", s.name, ir_fn.name);
+                    ir_fn.name = prefix_name(format!("{}::{}", s.name, ir_fn.name));
                     ir_fn.file = Some(file_path.clone());
                     functions.push(ir_fn);
                 }
@@ -1462,7 +1489,7 @@ pub fn lower_typed_module(
                     }
                     init_body.push(IrInstruction::Return(None));
                     functions.push(IrFunction {
-                        name: format!("{}::init", s.name),
+                        name: prefix_name(format!("{}::init", s.name)),
                         params,
                         return_type: Type::Unit,
                         blocks: vec![IrBlock {
@@ -1475,6 +1502,27 @@ pub fn lower_typed_module(
                 }
             }
             _ => {}
+        }
+    }
+
+    // When a module prefix was applied, also rewrite Call targets that reference
+    // functions defined in this module so intra-module calls use the prefixed
+    // names.  Calls to external / runtime functions are left untouched.
+    if module_prefix.is_some() {
+        let local_names: std::collections::HashSet<String> =
+            functions.iter().map(|f| f.name.clone()).collect();
+        for func in &mut functions {
+            for block in &mut func.blocks {
+                for inst in &mut block.instructions {
+                    if let IrInstruction::Call { target, .. } = inst {
+                        // Check if the target, after prefixing, matches a local function.
+                        let prefixed = prefix_name(target.clone());
+                        if local_names.contains(&prefixed) {
+                            *target = prefixed;
+                        }
+                    }
+                }
+            }
         }
     }
 
