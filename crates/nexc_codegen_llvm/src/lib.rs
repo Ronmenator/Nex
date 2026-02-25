@@ -62,7 +62,15 @@ fn emit_runtime_decls(out: &mut String) {
     out.push_str("declare void @nex_gc_safepoint()\n");
     out.push_str("declare void @nex_throw(i8*)\n");
     out.push_str("declare i32 @puts(i8*)\n");
-    out.push_str("declare i32 @printf(i8*, ...)\n\n");
+    out.push_str("declare i32 @printf(i8*, ...)\n");
+    // List<T> runtime (type-erased)
+    out.push_str("declare i64 @nex_list_new()\n");
+    out.push_str("declare void @nex_list_add(i64, i64)\n");
+    out.push_str("declare i64 @nex_list_get(i64, i64)\n");
+    out.push_str("declare void @nex_list_set(i64, i64, i64)\n");
+    out.push_str("declare i64 @nex_list_length(i64)\n");
+    out.push_str("declare i64 @nex_list_remove(i64, i64)\n");
+    out.push_str("declare void @nex_list_free(i64)\n\n");
 }
 
 fn collect_strings(func: &IrFunction, pool: &mut Vec<String>) {
@@ -256,6 +264,7 @@ fn llvm_type(ty: &nexc_type::Type) -> String {
         nexc_type::Type::Double => "double".into(),
         nexc_type::Type::Char => "i32".into(),
         nexc_type::Type::String => "i8*".into(),
+        nexc_type::Type::Generic(_, _) => "i64".into(), // type erasure
         _ => "i64".into(),
     }
 }

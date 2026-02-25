@@ -2,14 +2,8 @@
 //
 // Architecture (Pre-LayerNorm GPT-2 with MQA):
 //   Token Embedding + Position Embedding
-//   → 4 × [ LN → MQA(4 heads, shared K/V) + Residual → LN → FFN(GELU) + Residual ]
+//   → N × [ LN → MQA(4 heads, shared K/V) + Residual → LN → FFN(GELU) + Residual ]
 //   → Final LN → LM Head
-//
-// Multi-Query Attention (Shazeer 2019):
-//   Q: d_model → d_model (split into n_heads via narrow)
-//   K: d_model → d_head  (shared across all heads)
-//   V: d_model → d_head  (shared across all heads)
-//   Causal masking prevents attending to future positions.
 //
 // Usage:
 //   nex run examples/gpt2_transformer [--epochs N] [--lr F] [--seed N] [--save PATH]
@@ -20,18 +14,28 @@ import torch.loss
 import torch.optim
 import torch.model
 
-// ===========================================================================
-// Builder helpers
-// ===========================================================================
+// ===== Config =====
 
-def build_proj(d_in: Int, d_out: Int) -> Var {
-    var m = nn_sequential_new()
+struct GPTConfig {
+    n_embd: Int
+    n_head: Int
+    n_layer: Int
+    vocab_size: Int
+    block_size: Int
+    d_head: Int
+    d_ff: Int
+}
+
+// ===== Builder helpers =====
+
+def build_proj(d_in: Int, d_out: Int) -> Module {
+    var m: Module = nn_sequential_new()
     nn_linear(m, d_in, d_out)
     return m
 }
 
-def build_ffn(d_model: Int, d_ff: Int) -> Var {
-    var m = nn_sequential_new()
+def build_ffn(d_model: Int, d_ff: Int) -> Module {
+    var m: Module = nn_sequential_new()
     nn_linear(m, d_model, d_ff)
     nn_gelu(m)
     nn_linear(m, d_ff, d_model)
@@ -39,181 +43,166 @@ def build_ffn(d_model: Int, d_ff: Int) -> Var {
     return m
 }
 
-def build_ln(dim: Int) -> Var {
-    var m = nn_sequential_new()
+def build_ln(dim: Int) -> Module {
+    var m: Module = nn_sequential_new()
     nn_layer_norm(m, dim)
     return m
 }
 
-def build_embedding(num_emb: Int, emb_dim: Int) -> Var {
-    var m = nn_sequential_new()
+def build_embedding(num_emb: Int, emb_dim: Int) -> Module {
+    var m: Module = nn_sequential_new()
     nn_embedding(m, num_emb, emb_dim)
     return m
 }
 
-// ===========================================================================
-// Attention: single-head scaled dot-product with causal mask
-// ===========================================================================
+// ===== Attention helpers =====
 
-def attn_head(q: Var, k: Var, v: Var, causal_mask: Var) -> Var {
-    // q: [seq, d_head], k: [seq, d_head], v: [seq, d_head]
-    var kt = tensor_transpose(k, 0, 1)
-    var scores = tensor_matmul(q, kt)
-    // Scale by 1/sqrt(d_head). d_head=16, sqrt(16)=4.0
-    scores = tensor_div_scalar(scores, 4.0)
-    // Causal mask: fill future positions with large negative
-    scores = tensor_masked_fill(scores, causal_mask, -100000.0)
-    var weights = tensor_softmax(scores, 1)
-    return tensor_matmul(weights, v)
+def attn_head(q: Tensor, k: Tensor, v: Tensor, causal_mask: Tensor) -> Tensor {
+    var kt: Tensor = k.transpose(0, 1)
+    var scores: Tensor = q.matmul(kt).div_scalar(4.0)
+    scores = scores.masked_fill(causal_mask, -100000.0)
+    var weights: Tensor = scores.softmax(1)
+    return weights.matmul(v)
 }
-
-// ===========================================================================
-// Multi-Query Attention: shared K/V, per-head Q via narrow
-// ===========================================================================
 
 def mqa_forward(
-    q_proj: Var, k_proj: Var, v_proj: Var, o_proj: Var,
-    x: Var, causal_mask: Var
-) -> Var {
-    var q_all = nn_forward(q_proj, x)
-    var k = nn_forward(k_proj, x)
-    var v = nn_forward(v_proj, x)
+    q_proj: Module, k_proj: Module, v_proj: Module, o_proj: Module,
+    x: Tensor, causal_mask: Tensor
+) -> Tensor {
+    var q_all: Tensor = q_proj.forward(x)
+    var k: Tensor = k_proj.forward(x)
+    var v: Tensor = v_proj.forward(x)
 
-    // Split Q into 4 heads along feature dim (d_head=16 each)
-    var q0 = tensor_narrow(q_all, 1, 0, 16)
-    var q1 = tensor_narrow(q_all, 1, 16, 16)
-    var q2 = tensor_narrow(q_all, 1, 32, 16)
-    var q3 = tensor_narrow(q_all, 1, 48, 16)
+    var q0: Tensor = q_all.narrow(1, 0, 16)
+    var q1: Tensor = q_all.narrow(1, 16, 16)
+    var q2: Tensor = q_all.narrow(1, 32, 16)
+    var q3: Tensor = q_all.narrow(1, 48, 16)
 
-    // Per-head attention (all share the same K, V)
-    var h0 = attn_head(q0, k, v, causal_mask)
-    var h1 = attn_head(q1, k, v, causal_mask)
-    var h2 = attn_head(q2, k, v, causal_mask)
-    var h3 = attn_head(q3, k, v, causal_mask)
+    var h0: Tensor = attn_head(q0, k, v, causal_mask)
+    var h1: Tensor = attn_head(q1, k, v, causal_mask)
+    var h2: Tensor = attn_head(q2, k, v, causal_mask)
+    var h3: Tensor = attn_head(q3, k, v, causal_mask)
 
-    // Concatenate heads → [seq, d_model]
-    var ctx = tensor_cat(tensor_cat(tensor_cat(h0, h1, 1), h2, 1), h3, 1)
-
-    return nn_forward(o_proj, ctx)
+    var ctx: Tensor = h0.cat(h1, 1).cat(h2, 1).cat(h3, 1)
+    return o_proj.forward(ctx)
 }
 
-// ===========================================================================
-// Transformer block: Pre-LayerNorm MQA + FFN with residual connections
-// ===========================================================================
-
 def block_forward(
-    ln1: Var, ln2: Var,
-    q_proj: Var, k_proj: Var, v_proj: Var, o_proj: Var,
-    ffn: Var, x: Var, causal_mask: Var
-) -> Var {
-    // Pre-norm MQA + residual
-    var normed = nn_forward(ln1, x)
-    var attn_out = mqa_forward(q_proj, k_proj, v_proj, o_proj, normed, causal_mask)
-    x = tensor_add(x, attn_out)
+    ln1: Module, q_proj: Module, k_proj: Module, v_proj: Module,
+    o_proj: Module, ln2: Module, ffn: Module,
+    x: Tensor, causal_mask: Tensor
+) -> Tensor {
+    var normed: Tensor = ln1.forward(x)
+    var attn_out: Tensor = mqa_forward(q_proj, k_proj, v_proj, o_proj, normed, causal_mask)
+    x = x + attn_out
 
-    // Pre-norm FFN + residual
-    normed = nn_forward(ln2, x)
-    var ff_out = nn_forward(ffn, normed)
-    x = tensor_add(x, ff_out)
-
+    normed = ln2.forward(x)
+    var ff_out: Tensor = ffn.forward(normed)
+    x = x + ff_out
     return x
 }
 
-// ===========================================================================
-// Optimizer step + zero_grad combined
-// ===========================================================================
+// ===== GPT Model =====
 
-def optim_update(opt: Var) {
-    optim_step(opt)
-    optim_zero_grad(opt)
-    return
+class GPT {
+    tok_emb: Module
+    pos_emb: Module
+    modules: List
+    ln_f: Module
+    lm_head: Module
+    n_layers: Int
+
+    def init(config: GPTConfig) {
+        self.tok_emb = build_embedding(config.vocab_size, config.n_embd)
+        self.pos_emb = build_embedding(config.block_size, config.n_embd)
+        self.modules = List()
+        self.n_layers = config.n_layer
+
+        var i = 0
+        while (i < config.n_layer) {
+            self.modules.add(build_ln(config.n_embd))
+            self.modules.add(build_proj(config.n_embd, config.n_embd))
+            self.modules.add(build_proj(config.n_embd, config.d_head))
+            self.modules.add(build_proj(config.n_embd, config.d_head))
+            self.modules.add(build_proj(config.n_embd, config.n_embd))
+            self.modules.add(build_ln(config.n_embd))
+            self.modules.add(build_ffn(config.n_embd, config.d_ff))
+            i = i + 1
+        }
+
+        self.ln_f = build_ln(config.n_embd)
+        self.lm_head = build_proj(config.n_embd, config.vocab_size)
+    }
+
+    def to_device(device: String) {
+        self.tok_emb.to_device(device)
+        self.pos_emb.to_device(device)
+        var i = 0
+        while (i < self.modules.length()) {
+            var m: Module = self.modules.get(i)
+            m.to_device(device)
+            i = i + 1
+        }
+        self.ln_f.to_device(device)
+        self.lm_head.to_device(device)
+    }
+
+    def parameters() -> List {
+        var params = List()
+        params.add(self.tok_emb)
+        params.add(self.pos_emb)
+        var i = 0
+        while (i < self.modules.length()) {
+            params.add(self.modules.get(i))
+            i = i + 1
+        }
+        params.add(self.ln_f)
+        params.add(self.lm_head)
+        return params
+    }
+
+    def forward(x: Tensor, causal_mask: Tensor) -> Tensor {
+        var h: Tensor = self.tok_emb.forward(x) + self.pos_emb.forward(x)
+        var bi = 0
+        while (bi < self.n_layers) {
+            var base = bi * 7
+            h = block_forward(
+                self.modules.get(base), self.modules.get(base + 1),
+                self.modules.get(base + 2), self.modules.get(base + 3),
+                self.modules.get(base + 4), self.modules.get(base + 5),
+                self.modules.get(base + 6), h, causal_mask)
+            bi = bi + 1
+        }
+        h = self.ln_f.forward(h)
+        return self.lm_head.forward(h)
+    }
+
+    def free() {
+        nn_free(self.tok_emb)
+        nn_free(self.pos_emb)
+        var i = 0
+        while (i < self.modules.length()) {
+            nn_free(self.modules.get(i))
+            i = i + 1
+        }
+        nn_free(self.ln_f)
+        nn_free(self.lm_head)
+    }
 }
 
-// ===========================================================================
-// Move a block (7 modules) to device
-// ===========================================================================
-
-def block_to_device(
-    ln1: Var, q: Var, k: Var, v: Var, o: Var, ln2: Var, ffn: Var,
-    device: String
-) {
-    nn_to_device(ln1, device)
-    nn_to_device(q, device)
-    nn_to_device(k, device)
-    nn_to_device(v, device)
-    nn_to_device(o, device)
-    nn_to_device(ln2, device)
-    nn_to_device(ffn, device)
-    return
-}
-
-// ===========================================================================
-// Update all optimizers for one block (7 optimizers)
-// ===========================================================================
-
-def block_optim_update(
-    ol1: Var, oq: Var, ok: Var, ov: Var, oo: Var, ol2: Var, of_: Var
-) {
-    optim_update(ol1)
-    optim_update(oq)
-    optim_update(ok)
-    optim_update(ov)
-    optim_update(oo)
-    optim_update(ol2)
-    optim_update(of_)
-    return
-}
-
-// ===========================================================================
-// Free a block's modules and optimizers
-// ===========================================================================
-
-def block_free_modules(
-    ln1: Var, q: Var, k: Var, v: Var, o: Var, ln2: Var, ffn: Var
-) {
-    nn_free(ln1)
-    nn_free(q)
-    nn_free(k)
-    nn_free(v)
-    nn_free(o)
-    nn_free(ln2)
-    nn_free(ffn)
-    return
-}
-
-def block_free_optims(
-    ol1: Var, oq: Var, ok: Var, ov: Var, oo: Var, ol2: Var, of_: Var
-) {
-    optim_free(ol1)
-    optim_free(oq)
-    optim_free(ok)
-    optim_free(ov)
-    optim_free(oo)
-    optim_free(ol2)
-    optim_free(of_)
-    return
-}
-
-// ===========================================================================
-// Entry point
-// ===========================================================================
+// ===== Entry point =====
 
 def main() {
     println("=== GPT-2 with Multi-Query Attention (Nex) ===")
     println("")
 
-    // ---- Hyperparameters (defaults) ----
-    seq_len = 32
-    vocab_size = 32
-    d_model = 64
-    d_head = 16
-    d_ff = 256
+    // Hyperparameters
     n_epochs = 20
     lr = 0.001
     seed = 42
     save_path = "gpt2_mqa.pt"
 
-    // ---- Parse CLI arguments ----
+    // CLI argument parsing
     argc = env_args_count()
     i = 1
     while (i < argc) {
@@ -239,25 +228,27 @@ def main() {
 
     torch_manual_seed(seed)
 
-    // ---- Device selection ----
     device = "cpu"
     if (cuda_is_available() == 1) {
         device = "cuda"
     }
 
+    // Config: n_embd=64, n_head=4, n_layer=4, vocab=32, block=32, d_head=16, d_ff=256
+    var config = GPTConfig(64, 4, 4, 32, 32, 16, 256)
+
     println("Config:")
-    print("  seq_len    = ")
-    println(seq_len)
+    print("  n_embd     = ")
+    println(config.n_embd)
     print("  vocab_size = ")
-    println(vocab_size)
-    print("  d_model    = ")
-    println(d_model)
+    println(config.vocab_size)
+    print("  n_layer    = ")
+    println(config.n_layer)
+    print("  n_head     = ")
+    println(config.n_head)
     print("  d_head     = ")
-    println(d_head)
+    println(config.d_head)
     print("  d_ff       = ")
-    println(d_ff)
-    println("  n_heads    = 4")
-    println("  n_layers   = 4")
+    println(config.d_ff)
     print("  epochs     = ")
     println(n_epochs)
     print("  lr         = ")
@@ -266,175 +257,52 @@ def main() {
     println(device)
     println("")
 
-    // ==================================================================
     // Build model
-    // ==================================================================
     println("Building model...")
+    var model = GPT(config)
+    model.to_device(device)
 
-    // Embeddings: map token/position indices → d_model vectors
-    var tok_emb = build_embedding(vocab_size, d_model)
-    var pos_emb = build_embedding(seq_len, d_model)
-
-    // Block 1: LN1, Q(d_model→d_model), K(d_model→d_head), V(d_model→d_head), O(d_model→d_model), LN2, FFN
-    var b1_ln1 = build_ln(d_model)
-    var b1_q   = build_proj(d_model, d_model)
-    var b1_k   = build_proj(d_model, d_head)
-    var b1_v   = build_proj(d_model, d_head)
-    var b1_o   = build_proj(d_model, d_model)
-    var b1_ln2 = build_ln(d_model)
-    var b1_ffn = build_ffn(d_model, d_ff)
-
-    // Block 2
-    var b2_ln1 = build_ln(d_model)
-    var b2_q   = build_proj(d_model, d_model)
-    var b2_k   = build_proj(d_model, d_head)
-    var b2_v   = build_proj(d_model, d_head)
-    var b2_o   = build_proj(d_model, d_model)
-    var b2_ln2 = build_ln(d_model)
-    var b2_ffn = build_ffn(d_model, d_ff)
-
-    // Block 3
-    var b3_ln1 = build_ln(d_model)
-    var b3_q   = build_proj(d_model, d_model)
-    var b3_k   = build_proj(d_model, d_head)
-    var b3_v   = build_proj(d_model, d_head)
-    var b3_o   = build_proj(d_model, d_model)
-    var b3_ln2 = build_ln(d_model)
-    var b3_ffn = build_ffn(d_model, d_ff)
-
-    // Block 4
-    var b4_ln1 = build_ln(d_model)
-    var b4_q   = build_proj(d_model, d_model)
-    var b4_k   = build_proj(d_model, d_head)
-    var b4_v   = build_proj(d_model, d_head)
-    var b4_o   = build_proj(d_model, d_model)
-    var b4_ln2 = build_ln(d_model)
-    var b4_ffn = build_ffn(d_model, d_ff)
-
-    // Final layer norm + language model head
-    var final_ln = build_ln(d_model)
-    var lm_head  = build_proj(d_model, vocab_size)
-
-    println("  4 transformer blocks (MQA, 4 heads each)")
-    println("  34 modules total")
-
-    // ==================================================================
-    // Move all modules to device
-    // ==================================================================
-    nn_to_device(tok_emb, device)
-    nn_to_device(pos_emb, device)
-    block_to_device(b1_ln1, b1_q, b1_k, b1_v, b1_o, b1_ln2, b1_ffn, device)
-    block_to_device(b2_ln1, b2_q, b2_k, b2_v, b2_o, b2_ln2, b2_ffn, device)
-    block_to_device(b3_ln1, b3_q, b3_k, b3_v, b3_o, b3_ln2, b3_ffn, device)
-    block_to_device(b4_ln1, b4_q, b4_k, b4_v, b4_o, b4_ln2, b4_ffn, device)
-    nn_to_device(final_ln, device)
-    nn_to_device(lm_head, device)
-
-    // ==================================================================
-    // Create optimizers (Adam, one per module)
-    // ==================================================================
-    var o_te  = optim_adam(tok_emb, lr)
-    var o_pe  = optim_adam(pos_emb, lr)
-
-    var o_1l1 = optim_adam(b1_ln1, lr)
-    var o_1q  = optim_adam(b1_q, lr)
-    var o_1k  = optim_adam(b1_k, lr)
-    var o_1v  = optim_adam(b1_v, lr)
-    var o_1o  = optim_adam(b1_o, lr)
-    var o_1l2 = optim_adam(b1_ln2, lr)
-    var o_1f  = optim_adam(b1_ffn, lr)
-
-    var o_2l1 = optim_adam(b2_ln1, lr)
-    var o_2q  = optim_adam(b2_q, lr)
-    var o_2k  = optim_adam(b2_k, lr)
-    var o_2v  = optim_adam(b2_v, lr)
-    var o_2o  = optim_adam(b2_o, lr)
-    var o_2l2 = optim_adam(b2_ln2, lr)
-    var o_2f  = optim_adam(b2_ffn, lr)
-
-    var o_3l1 = optim_adam(b3_ln1, lr)
-    var o_3q  = optim_adam(b3_q, lr)
-    var o_3k  = optim_adam(b3_k, lr)
-    var o_3v  = optim_adam(b3_v, lr)
-    var o_3o  = optim_adam(b3_o, lr)
-    var o_3l2 = optim_adam(b3_ln2, lr)
-    var o_3f  = optim_adam(b3_ffn, lr)
-
-    var o_4l1 = optim_adam(b4_ln1, lr)
-    var o_4q  = optim_adam(b4_q, lr)
-    var o_4k  = optim_adam(b4_k, lr)
-    var o_4v  = optim_adam(b4_v, lr)
-    var o_4o  = optim_adam(b4_o, lr)
-    var o_4l2 = optim_adam(b4_ln2, lr)
-    var o_4f  = optim_adam(b4_ffn, lr)
-
-    var o_fln = optim_adam(final_ln, lr)
-    var o_lm  = optim_adam(lm_head, lr)
-
+    // Create optimizers (one per module)
+    var params = model.parameters()
+    var optims = List()
+    var pi = 0
+    while (pi < params.length()) {
+        optims.add(optim_adam(params.get(pi), lr))
+        pi = pi + 1
+    }
     println("  Adam optimizers initialized")
 
-    // ==================================================================
-    // Create causal mask: [seq_len, seq_len] boolean
-    // True where j > i (future positions to be masked)
-    // ==================================================================
-    var ones_sq = tensor_ones_like(tensor_eye(seq_len))
-    var upper_tri = tensor_triu(ones_sq, 1)
-    var causal_mask = tensor_to_device(tensor_gt_scalar(upper_tri, 0.5), device)
+    // Causal mask
+    var ones_sq: Tensor = tensor_ones_like(tensor_eye(config.block_size))
+    var upper_tri: Tensor = ones_sq.triu(1)
+    var causal_mask: Tensor = upper_tri.gt_scalar(0.5).to_device(device)
 
-    // ==================================================================
     // Training data
-    // Input:  position indices [0, 1, ..., 31]  (float → cast to int64 by embedding)
-    // Target: same indices as long tensor (cross-entropy target)
-    // Task:   predict own position index through the full transformer stack
-    // ==================================================================
-    var input_ids = tensor_to_device(tensor_arange(0.0, 32.0, 1.0), device)
-    var target = tensor_to_device(tensor_to_dtype_long(tensor_arange(0.0, 32.0, 1.0)), device)
+    var input_ids: Tensor = tensor_arange(0.0, 32.0, 1.0).to_device(device)
+    var target: Tensor = tensor_to_dtype_long(tensor_arange(0.0, 32.0, 1.0)).to_device(device)
 
     println("")
     println("Training...")
     println("")
 
-    // ==================================================================
     // Training loop
-    // ==================================================================
     epoch = 0
     while (epoch < n_epochs) {
-        // --- Forward pass ---
-        var tok_out = nn_forward(tok_emb, input_ids)
-        var pos_out = nn_forward(pos_emb, input_ids)
-        var x = tensor_add(tok_out, pos_out)
-
-        // 4 transformer blocks
-        x = block_forward(b1_ln1, b1_ln2, b1_q, b1_k, b1_v, b1_o, b1_ffn, x, causal_mask)
-        x = block_forward(b2_ln1, b2_ln2, b2_q, b2_k, b2_v, b2_o, b2_ffn, x, causal_mask)
-        x = block_forward(b3_ln1, b3_ln2, b3_q, b3_k, b3_v, b3_o, b3_ffn, x, causal_mask)
-        x = block_forward(b4_ln1, b4_ln2, b4_q, b4_k, b4_v, b4_o, b4_ffn, x, causal_mask)
-
-        // Final layer norm + LM head → logits [seq_len, vocab_size]
-        x = nn_forward(final_ln, x)
-        var logits = nn_forward(lm_head, x)
-
-        // Cross-entropy loss
-        var loss = loss_cross_entropy(logits, target)
-        var loss_val = tensor_item_float(loss)
+        var logits: Tensor = model.forward(input_ids, causal_mask)
+        var loss: Tensor = logits.cross_entropy(target)
+        var loss_val = loss.item()
 
         print("  epoch ")
         print(epoch)
         print("  loss = ")
         println(loss_val)
 
-        // --- Backward pass ---
-        tensor_backward(loss)
+        loss.backward()
 
-        // --- Update all parameters ---
-        optim_update(o_te)
-        optim_update(o_pe)
-        block_optim_update(o_1l1, o_1q, o_1k, o_1v, o_1o, o_1l2, o_1f)
-        block_optim_update(o_2l1, o_2q, o_2k, o_2v, o_2o, o_2l2, o_2f)
-        block_optim_update(o_3l1, o_3q, o_3k, o_3v, o_3o, o_3l2, o_3f)
-        block_optim_update(o_4l1, o_4q, o_4k, o_4v, o_4o, o_4l2, o_4f)
-        optim_update(o_fln)
-        optim_update(o_lm)
+        for (opt in optims) {
+            optim_step(opt)
+            optim_zero_grad(opt)
+        }
 
         epoch = epoch + 1
     }
@@ -442,74 +310,45 @@ def main() {
     println("")
     println("Training complete!")
 
-    // ==================================================================
-    // Inference (no gradients)
-    // ==================================================================
+    // Inference
     println("")
     println("Running inference...")
     torch_no_grad(1)
 
-    var test_in = tensor_to_device(tensor_arange(0.0, 32.0, 1.0), device)
-    var h = tensor_add(nn_forward(tok_emb, test_in), nn_forward(pos_emb, test_in))
-    h = block_forward(b1_ln1, b1_ln2, b1_q, b1_k, b1_v, b1_o, b1_ffn, h, causal_mask)
-    h = block_forward(b2_ln1, b2_ln2, b2_q, b2_k, b2_v, b2_o, b2_ffn, h, causal_mask)
-    h = block_forward(b3_ln1, b3_ln2, b3_q, b3_k, b3_v, b3_o, b3_ffn, h, causal_mask)
-    h = block_forward(b4_ln1, b4_ln2, b4_q, b4_k, b4_v, b4_o, b4_ffn, h, causal_mask)
-    h = nn_forward(final_ln, h)
-    var out = nn_forward(lm_head, h)
-
-    // Predictions: argmax along vocab dim
-    var preds = tensor_argmax(out, 1)
+    var test_in: Tensor = tensor_arange(0.0, 32.0, 1.0).to_device(device)
+    var out: Tensor = model.forward(test_in, causal_mask)
+    var preds: Tensor = out.argmax(1)
 
     print("  Output shape: [")
-    print(tensor_shape_dim(out, 0))
+    print(out.shape_dim(0))
     print(", ")
-    print(tensor_shape_dim(out, 1))
+    print(out.shape_dim(1))
     println("]")
 
     println("  Predictions (argmax, should be 0..31):")
     print("  ")
-    tensor_print(preds)
+    preds.print()
 
-    // Compute accuracy: |pred - target| < 0.5 means correct
-    var preds_f = tensor_to_dtype_float(preds)
-    var target_f = tensor_to_dtype_float(target)
-    var diff = tensor_abs(tensor_sub(preds_f, target_f))
-    var correct = tensor_to_dtype_float(tensor_lt_scalar(diff, 0.5))
-    var accuracy = tensor_item_float(tensor_mean(correct))
+    var preds_f: Tensor = preds.to_float()
+    var target_f: Tensor = target.to_float()
+    var diff: Tensor = (preds_f - target_f).abs()
+    var correct: Tensor = diff.lt_scalar(0.5).to_float()
+    var accuracy = correct.mean().item()
     print("  Accuracy: ")
     println(accuracy)
 
     torch_no_grad(0)
 
-    // ==================================================================
     // Save model
-    // ==================================================================
-    model_save(lm_head, save_path)
+    model_save(model.lm_head, save_path)
     print("  Saved LM head weights to ")
     println(save_path)
 
-    // ==================================================================
-    // Cleanup: free all modules, optimizers, and tensors
-    // ==================================================================
-    nn_free(tok_emb)
-    nn_free(pos_emb)
-    block_free_modules(b1_ln1, b1_q, b1_k, b1_v, b1_o, b1_ln2, b1_ffn)
-    block_free_modules(b2_ln1, b2_q, b2_k, b2_v, b2_o, b2_ln2, b2_ffn)
-    block_free_modules(b3_ln1, b3_q, b3_k, b3_v, b3_o, b3_ln2, b3_ffn)
-    block_free_modules(b4_ln1, b4_q, b4_k, b4_v, b4_o, b4_ln2, b4_ffn)
-    nn_free(final_ln)
-    nn_free(lm_head)
-
-    optim_free(o_te)
-    optim_free(o_pe)
-    block_free_optims(o_1l1, o_1q, o_1k, o_1v, o_1o, o_1l2, o_1f)
-    block_free_optims(o_2l1, o_2q, o_2k, o_2v, o_2o, o_2l2, o_2f)
-    block_free_optims(o_3l1, o_3q, o_3k, o_3v, o_3o, o_3l2, o_3f)
-    block_free_optims(o_4l1, o_4q, o_4k, o_4v, o_4o, o_4l2, o_4f)
-    optim_free(o_fln)
-    optim_free(o_lm)
-
+    // Cleanup
+    model.free()
+    for (opt in optims) {
+        optim_free(opt)
+    }
     tensor_free(input_ids)
     tensor_free(target)
     tensor_free(causal_mask)

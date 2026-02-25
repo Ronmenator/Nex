@@ -1,0 +1,17 @@
+// nex3d.font — Built-in bitmap font for text rendering.
+// Uses a procedurally generated 8x8 pixel font (ASCII 32-126).
+// Renders text as textured quads using the SpriteBatch system.
+
+import nex3d.color
+
+// Draw text at screen position (x, y) with given scale and color.
+// Scale 1.0 = 8px tall, scale 2.0 = 16px tall, etc.
+public def draw_text(text: String, x: Float, y: Float, scale: Float, c: Color) {
+    engine_font_draw_text(text, x, y, scale, c.r, c.g, c.b)
+    return
+}
+
+// Measure the width of text at a given scale (in pixels).
+public def measure_text(text: String, scale: Float) -> Float {
+    return engine_font_measure_text(text, scale)
+}

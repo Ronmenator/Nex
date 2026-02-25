@@ -386,6 +386,10 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
 fn format_type_expr(ty: &nexc_ast::TypeExpr) -> String {
     match &ty.kind {
         nexc_ast::TypeExprKind::Named(n) => n.clone(),
+        nexc_ast::TypeExprKind::Generic(base, args) => {
+            let params: Vec<String> = args.iter().map(format_type_expr).collect();
+            format!("{}<{}>", base, params.join(", "))
+        }
         nexc_ast::TypeExprKind::Var => "Var".into(),
         nexc_ast::TypeExprKind::Unit => "Unit".into(),
         nexc_ast::TypeExprKind::Nullable(inner) => format!("{}?", format_type_expr(inner)),

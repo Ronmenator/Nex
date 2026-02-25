@@ -1,0 +1,219 @@
+// nex3d.bounds — Bounding volumes, rays, and planes for collision and picking.
+// Pure Nex implementation using nex3d.math; no runtime engine dependency.
+
+import nex3d.math
+
+// ===========================================================================
+// BoundingBox — axis-aligned bounding box (AABB)
+// ===========================================================================
+
+public struct BoundingBox {
+    min: Vec3
+    max: Vec3
+}
+
+public def bbox(min: Vec3, max: Vec3) -> BoundingBox {
+    return BoundingBox(min, max)
+}
+
+public def bbox_from_center(center: Vec3, half_extents: Vec3) -> BoundingBox {
+    return BoundingBox(
+        vec3_sub(center, half_extents),
+        vec3_add(center, half_extents)
+    )
+}
+
+public def bbox_center(b: BoundingBox) -> Vec3 {
+    return vec3_mul(vec3_add(b.min, b.max), 0.5f)
+}
+
+public def bbox_extents(b: BoundingBox) -> Vec3 {
+    return vec3_sub(b.max, b.min)
+}
+
+public def bbox_half_extents(b: BoundingBox) -> Vec3 {
+    return vec3_mul(vec3_sub(b.max, b.min), 0.5f)
+}
+
+public def bbox_contains_point(b: BoundingBox, p: Vec3) -> Bool {
+    return p.x >= b.min.x && p.x <= b.max.x
+        && p.y >= b.min.y && p.y <= b.max.y
+        && p.z >= b.min.z && p.z <= b.max.z
+}
+
+public def bbox_intersects_bbox(a: BoundingBox, b: BoundingBox) -> Bool {
+    return a.min.x <= b.max.x && a.max.x >= b.min.x
+        && a.min.y <= b.max.y && a.max.y >= b.min.y
+        && a.min.z <= b.max.z && a.max.z >= b.min.z
+}
+
+public def bbox_intersects_sphere(b: BoundingBox, s: BoundingSphere) -> Bool {
+    // Clamp sphere center to box, compute distance
+    cx = clampf(s.center.x, b.min.x, b.max.x)
+    cy = clampf(s.center.y, b.min.y, b.max.y)
+    cz = clampf(s.center.z, b.min.z, b.max.z)
+    closest = vec3(cx, cy, cz)
+    diff = vec3_sub(s.center, closest)
+    dist_sq = vec3_dot(diff, diff)
+    return dist_sq <= s.radius * s.radius
+}
+
+public def bbox_merge(a: BoundingBox, b: BoundingBox) -> BoundingBox {
+    mn = vec3(
+        min(a.min.x, b.min.x),
+        min(a.min.y, b.min.y),
+        min(a.min.z, b.min.z)
+    )
+    mx = vec3(
+        max(a.max.x, b.max.x),
+        max(a.max.y, b.max.y),
+        max(a.max.z, b.max.z)
+    )
+    return BoundingBox(mn, mx)
+}
+
+// ===========================================================================
+// BoundingSphere
+// ===========================================================================
+
+public struct BoundingSphere {
+    center: Vec3
+    radius: Float
+}
+
+public def bsphere(center: Vec3, radius: Float) -> BoundingSphere {
+    return BoundingSphere(center, radius)
+}
+
+public def bsphere_contains_point(s: BoundingSphere, p: Vec3) -> Bool {
+    diff = vec3_sub(p, s.center)
+    dist_sq = vec3_dot(diff, diff)
+    return dist_sq <= s.radius * s.radius
+}
+
+public def bsphere_intersects_sphere(a: BoundingSphere, b: BoundingSphere) -> Bool {
+    diff = vec3_sub(a.center, b.center)
+    dist_sq = vec3_dot(diff, diff)
+    r_sum = a.radius + b.radius
+    return dist_sq <= r_sum * r_sum
+}
+
+// ===========================================================================
+// Ray — origin + direction (direction should be normalized)
+// ===========================================================================
+
+public struct Ray {
+    origin: Vec3
+    direction: Vec3
+}
+
+public def ray(origin: Vec3, direction: Vec3) -> Ray {
+    return Ray(origin, vec3_normalize(direction))
+}
+
+public def ray_point_at(r: Ray, t: Float) -> Vec3 {
+    return vec3_add(r.origin, vec3_mul(r.direction, t))
+}
+
+// Ray-AABB intersection (slab method). Returns distance t or -1.0 on miss.
+public def ray_intersects_bbox(r: Ray, b: BoundingBox) -> Float {
+    t_min = 0.0f - 999999.0f
+    t_max = 999999.0f
+
+    // X slab
+    if (abs(r.direction.x) > 0.00001f) {
+        inv = 1.0f / r.direction.x
+        t1 = (b.min.x - r.origin.x) * inv
+        t2 = (b.max.x - r.origin.x) * inv
+        if (t1 > t2) {
+            tmp = t1
+            t1 = t2
+            t2 = tmp
+        }
+        if (t1 > t_min) { t_min = t1 }
+        if (t2 < t_max) { t_max = t2 }
+        if (t_min > t_max) { return 0.0f - 1.0f }
+    }
+
+    // Y slab
+    if (abs(r.direction.y) > 0.00001f) {
+        inv = 1.0f / r.direction.y
+        t1 = (b.min.y - r.origin.y) * inv
+        t2 = (b.max.y - r.origin.y) * inv
+        if (t1 > t2) {
+            tmp = t1
+            t1 = t2
+            t2 = tmp
+        }
+        if (t1 > t_min) { t_min = t1 }
+        if (t2 < t_max) { t_max = t2 }
+        if (t_min > t_max) { return 0.0f - 1.0f }
+    }
+
+    // Z slab
+    if (abs(r.direction.z) > 0.00001f) {
+        inv = 1.0f / r.direction.z
+        t1 = (b.min.z - r.origin.z) * inv
+        t2 = (b.max.z - r.origin.z) * inv
+        if (t1 > t2) {
+            tmp = t1
+            t1 = t2
+            t2 = tmp
+        }
+        if (t1 > t_min) { t_min = t1 }
+        if (t2 < t_max) { t_max = t2 }
+        if (t_min > t_max) { return 0.0f - 1.0f }
+    }
+
+    if (t_max < 0.0f) { return 0.0f - 1.0f }
+    if (t_min < 0.0f) { return t_max }
+    return t_min
+}
+
+// Ray-Sphere intersection. Returns distance t or -1.0 on miss.
+public def ray_intersects_sphere(r: Ray, s: BoundingSphere) -> Float {
+    oc = vec3_sub(r.origin, s.center)
+    a = vec3_dot(r.direction, r.direction)
+    b = 2.0f * vec3_dot(oc, r.direction)
+    c = vec3_dot(oc, oc) - s.radius * s.radius
+    discriminant = b * b - 4.0f * a * c
+    if (discriminant < 0.0f) { return 0.0f - 1.0f }
+    t = (0.0f - b - sqrt(discriminant)) / (2.0f * a)
+    if (t < 0.0f) {
+        t = (0.0f - b + sqrt(discriminant)) / (2.0f * a)
+    }
+    if (t < 0.0f) { return 0.0f - 1.0f }
+    return t
+}
+
+// ===========================================================================
+// Plane — normal + distance from origin (normal dot P = d)
+// ===========================================================================
+
+public struct Plane {
+    normal: Vec3
+    d: Float
+}
+
+public def plane(normal: Vec3, d: Float) -> Plane {
+    return Plane(vec3_normalize(normal), d)
+}
+
+public def plane_from_point_normal(point: Vec3, normal: Vec3) -> Plane {
+    n = vec3_normalize(normal)
+    return Plane(n, vec3_dot(n, point))
+}
+
+// Signed distance from plane to point (positive = front side).
+public def plane_distance(p: Plane, point: Vec3) -> Float {
+    return vec3_dot(p.normal, point) - p.d
+}
+
+// Ray-Plane intersection. Returns distance t or -1.0 on miss (parallel).
+public def plane_intersects_ray(p: Plane, r: Ray) -> Float {
+    denom = vec3_dot(p.normal, r.direction)
+    if (abs(denom) < 0.00001f) { return 0.0f - 1.0f }
+    t = (p.d - vec3_dot(p.normal, r.origin)) / denom
+    if (t < 0.0f) { return 0.0f - 1.0f }
+    return t
+}

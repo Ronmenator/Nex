@@ -441,6 +441,56 @@ pub unsafe extern "C" fn nex_dispose(_resource: *mut u8) {
     // v1: no-op
 }
 
+// ---- List<T> (type-erased as Vec<i64>) ----
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_new() -> *mut Vec<i64> {
+    Box::into_raw(Box::new(Vec::<i64>::new()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_add(list: *mut Vec<i64>, item: i64) {
+    if !list.is_null() {
+        (*list).push(item);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_get(list: *mut Vec<i64>, index: i64) -> i64 {
+    if list.is_null() { return 0; }
+    let v = &*list;
+    let i = index as usize;
+    if i < v.len() { v[i] } else { 0 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_set(list: *mut Vec<i64>, index: i64, value: i64) {
+    if list.is_null() { return; }
+    let v = &mut *list;
+    let i = index as usize;
+    if i < v.len() { v[i] = value; }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_length(list: *mut Vec<i64>) -> i64 {
+    if list.is_null() { 0 } else { (*list).len() as i64 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_remove(list: *mut Vec<i64>, index: i64) -> i64 {
+    if list.is_null() { return 0; }
+    let v = &mut *list;
+    let i = index as usize;
+    if i < v.len() { v.remove(i) } else { 0 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_list_free(list: *mut Vec<i64>) {
+    if !list.is_null() {
+        drop(Box::from_raw(list));
+    }
+}
+
 // ---- GC root management (Rust API) ----
 
 pub fn gc_add_root(obj: *mut NexObj) {

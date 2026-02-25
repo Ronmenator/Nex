@@ -1,0 +1,50 @@
+// nex3d.states — Render state configuration.
+// Controls blending, culling, fill mode, and depth testing.
+
+// ===========================================================================
+// Blend modes
+// ===========================================================================
+
+public def BLEND_OPAQUE() -> Int64   { return 0 }
+public def BLEND_ALPHA() -> Int64    { return 1 }
+public def BLEND_ADDITIVE() -> Int64 { return 2 }
+public def BLEND_MULTIPLY() -> Int64 { return 3 }
+
+public def set_blend_mode(mode: Int64) {
+    engine_set_blend_mode(mode)
+    return
+}
+
+// ===========================================================================
+// Cull modes
+// ===========================================================================
+
+public def CULL_NONE() -> Int64  { return 0 }
+public def CULL_BACK() -> Int64  { return 1 }
+public def CULL_FRONT() -> Int64 { return 2 }
+
+public def set_cull_mode(mode: Int64) {
+    engine_set_cull_mode(mode)
+    return
+}
+
+// ===========================================================================
+// Fill modes
+// ===========================================================================
+
+public def FILL_SOLID() -> Int64     { return 0 }
+public def FILL_WIREFRAME() -> Int64 { return 1 }
+
+public def set_fill_mode(mode: Int64) {
+    engine_set_fill_mode(mode)
+    return
+}
+
+// ===========================================================================
+// Depth testing
+// ===========================================================================
+
+public def set_depth_enabled(enabled: Int64) {
+    engine_set_depth_enabled(enabled)
+    return
+}

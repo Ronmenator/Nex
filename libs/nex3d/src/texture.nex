@@ -1,0 +1,34 @@
+// nex3d.texture — Texture2D loading and binding for 3D and 2D rendering.
+// Wraps nex_engine_texture_* runtime FFI functions.
+
+public struct Texture2D {
+    handle: Int64
+    width: Int64
+    height: Int64
+}
+
+// Load a texture from a file (PNG, JPEG). Returns a Texture2D.
+public def texture_load(path: String) -> Texture2D {
+    h = engine_texture_load(path)
+    w = engine_texture_width(h)
+    ht = engine_texture_height(h)
+    return Texture2D(h, w, ht)
+}
+
+// Bind a texture for subsequent draw calls.
+public def texture_bind(tex: Texture2D) {
+    engine_texture_bind(tex.handle)
+    return
+}
+
+// Unbind the current texture (reverts to untextured rendering).
+public def texture_unbind() {
+    engine_texture_unbind()
+    return
+}
+
+// Push a vertex with UV coordinates (for textured geometry).
+public def push_vertex_uv(x: Float, y: Float, z: Float, nx: Float, ny: Float, nz: Float, u: Float, v: Float, r: Float, g: Float, b: Float) {
+    engine_push_vertex_uv(x, y, z, nx, ny, nz, u, v, r, g, b)
+    return
+}

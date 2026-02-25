@@ -1,0 +1,48 @@
+// nex3d.audio — Sound loading and playback.
+// Supports WAV, MP3, OGG, and FLAC formats via rodio.
+
+public struct Sound { handle: Int64 }
+
+// ---- Loading ----
+
+public def sound_load(path: String) -> Sound {
+    var h: Int64 = engine_audio_load(path)
+    return Sound(h)
+}
+
+// ---- Playback ----
+
+public def sound_play(s: Sound) {
+    engine_audio_play(s.handle)
+    return
+}
+
+public def sound_play_looped(s: Sound) {
+    engine_audio_play_looped(s.handle)
+    return
+}
+
+public def sound_stop(s: Sound) {
+    engine_audio_stop(s.handle)
+    return
+}
+
+// ---- Volume ----
+
+public def sound_set_volume(s: Sound, volume: Float) {
+    engine_audio_set_volume(s.handle, volume)
+    return
+}
+
+// ---- Queries ----
+
+public def sound_is_playing(s: Sound) -> Bool {
+    return engine_audio_is_playing(s.handle) != 0
+}
+
+// ---- Cleanup ----
+
+public def sound_free(s: Sound) {
+    engine_audio_free(s.handle)
+    return
+}

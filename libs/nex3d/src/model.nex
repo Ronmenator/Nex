@@ -1,0 +1,31 @@
+// nex3d.model — OBJ model loading and rendering.
+// Loads .obj files with vertex positions, normals, and texture coordinates.
+
+public struct Model { handle: Int64 }
+
+// ---- Loading ----
+
+public def model_load(path: String) -> Model {
+    var h: Int64 = engine_model_load(path)
+    return Model(h)
+}
+
+// ---- Rendering ----
+
+public def model_draw(m: Model) {
+    engine_model_draw(m.handle)
+    return
+}
+
+// ---- Queries ----
+
+public def model_vertex_count(m: Model) -> Int64 {
+    return engine_model_vertex_count(m.handle)
+}
+
+// ---- Cleanup ----
+
+public def model_free(m: Model) {
+    engine_model_free(m.handle)
+    return
+}

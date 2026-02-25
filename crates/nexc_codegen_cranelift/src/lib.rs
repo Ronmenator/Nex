@@ -212,6 +212,13 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_time_elapsed_millis);
 
     // std.collections
+    sym!(nex_list_new);
+    sym!(nex_list_add);
+    sym!(nex_list_get);
+    sym!(nex_list_set);
+    sym!(nex_list_length);
+    sym!(nex_list_remove);
+    sym!(nex_list_free);
     sym!(nex_list_sort_int);
     sym!(nex_list_reverse);
     sym!(nex_list_clear);
@@ -430,7 +437,69 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_engine_set_camera_up",
     "nex_engine_set_perspective",
     "nex_engine_push_vertex",
+    "nex_engine_push_vertex_lit",
     "nex_engine_draw_triangles",
+    "nex_engine_set_ambient_color",
+    "nex_engine_light_set_type",
+    "nex_engine_light_set_enabled",
+    "nex_engine_light_set_position",
+    "nex_engine_light_set_direction",
+    "nex_engine_light_set_color",
+    "nex_engine_light_set_intensity",
+    "nex_engine_light_set_range",
+    "nex_engine_light_set_spot_angles",
+    "nex_engine_clear_lights",
+    "nex_engine_push_vertex_uv",
+    "nex_engine_texture_load",
+    "nex_engine_texture_bind",
+    "nex_engine_texture_unbind",
+    "nex_engine_texture_width",
+    "nex_engine_texture_height",
+    "nex_engine_spritebatch_begin",
+    "nex_engine_spritebatch_end",
+    "nex_engine_spritebatch_draw",
+    "nex_engine_spritebatch_draw_src",
+    "nex_engine_font_draw_text",
+    "nex_engine_font_measure_text",
+    "nex_engine_set_blend_mode",
+    "nex_engine_set_cull_mode",
+    "nex_engine_set_fill_mode",
+    "nex_engine_set_depth_enabled",
+    "nex_engine_mouse_scroll_delta",
+    "nex_engine_audio_load",
+    "nex_engine_audio_play",
+    "nex_engine_audio_play_looped",
+    "nex_engine_audio_stop",
+    "nex_engine_audio_set_volume",
+    "nex_engine_audio_is_playing",
+    "nex_engine_audio_free",
+    "nex_engine_model_load",
+    "nex_engine_model_draw",
+    "nex_engine_model_vertex_count",
+    "nex_engine_model_free",
+    "nex_engine_anim_model_load",
+    "nex_engine_anim_model_draw",
+    "nex_engine_anim_play",
+    "nex_engine_anim_stop",
+    "nex_engine_anim_pause",
+    "nex_engine_anim_set_speed",
+    "nex_engine_anim_set_looping",
+    "nex_engine_anim_set_time",
+    "nex_engine_anim_get_time",
+    "nex_engine_anim_clip_count",
+    "nex_engine_anim_clip_duration",
+    "nex_engine_anim_joint_count",
+    "nex_engine_anim_model_free",
+    "nex_engine_rendertarget_create",
+    "nex_engine_rendertarget_bind",
+    "nex_engine_rendertarget_unbind",
+    "nex_engine_rendertarget_as_texture",
+    "nex_engine_rendertarget_width",
+    "nex_engine_rendertarget_height",
+    "nex_engine_rendertarget_free",
+    "nex_engine_gamepad_connected",
+    "nex_engine_gamepad_button",
+    "nex_engine_gamepad_axis",
     "nex_engine_enable_ui_overlay",
     // nex UI
     "nex_ui_app_create",
@@ -1921,7 +1990,80 @@ fn engine_function_name(name: &str) -> Option<&'static str> {
         "engine_set_perspective" => Some("nex_engine_set_perspective"),
         // Drawing
         "engine_push_vertex" => Some("nex_engine_push_vertex"),
+        "engine_push_vertex_lit" => Some("nex_engine_push_vertex_lit"),
         "engine_draw_triangles" => Some("nex_engine_draw_triangles"),
+        // Lighting
+        "engine_set_ambient_color" => Some("nex_engine_set_ambient_color"),
+        "engine_light_set_type" => Some("nex_engine_light_set_type"),
+        "engine_light_set_enabled" => Some("nex_engine_light_set_enabled"),
+        "engine_light_set_position" => Some("nex_engine_light_set_position"),
+        "engine_light_set_direction" => Some("nex_engine_light_set_direction"),
+        "engine_light_set_color" => Some("nex_engine_light_set_color"),
+        "engine_light_set_intensity" => Some("nex_engine_light_set_intensity"),
+        "engine_light_set_range" => Some("nex_engine_light_set_range"),
+        "engine_light_set_spot_angles" => Some("nex_engine_light_set_spot_angles"),
+        "engine_clear_lights" => Some("nex_engine_clear_lights"),
+        // Texture
+        "engine_push_vertex_uv" => Some("nex_engine_push_vertex_uv"),
+        "engine_texture_load" => Some("nex_engine_texture_load"),
+        "engine_texture_bind" => Some("nex_engine_texture_bind"),
+        "engine_texture_unbind" => Some("nex_engine_texture_unbind"),
+        "engine_texture_width" => Some("nex_engine_texture_width"),
+        "engine_texture_height" => Some("nex_engine_texture_height"),
+        // SpriteBatch
+        "engine_spritebatch_begin" => Some("nex_engine_spritebatch_begin"),
+        "engine_spritebatch_end" => Some("nex_engine_spritebatch_end"),
+        "engine_spritebatch_draw" => Some("nex_engine_spritebatch_draw"),
+        "engine_spritebatch_draw_src" => Some("nex_engine_spritebatch_draw_src"),
+        // Font
+        "engine_font_draw_text" => Some("nex_engine_font_draw_text"),
+        "engine_font_measure_text" => Some("nex_engine_font_measure_text"),
+        // Render States
+        "engine_set_blend_mode" => Some("nex_engine_set_blend_mode"),
+        "engine_set_cull_mode" => Some("nex_engine_set_cull_mode"),
+        "engine_set_fill_mode" => Some("nex_engine_set_fill_mode"),
+        "engine_set_depth_enabled" => Some("nex_engine_set_depth_enabled"),
+        // Mouse scroll
+        "engine_mouse_scroll_delta" => Some("nex_engine_mouse_scroll_delta"),
+        // Audio
+        "engine_audio_load" => Some("nex_engine_audio_load"),
+        "engine_audio_play" => Some("nex_engine_audio_play"),
+        "engine_audio_play_looped" => Some("nex_engine_audio_play_looped"),
+        "engine_audio_stop" => Some("nex_engine_audio_stop"),
+        "engine_audio_set_volume" => Some("nex_engine_audio_set_volume"),
+        "engine_audio_is_playing" => Some("nex_engine_audio_is_playing"),
+        "engine_audio_free" => Some("nex_engine_audio_free"),
+        // Model loading
+        "engine_model_load" => Some("nex_engine_model_load"),
+        "engine_model_draw" => Some("nex_engine_model_draw"),
+        "engine_model_vertex_count" => Some("nex_engine_model_vertex_count"),
+        "engine_model_free" => Some("nex_engine_model_free"),
+        // Skeletal Animation
+        "engine_anim_model_load" => Some("nex_engine_anim_model_load"),
+        "engine_anim_model_draw" => Some("nex_engine_anim_model_draw"),
+        "engine_anim_play" => Some("nex_engine_anim_play"),
+        "engine_anim_stop" => Some("nex_engine_anim_stop"),
+        "engine_anim_pause" => Some("nex_engine_anim_pause"),
+        "engine_anim_set_speed" => Some("nex_engine_anim_set_speed"),
+        "engine_anim_set_looping" => Some("nex_engine_anim_set_looping"),
+        "engine_anim_set_time" => Some("nex_engine_anim_set_time"),
+        "engine_anim_get_time" => Some("nex_engine_anim_get_time"),
+        "engine_anim_clip_count" => Some("nex_engine_anim_clip_count"),
+        "engine_anim_clip_duration" => Some("nex_engine_anim_clip_duration"),
+        "engine_anim_joint_count" => Some("nex_engine_anim_joint_count"),
+        "engine_anim_model_free" => Some("nex_engine_anim_model_free"),
+        // RenderTarget
+        "engine_rendertarget_create" => Some("nex_engine_rendertarget_create"),
+        "engine_rendertarget_bind" => Some("nex_engine_rendertarget_bind"),
+        "engine_rendertarget_unbind" => Some("nex_engine_rendertarget_unbind"),
+        "engine_rendertarget_as_texture" => Some("nex_engine_rendertarget_as_texture"),
+        "engine_rendertarget_width" => Some("nex_engine_rendertarget_width"),
+        "engine_rendertarget_height" => Some("nex_engine_rendertarget_height"),
+        "engine_rendertarget_free" => Some("nex_engine_rendertarget_free"),
+        // Gamepad
+        "engine_gamepad_connected" => Some("nex_engine_gamepad_connected"),
+        "engine_gamepad_button" => Some("nex_engine_gamepad_button"),
+        "engine_gamepad_axis" => Some("nex_engine_gamepad_axis"),
         // UI Overlay
         "engine_enable_ui_overlay" => Some("nex_engine_enable_ui_overlay"),
         _ => None,
@@ -2236,6 +2378,10 @@ fn collect_needed_imports(ir: &IrModule) -> std::collections::HashSet<String> {
                             }
                         } else if let Some(rt) = stdlib_function_name(target) {
                             needed.insert(rt.to_string());
+                        } else if target.starts_with("nex_") {
+                            // IR targets already using full runtime names
+                            // (e.g. nex_list_add from builtin dispatch)
+                            needed.insert(target.clone());
                         }
                     }
                     IrInstruction::BinOp { op, .. } if op == "add" => {
@@ -2481,7 +2627,15 @@ fn declare_runtime_imports<M: Module>(
         ("nex_time_now_nanos", &sig_ret_ptr),
         ("nex_time_sleep_millis", &sig_void_ptr),
         ("nex_time_elapsed_millis", &sig_ptr_ptr),
-        // std.collections
+        // std.collections — core List ops
+        ("nex_list_new", &sig_ret_ptr),
+        ("nex_list_add", &sig_void_ptr2),
+        ("nex_list_get", &sig_ptr_ptr2),
+        ("nex_list_set", &sig_void_ptr3),
+        ("nex_list_length", &sig_ptr_ptr),
+        ("nex_list_remove", &sig_ptr_ptr2),
+        ("nex_list_free", &sig_void_ptr),
+        // std.collections — extended
         ("nex_list_sort_int", &sig_void_ptr),
         ("nex_list_reverse", &sig_void_ptr),
         ("nex_list_clear", &sig_void_ptr),
@@ -2603,6 +2757,14 @@ fn declare_runtime_imports<M: Module>(
     // void(i64, i64, i64, i64, i64, i64, i64) – seven args, no return
     let mut sig_void_ptr7 = Signature::new(cc);
     for _ in 0..7 { sig_void_ptr7.params.push(AbiParam::new(types::I64)); }
+
+    // void(i64 x 9) – nine args, no return (push_vertex_lit)
+    let mut sig_void_ptr9 = Signature::new(cc);
+    for _ in 0..9 { sig_void_ptr9.params.push(AbiParam::new(types::I64)); }
+
+    // void(i64 x 11) – eleven args, no return (push_vertex_uv)
+    let mut sig_void_ptr11 = Signature::new(cc);
+    for _ in 0..11 { sig_void_ptr11.params.push(AbiParam::new(types::I64)); }
 
     // i64(i64, i64, i64, i64) – four args, one return
     let mut sig_ptr_ptr4 = Signature::new(cc);
@@ -2733,7 +2895,80 @@ fn declare_runtime_imports<M: Module>(
         ("nex_engine_set_perspective", &sig_void_ptr4),
         // Drawing
         ("nex_engine_push_vertex", &sig_void_ptr6),
+        ("nex_engine_push_vertex_lit", &sig_void_ptr9),
         ("nex_engine_draw_triangles", &sig_void),
+        // Lighting
+        ("nex_engine_set_ambient_color", &sig_void_ptr3),
+        ("nex_engine_light_set_type", &sig_void_ptr2),
+        ("nex_engine_light_set_enabled", &sig_void_ptr2),
+        ("nex_engine_light_set_position", &sig_void_ptr4),
+        ("nex_engine_light_set_direction", &sig_void_ptr4),
+        ("nex_engine_light_set_color", &sig_void_ptr4),
+        ("nex_engine_light_set_intensity", &sig_void_ptr2),
+        ("nex_engine_light_set_range", &sig_void_ptr2),
+        ("nex_engine_light_set_spot_angles", &sig_void_ptr3),
+        ("nex_engine_clear_lights", &sig_void),
+        // Texture
+        ("nex_engine_push_vertex_uv", &sig_void_ptr11),
+        ("nex_engine_texture_load", &sig_ptr_ptr),
+        ("nex_engine_texture_bind", &sig_void_ptr),
+        ("nex_engine_texture_unbind", &sig_void),
+        ("nex_engine_texture_width", &sig_ptr_ptr),
+        ("nex_engine_texture_height", &sig_ptr_ptr),
+        // SpriteBatch
+        ("nex_engine_spritebatch_begin", &sig_void),
+        ("nex_engine_spritebatch_end", &sig_void),
+        ("nex_engine_spritebatch_draw", &sig_void_ptr9),
+        ("nex_engine_spritebatch_draw_src", &sig_void_ptr9),
+        // Font
+        ("nex_engine_font_draw_text", &sig_void_ptr7),
+        ("nex_engine_font_measure_text", &sig_ptr_ptr2),
+        // Render States
+        ("nex_engine_set_blend_mode", &sig_void_ptr),
+        ("nex_engine_set_cull_mode", &sig_void_ptr),
+        ("nex_engine_set_fill_mode", &sig_void_ptr),
+        ("nex_engine_set_depth_enabled", &sig_void_ptr),
+        // Mouse scroll
+        ("nex_engine_mouse_scroll_delta", &sig_ret_ptr),
+        // Audio
+        ("nex_engine_audio_load", &sig_ptr_ptr),          // path_ptr → handle
+        ("nex_engine_audio_play", &sig_void_ptr),          // handle
+        ("nex_engine_audio_play_looped", &sig_void_ptr),   // handle
+        ("nex_engine_audio_stop", &sig_void_ptr),          // handle
+        ("nex_engine_audio_set_volume", &sig_void_ptr2),   // handle, volume_bits
+        ("nex_engine_audio_is_playing", &sig_ptr_ptr),     // handle → 0/1
+        ("nex_engine_audio_free", &sig_void_ptr),          // handle
+        // Model loading
+        ("nex_engine_model_load", &sig_ptr_ptr),           // path_ptr → handle
+        ("nex_engine_model_draw", &sig_void_ptr),          // handle
+        ("nex_engine_model_vertex_count", &sig_ptr_ptr),   // handle → count
+        ("nex_engine_model_free", &sig_void_ptr),          // handle
+        // Skeletal Animation
+        ("nex_engine_anim_model_load", &sig_ptr_ptr),      // path_ptr → handle
+        ("nex_engine_anim_model_draw", &sig_void_ptr),     // handle
+        ("nex_engine_anim_play", &sig_void_ptr2),          // handle, clip
+        ("nex_engine_anim_stop", &sig_void_ptr),           // handle
+        ("nex_engine_anim_pause", &sig_void_ptr),          // handle
+        ("nex_engine_anim_set_speed", &sig_void_ptr2),     // handle, speed_bits
+        ("nex_engine_anim_set_looping", &sig_void_ptr2),   // handle, flag
+        ("nex_engine_anim_set_time", &sig_void_ptr2),      // handle, time_bits
+        ("nex_engine_anim_get_time", &sig_ptr_ptr),        // handle → time
+        ("nex_engine_anim_clip_count", &sig_ptr_ptr),      // handle → count
+        ("nex_engine_anim_clip_duration", &sig_ptr_ptr2),  // handle, clip → duration
+        ("nex_engine_anim_joint_count", &sig_ptr_ptr),     // handle → count
+        ("nex_engine_anim_model_free", &sig_void_ptr),     // handle
+        // RenderTarget
+        ("nex_engine_rendertarget_create", &sig_ptr_ptr2), // w, h → handle
+        ("nex_engine_rendertarget_bind", &sig_void_ptr),   // handle
+        ("nex_engine_rendertarget_unbind", &sig_void),
+        ("nex_engine_rendertarget_as_texture", &sig_ptr_ptr), // handle → tex_handle
+        ("nex_engine_rendertarget_width", &sig_ptr_ptr),   // handle → width
+        ("nex_engine_rendertarget_height", &sig_ptr_ptr),  // handle → height
+        ("nex_engine_rendertarget_free", &sig_void_ptr),   // handle
+        // Gamepad
+        ("nex_engine_gamepad_connected", &sig_ptr_ptr),    // player → 0/1
+        ("nex_engine_gamepad_button", &sig_ptr_ptr2),      // player, button → 0/1
+        ("nex_engine_gamepad_axis", &sig_ptr_ptr2),        // player, axis → f64 (as bits)
         // UI Overlay
         ("nex_engine_enable_ui_overlay", &sig_void),
     ];

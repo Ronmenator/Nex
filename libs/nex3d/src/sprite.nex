@@ -1,0 +1,39 @@
+// nex3d.sprite — SpriteBatch for 2D sprite rendering.
+// XNA-style SpriteBatch: begin, draw calls, end.
+// Uses orthographic projection for screen-space coordinates.
+
+import nex3d.math
+import nex3d.color
+import nex3d.texture
+
+// SpriteBatch operates in screen space (pixels).
+// Call spritebatch_begin() to set up 2D mode, draw sprites, then spritebatch_end().
+// Note: You must set the camera to orthographic projection before calling begin().
+
+public def spritebatch_begin() {
+    engine_spritebatch_begin()
+    return
+}
+
+public def spritebatch_end() {
+    engine_spritebatch_end()
+    return
+}
+
+// Draw a texture at a position with a tint color.
+public def spritebatch_draw(tex: Texture2D, x: Float, y: Float, c: Color) {
+    engine_spritebatch_draw(tex.handle, x, y, tex.width, tex.height, c.r, c.g, c.b, c.a)
+    return
+}
+
+// Draw a texture stretched to a destination rectangle.
+public def spritebatch_draw_rect(tex: Texture2D, x: Float, y: Float, w: Float, h: Float, c: Color) {
+    engine_spritebatch_draw(tex.handle, x, y, w, h, c.r, c.g, c.b, c.a)
+    return
+}
+
+// Draw a portion of a texture (source rectangle) to a destination rectangle.
+public def spritebatch_draw_src(tex: Texture2D, sx: Float, sy: Float, sw: Float, sh: Float, dx: Float, dy: Float, dw: Float, dh: Float) {
+    engine_spritebatch_draw_src(tex.handle, sx, sy, sw, sh, dx, dy, dw, dh)
+    return
+}

@@ -777,6 +777,46 @@ impl Parser {
             self.push_error("expected '(' after for");
         }
 
+        // Check for for-each syntax: for (ident in expr) { ... }
+        let saved_pos = self.pos;
+        let maybe_foreach = if self.is_identifier_start() {
+            let ident = self.advance().lexeme.clone();
+            if self.is_contextual_keyword("in") {
+                self.advance(); // consume 'in'
+                Some(ident)
+            } else {
+                self.pos = saved_pos; // backtrack
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(var_name) = maybe_foreach {
+            let iterable = self.parse_expression();
+            if !self.consume_if(&TokenKind::RParen) {
+                self.push_error("expected ')' after for-each iterable");
+            }
+            let body = if self.consume_if(&TokenKind::LBrace) {
+                Stmt::Block(self.parse_block())
+            } else {
+                self.push_error("expected '{' for for body");
+                self.recover_to_statement_boundary();
+                Stmt::Block(Block {
+                    statements: Vec::new(),
+                    span,
+                })
+            };
+            return ForStmt {
+                init: None,
+                condition: None,
+                step: None,
+                body: Box::new(body),
+                span,
+                for_each: Some((var_name, Box::new(iterable))),
+            };
+        }
+
         let init = if matches!(
             self.peek_kind(),
             Some(TokenKind::Semicolon | TokenKind::SyntheticSemicolon)
@@ -835,6 +875,7 @@ impl Parser {
             step,
             body: Box::new(body),
             span,
+            for_each: None,
         }
     }
 
@@ -1225,9 +1266,20 @@ impl Parser {
             }
         }
 
-        if self.consume_if(&TokenKind::LBracket) {
+        // Generic type arguments: List[Int] or List<Int>
+        let (open_bracket, close_kind, close_err) =
+            if matches!(self.peek_kind(), Some(TokenKind::LBracket)) {
+                (true, TokenKind::RBracket, "expected ',' or ']' in type argument list")
+            } else if matches!(self.peek_kind(), Some(TokenKind::Lt)) {
+                (true, TokenKind::Gt, "expected ',' or '>' in type argument list")
+            } else {
+                (false, TokenKind::RBracket, "")
+            };
+
+        if open_bracket {
+            self.advance(); // consume '[' or '<'
             let mut args = Vec::new();
-            if !self.consume_if(&TokenKind::RBracket) {
+            if !self.consume_if(&close_kind) {
                 while !self.is_eof() {
                     if let Some(arg) = self.parse_type_expr() {
                         args.push(arg);
@@ -1237,19 +1289,24 @@ impl Parser {
                     if self.consume_if(&TokenKind::Comma) {
                         continue;
                     }
-                    if self.consume_if(&TokenKind::RBracket) {
+                    if self.consume_if(&close_kind) {
                         break;
                     }
-                    self.push_error("expected ',' or ']' in type argument list");
+                    self.push_error(close_err);
                     break;
                 }
             }
-            let rendered = args
-                .iter()
-                .map(render_type_expr)
-                .collect::<Vec<_>>()
-                .join(", ");
-            name = format!("{name}[{rendered}]");
+            let base = TypeExpr {
+                span: start,
+                kind: TypeExprKind::Generic(name, args),
+            };
+            if self.consume_if(&TokenKind::Question) {
+                return Some(TypeExpr {
+                    span: start,
+                    kind: TypeExprKind::Nullable(Box::new(base)),
+                });
+            }
+            return Some(base);
         }
 
         let base = TypeExpr {
@@ -1745,6 +1802,10 @@ fn resolve_type_name_kind(name: &str) -> TypeExprKind {
 fn render_type_expr(ty: &TypeExpr) -> String {
     match &ty.kind {
         TypeExprKind::Named(name) => name.clone(),
+        TypeExprKind::Generic(base, args) => {
+            let params = args.iter().map(render_type_expr).collect::<Vec<_>>().join(", ");
+            format!("{base}<{params}>")
+        }
         TypeExprKind::Var => "Var".to_string(),
         TypeExprKind::Unit => "Unit".to_string(),
         TypeExprKind::Nullable(inner) => format!("{}?", render_type_expr(inner)),
@@ -2007,6 +2068,10 @@ mod tests {
     fn ty_to_string(ty: &TypeExpr) -> String {
         match &ty.kind {
             TypeExprKind::Named(name) => name.clone(),
+            TypeExprKind::Generic(base, args) => {
+                let params = args.iter().map(ty_to_string).collect::<Vec<_>>().join(", ");
+                format!("{base}<{params}>")
+            }
             TypeExprKind::Var => "Var".to_string(),
             TypeExprKind::Unit => "Unit".to_string(),
             TypeExprKind::Nullable(inner) => format!("{}?", ty_to_string(inner)),
@@ -2243,11 +2308,11 @@ public struct Vec2[T] : Equatable {
         };
         assert_eq!(
             ty_to_string(function.params[0].type_hint.as_ref().unwrap()),
-            "List[Int]"
+            "List<Int>"
         );
         assert_eq!(
             ty_to_string(function.params[1].type_hint.as_ref().unwrap()),
-            "Map[String, Int]"
+            "Map<String, Int>"
         );
     }
 

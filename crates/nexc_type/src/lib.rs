@@ -18,6 +18,9 @@ pub enum Type {
     Var,
     Null,
     Named(String),
+    /// Generic type instantiation, e.g. `List<Int>` → `Generic("List", [Int])`.
+    /// At runtime this is erased to the base type (type erasure, like Java).
+    Generic(String, Vec<Type>),
     Nullable(Box<Type>),
     Function(Vec<Type>, Box<Type>),
     Unknown,
@@ -54,6 +57,10 @@ impl Type {
             Type::Var => "Var".into(),
             Type::Null => "Null".into(),
             Type::Named(n) => n.clone(),
+            Type::Generic(base, args) => {
+                let params: Vec<_> = args.iter().map(|t| t.display_name()).collect();
+                format!("{}<{}>", base, params.join(", "))
+            }
             Type::Nullable(inner) => format!("{}?", inner.display_name()),
             Type::Function(params, ret) => {
                 let p: Vec<_> = params.iter().map(|t| t.display_name()).collect();
@@ -178,6 +185,10 @@ fn resolve_type_expr(ty: &TypeExpr) -> Type {
             "Object" => Type::Named("Object".into()),
             other => Type::Named(other.into()),
         },
+        TypeExprKind::Generic(base, args) => {
+            let resolved_args: Vec<Type> = args.iter().map(|a| resolve_type_expr(a)).collect();
+            Type::Generic(base.clone(), resolved_args)
+        }
         TypeExprKind::Var => Type::Var,
         TypeExprKind::Unit => Type::Unit,
         TypeExprKind::Nullable(inner) => Type::Nullable(Box::new(resolve_type_expr(inner))),
@@ -200,6 +211,10 @@ fn seed_builtin_types(types: &mut HashMap<String, Type>) {
     types.insert("Float".into(), Type::Float);
     types.insert("Double".into(), Type::Double);
     types.insert("Char".into(), Type::Char);
+    types.insert("List".into(), Type::Named("List".into()));
+    types.insert("Tensor".into(), Type::Named("Tensor".into()));
+    types.insert("Module".into(), Type::Named("Module".into()));
+    types.insert("Optimizer".into(), Type::Named("Optimizer".into()));
 }
 
 fn inject_implicit_object_base(file: &mut SourceFile) {
@@ -391,16 +406,27 @@ fn check_stmt(stmt: &Stmt, scope: &mut Scope, sink: &mut DiagnosticSink) {
             check_stmt(&while_stmt.body, scope, sink);
         }
         Stmt::For(for_stmt) => {
-            if let Some(init) = &for_stmt.init {
-                infer_expr(init, scope, sink);
+            if let Some((var_name, iterable)) = &for_stmt.for_each {
+                let iter_ty = infer_expr(iterable, scope, sink);
+                // Infer element type from generic type parameter
+                let elem_ty = match &iter_ty {
+                    Type::Generic(_, args) if !args.is_empty() => args[0].clone(),
+                    _ => Type::Unknown,
+                };
+                scope.variables.insert(var_name.clone(), elem_ty);
+                check_stmt(&for_stmt.body, scope, sink);
+            } else {
+                if let Some(init) = &for_stmt.init {
+                    infer_expr(init, scope, sink);
+                }
+                if let Some(cond) = &for_stmt.condition {
+                    infer_expr(cond, scope, sink);
+                }
+                if let Some(step) = &for_stmt.step {
+                    infer_expr(step, scope, sink);
+                }
+                check_stmt(&for_stmt.body, scope, sink);
             }
-            if let Some(cond) = &for_stmt.condition {
-                infer_expr(cond, scope, sink);
-            }
-            if let Some(step) = &for_stmt.step {
-                infer_expr(step, scope, sink);
-            }
-            check_stmt(&for_stmt.body, scope, sink);
         }
         Stmt::Try(try_stmt) => {
             check_block(&try_stmt.body, scope, sink);

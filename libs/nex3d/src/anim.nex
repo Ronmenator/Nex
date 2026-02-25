@@ -1,0 +1,76 @@
+// nex3d.anim — Skeletal animation via glTF.
+// Loads .glb/.gltf models with skeleton, skins, and animation clips.
+// GPU skinning (linear blend, 4 bone influences per vertex).
+
+public struct AnimModel { handle: Int64 }
+
+// ---- Loading ----
+
+public def anim_model_load(path: String) -> AnimModel {
+    var h: Int64 = engine_anim_model_load(path)
+    return AnimModel(h)
+}
+
+// ---- Rendering ----
+
+public def anim_model_draw(m: AnimModel) {
+    engine_anim_model_draw(m.handle)
+    return
+}
+
+// ---- Playback ----
+
+public def anim_play(m: AnimModel, clip: Int64) {
+    engine_anim_play(m.handle, clip)
+    return
+}
+
+public def anim_stop(m: AnimModel) {
+    engine_anim_stop(m.handle)
+    return
+}
+
+public def anim_pause(m: AnimModel) {
+    engine_anim_pause(m.handle)
+    return
+}
+
+public def anim_set_speed(m: AnimModel, speed: Float) {
+    engine_anim_set_speed(m.handle, speed)
+    return
+}
+
+public def anim_set_looping(m: AnimModel, looping: Int64) {
+    engine_anim_set_looping(m.handle, looping)
+    return
+}
+
+public def anim_set_time(m: AnimModel, time: Float) {
+    engine_anim_set_time(m.handle, time)
+    return
+}
+
+// ---- Queries ----
+
+public def anim_get_time(m: AnimModel) -> Float {
+    return engine_anim_get_time(m.handle)
+}
+
+public def anim_clip_count(m: AnimModel) -> Int64 {
+    return engine_anim_clip_count(m.handle)
+}
+
+public def anim_clip_duration(m: AnimModel, clip: Int64) -> Float {
+    return engine_anim_clip_duration(m.handle, clip)
+}
+
+public def anim_joint_count(m: AnimModel) -> Int64 {
+    return engine_anim_joint_count(m.handle)
+}
+
+// ---- Cleanup ----
+
+public def anim_model_free(m: AnimModel) {
+    engine_anim_model_free(m.handle)
+    return
+}

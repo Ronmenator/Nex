@@ -1,0 +1,46 @@
+// nex3d.rendertarget — Off-screen render targets.
+// Create render targets to draw to textures for post-processing effects.
+
+public struct RenderTarget { handle: Int64, width: Int64, height: Int64 }
+
+// ---- Creation ----
+
+public def rendertarget_create(w: Int64, h: Int64) -> RenderTarget {
+    var handle: Int64 = engine_rendertarget_create(w, h)
+    return RenderTarget(handle, w, h)
+}
+
+// ---- Binding ----
+
+public def rendertarget_bind(rt: RenderTarget) {
+    engine_rendertarget_bind(rt.handle)
+    return
+}
+
+public def rendertarget_unbind() {
+    engine_rendertarget_unbind()
+    return
+}
+
+// ---- Use as texture ----
+
+public def rendertarget_as_texture(rt: RenderTarget) -> Int64 {
+    return engine_rendertarget_as_texture(rt.handle)
+}
+
+// ---- Queries ----
+
+public def rendertarget_width(rt: RenderTarget) -> Int64 {
+    return rt.width
+}
+
+public def rendertarget_height(rt: RenderTarget) -> Int64 {
+    return rt.height
+}
+
+// ---- Cleanup ----
+
+public def rendertarget_free(rt: RenderTarget) {
+    engine_rendertarget_free(rt.handle)
+    return
+}

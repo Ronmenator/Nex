@@ -1,0 +1,105 @@
+// nex3d.light — Lighting system for 3D rendering.
+// Supports directional, point, and spot lights (up to 8 simultaneous).
+// Wraps nex_engine_light_* runtime FFI functions.
+
+import nex3d.math
+import nex3d.color
+
+// ===========================================================================
+// Light type constants
+// ===========================================================================
+
+public def LIGHT_DIRECTIONAL() -> Int64 { return 1 }
+public def LIGHT_POINT() -> Int64       { return 2 }
+public def LIGHT_SPOT() -> Int64        { return 3 }
+
+// ===========================================================================
+// Convenience constructors — set up a light slot in one call
+// ===========================================================================
+
+// Set up a directional light (like the sun). Direction points FROM light.
+public def light_directional(slot: Int64, dir: Vec3, c: Color, intensity: Float) {
+    engine_light_set_type(slot, 1)
+    engine_light_set_direction(slot, dir.x, dir.y, dir.z)
+    engine_light_set_color(slot, c.r, c.g, c.b)
+    engine_light_set_intensity(slot, intensity)
+    return
+}
+
+// Set up a point light (omnidirectional, like a bulb).
+public def light_point(slot: Int64, pos: Vec3, c: Color, intensity: Float, range: Float) {
+    engine_light_set_type(slot, 2)
+    engine_light_set_position(slot, pos.x, pos.y, pos.z)
+    engine_light_set_color(slot, c.r, c.g, c.b)
+    engine_light_set_intensity(slot, intensity)
+    engine_light_set_range(slot, range)
+    return
+}
+
+// Set up a spot light (cone-shaped, like a flashlight).
+// inner_angle/outer_angle are in degrees.
+public def light_spot(slot: Int64, pos: Vec3, dir: Vec3, c: Color, intensity: Float, range: Float, inner_angle: Float, outer_angle: Float) {
+    engine_light_set_type(slot, 3)
+    engine_light_set_position(slot, pos.x, pos.y, pos.z)
+    engine_light_set_direction(slot, dir.x, dir.y, dir.z)
+    engine_light_set_color(slot, c.r, c.g, c.b)
+    engine_light_set_intensity(slot, intensity)
+    engine_light_set_range(slot, range)
+    engine_light_set_spot_angles(slot, inner_angle, outer_angle)
+    return
+}
+
+// ===========================================================================
+// Property setters — modify individual light properties
+// ===========================================================================
+
+public def light_set_position(slot: Int64, pos: Vec3) {
+    engine_light_set_position(slot, pos.x, pos.y, pos.z)
+    return
+}
+
+public def light_set_direction(slot: Int64, dir: Vec3) {
+    engine_light_set_direction(slot, dir.x, dir.y, dir.z)
+    return
+}
+
+public def light_set_color(slot: Int64, c: Color) {
+    engine_light_set_color(slot, c.r, c.g, c.b)
+    return
+}
+
+public def light_set_intensity(slot: Int64, intensity: Float) {
+    engine_light_set_intensity(slot, intensity)
+    return
+}
+
+public def light_set_enabled(slot: Int64, enabled: Int64) {
+    engine_light_set_enabled(slot, enabled)
+    return
+}
+
+public def light_set_range(slot: Int64, range: Float) {
+    engine_light_set_range(slot, range)
+    return
+}
+
+public def light_set_spot_angles(slot: Int64, inner_angle: Float, outer_angle: Float) {
+    engine_light_set_spot_angles(slot, inner_angle, outer_angle)
+    return
+}
+
+// ===========================================================================
+// Global lighting
+// ===========================================================================
+
+// Set the global ambient light color.
+public def set_ambient_color(c: Color) {
+    engine_set_ambient_color(c.r, c.g, c.b)
+    return
+}
+
+// Remove all lights (reset all 8 slots).
+public def clear_lights() {
+    engine_clear_lights()
+    return
+}

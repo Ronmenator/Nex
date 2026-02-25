@@ -181,6 +181,10 @@ fn collect_used_in_type_refs(f: &FunctionDecl, used: &mut HashSet<String>) {
 fn collect_used_in_type_expr(ty: &TypeExpr, used: &mut HashSet<String>) {
     match &ty.kind {
         TypeExprKind::Named(n) => { used.insert(n.clone()); }
+        TypeExprKind::Generic(base, args) => {
+            used.insert(base.clone());
+            for a in args { collect_used_in_type_expr(a, used); }
+        }
         TypeExprKind::Nullable(inner) => collect_used_in_type_expr(inner, used),
         TypeExprKind::Function(params, ret) => {
             for p in params { collect_used_in_type_expr(p, used); }

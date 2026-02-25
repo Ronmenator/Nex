@@ -1,0 +1,64 @@
+// nex3d.gamepad — Gamepad input queries via gilrs.
+// Supports up to 4 players (0-based index).
+
+// ---- Connection ----
+
+public def gamepad_connected(player: Int64) -> Bool {
+    return engine_gamepad_connected(player) != 0
+}
+
+// ---- Buttons ----
+
+public def gamepad_button(player: Int64, button: Int64) -> Bool {
+    return engine_gamepad_button(player, button) != 0
+}
+
+// ---- Axes ----
+
+// Returns axis value from -1.0 to 1.0.
+// Axis codes: 0=LeftX, 1=LeftY, 2=RightX, 3=RightY
+public def gamepad_axis(player: Int64, axis: Int64) -> Float {
+    return engine_gamepad_axis(player, axis)
+}
+
+// Convenience: returns left stick as Vec2
+public def gamepad_left_stick(player: Int64) -> Vec2 {
+    return Vec2(
+        engine_gamepad_axis(player, 0),
+        engine_gamepad_axis(player, 1)
+    )
+}
+
+// Convenience: returns right stick as Vec2
+public def gamepad_right_stick(player: Int64) -> Vec2 {
+    return Vec2(
+        engine_gamepad_axis(player, 2),
+        engine_gamepad_axis(player, 3)
+    )
+}
+
+// ---- Button codes ----
+
+public def GAMEPAD_A() -> Int64       { return 0 }
+public def GAMEPAD_B() -> Int64       { return 1 }
+public def GAMEPAD_X() -> Int64       { return 2 }
+public def GAMEPAD_Y() -> Int64       { return 3 }
+public def GAMEPAD_LB() -> Int64      { return 4 }
+public def GAMEPAD_RB() -> Int64      { return 5 }
+public def GAMEPAD_LT() -> Int64      { return 6 }
+public def GAMEPAD_RT() -> Int64      { return 7 }
+public def GAMEPAD_SELECT() -> Int64  { return 8 }
+public def GAMEPAD_START() -> Int64   { return 9 }
+public def GAMEPAD_L3() -> Int64      { return 10 }
+public def GAMEPAD_R3() -> Int64      { return 11 }
+public def GAMEPAD_DPAD_UP() -> Int64    { return 12 }
+public def GAMEPAD_DPAD_DOWN() -> Int64  { return 13 }
+public def GAMEPAD_DPAD_LEFT() -> Int64  { return 14 }
+public def GAMEPAD_DPAD_RIGHT() -> Int64 { return 15 }
+
+// ---- Axis codes ----
+
+public def AXIS_LEFT_X() -> Int64  { return 0 }
+public def AXIS_LEFT_Y() -> Int64  { return 1 }
+public def AXIS_RIGHT_X() -> Int64 { return 2 }
+public def AXIS_RIGHT_Y() -> Int64 { return 3 }

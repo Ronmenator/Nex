@@ -6,8 +6,15 @@ import nex3d.color
 
 // ---- Core vertex pushing (FFI wrappers) ----
 
+// Push a vertex without explicit normal (shader computes flat normal from derivatives).
 public def push_vertex(x: Float, y: Float, z: Float, r: Float, g: Float, b: Float) {
     engine_push_vertex(x, y, z, r, g, b)
+    return
+}
+
+// Push a vertex with explicit normal for proper per-vertex lighting.
+public def push_vertex_lit(x: Float, y: Float, z: Float, nx: Float, ny: Float, nz: Float, r: Float, g: Float, b: Float) {
+    engine_push_vertex_lit(x, y, z, nx, ny, nz, r, g, b)
     return
 }
 
@@ -22,6 +29,14 @@ public def draw_triangle(p1: Vec3, c1: Color, p2: Vec3, c2: Color, p3: Vec3, c3:
     engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
     engine_push_vertex(p2.x, p2.y, p2.z, c2.r, c2.g, c2.b)
     engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
+    return
+}
+
+// Draw a triangle with explicit normals per vertex.
+public def draw_triangle_lit(p1: Vec3, n1: Vec3, c1: Color, p2: Vec3, n2: Vec3, c2: Color, p3: Vec3, n3: Vec3, c3: Color) {
+    engine_push_vertex_lit(p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c1.r, c1.g, c1.b)
+    engine_push_vertex_lit(p2.x, p2.y, p2.z, n2.x, n2.y, n2.z, c2.r, c2.g, c2.b)
+    engine_push_vertex_lit(p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c3.r, c3.g, c3.b)
     return
 }
 
@@ -46,6 +61,19 @@ public def draw_quad_flat(p1: Vec3, p2: Vec3, p3: Vec3, p4: Vec3, c: Color) {
     return
 }
 
+// Draw a flat-colored quad with an explicit face normal.
+public def draw_quad_flat_lit(p1: Vec3, p2: Vec3, p3: Vec3, p4: Vec3, n: Vec3, c: Color) {
+    // Triangle 1: p1, p2, p3
+    engine_push_vertex_lit(p1.x, p1.y, p1.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    engine_push_vertex_lit(p2.x, p2.y, p2.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    engine_push_vertex_lit(p3.x, p3.y, p3.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    // Triangle 2: p1, p3, p4
+    engine_push_vertex_lit(p1.x, p1.y, p1.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    engine_push_vertex_lit(p3.x, p3.y, p3.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    engine_push_vertex_lit(p4.x, p4.y, p4.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    return
+}
+
 // ---- Convenience: draw a wireframe-style line as a thin quad ----
 
 public def draw_line(start: Vec3, to: Vec3, c: Color, thickness: Float) {
@@ -66,7 +94,7 @@ public def draw_line(start: Vec3, to: Vec3, c: Color, thickness: Float) {
     return
 }
 
-// ---- Convenience: draw a colored cube (6 faces, 12 triangles) ----
+// ---- Convenience: draw a colored cube with proper face normals ----
 
 public def draw_cube(center: Vec3, size: Float, c: Color) {
     h = size / 2.0f
@@ -74,53 +102,59 @@ public def draw_cube(center: Vec3, size: Float, c: Color) {
     cy = center.y
     cz = center.z
 
-    // Front face (z+)
-    draw_quad_flat(
+    // Front face (z+) — normal: (0, 0, 1)
+    n = vec3(0.0f, 0.0f, 1.0f)
+    draw_quad_flat_lit(
         vec3(cx - h, cy - h, cz + h),
         vec3(cx + h, cy - h, cz + h),
         vec3(cx + h, cy + h, cz + h),
         vec3(cx - h, cy + h, cz + h),
-        c
+        n, c
     )
-    // Back face (z-)
-    draw_quad_flat(
+    // Back face (z-) — normal: (0, 0, -1)
+    n = vec3(0.0f, 0.0f, 0.0f - 1.0f)
+    draw_quad_flat_lit(
         vec3(cx + h, cy - h, cz - h),
         vec3(cx - h, cy - h, cz - h),
         vec3(cx - h, cy + h, cz - h),
         vec3(cx + h, cy + h, cz - h),
-        c
+        n, c
     )
-    // Top face (y+)
-    draw_quad_flat(
+    // Top face (y+) — normal: (0, 1, 0)
+    n = vec3(0.0f, 1.0f, 0.0f)
+    draw_quad_flat_lit(
         vec3(cx - h, cy + h, cz + h),
         vec3(cx + h, cy + h, cz + h),
         vec3(cx + h, cy + h, cz - h),
         vec3(cx - h, cy + h, cz - h),
-        c
+        n, c
     )
-    // Bottom face (y-)
-    draw_quad_flat(
+    // Bottom face (y-) — normal: (0, -1, 0)
+    n = vec3(0.0f, 0.0f - 1.0f, 0.0f)
+    draw_quad_flat_lit(
         vec3(cx - h, cy - h, cz - h),
         vec3(cx + h, cy - h, cz - h),
         vec3(cx + h, cy - h, cz + h),
         vec3(cx - h, cy - h, cz + h),
-        c
+        n, c
     )
-    // Right face (x+)
-    draw_quad_flat(
+    // Right face (x+) — normal: (1, 0, 0)
+    n = vec3(1.0f, 0.0f, 0.0f)
+    draw_quad_flat_lit(
         vec3(cx + h, cy - h, cz + h),
         vec3(cx + h, cy - h, cz - h),
         vec3(cx + h, cy + h, cz - h),
         vec3(cx + h, cy + h, cz + h),
-        c
+        n, c
     )
-    // Left face (x-)
-    draw_quad_flat(
+    // Left face (x-) — normal: (-1, 0, 0)
+    n = vec3(0.0f - 1.0f, 0.0f, 0.0f)
+    draw_quad_flat_lit(
         vec3(cx - h, cy - h, cz - h),
         vec3(cx - h, cy - h, cz + h),
         vec3(cx - h, cy + h, cz + h),
         vec3(cx - h, cy + h, cz - h),
-        c
+        n, c
     )
     return
 }
@@ -139,6 +173,51 @@ public def draw_grid(size: Float, divisions: Int64, c: Color) {
         // Lines along Z axis
         draw_line(vec3(pos, 0.0f, 0.0f - half), vec3(pos, 0.0f, half), c, thickness)
         i = i + 1
+    }
+    return
+}
+
+// ---- Convenience: draw a sphere approximation with proper normals ----
+
+public def draw_sphere(center: Vec3, radius: Float, c: Color, segments: Int64) {
+    rings = segments
+    slices = segments
+    pi = 3.14159265358979f
+
+    ring = 0
+    while (ring < rings) {
+        theta1 = pi * ring / rings
+        theta2 = pi * (ring + 1) / rings
+
+        slice = 0
+        while (slice < slices) {
+            phi1 = 2.0f * pi * slice / slices
+            phi2 = 2.0f * pi * (slice + 1) / slices
+
+            // Four corners of this quad patch on the sphere
+            n1 = vec3(sin(theta1) * cos(phi1), cos(theta1), sin(theta1) * sin(phi1))
+            n2 = vec3(sin(theta1) * cos(phi2), cos(theta1), sin(theta1) * sin(phi2))
+            n3 = vec3(sin(theta2) * cos(phi2), cos(theta2), sin(theta2) * sin(phi2))
+            n4 = vec3(sin(theta2) * cos(phi1), cos(theta2), sin(theta2) * sin(phi1))
+
+            p1 = vec3_add(center, vec3_mul(n1, radius))
+            p2 = vec3_add(center, vec3_mul(n2, radius))
+            p3 = vec3_add(center, vec3_mul(n3, radius))
+            p4 = vec3_add(center, vec3_mul(n4, radius))
+
+            // Triangle 1
+            engine_push_vertex_lit(p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c.r, c.g, c.b)
+            engine_push_vertex_lit(p2.x, p2.y, p2.z, n2.x, n2.y, n2.z, c.r, c.g, c.b)
+            engine_push_vertex_lit(p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c.r, c.g, c.b)
+
+            // Triangle 2
+            engine_push_vertex_lit(p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c.r, c.g, c.b)
+            engine_push_vertex_lit(p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c.r, c.g, c.b)
+            engine_push_vertex_lit(p4.x, p4.y, p4.z, n4.x, n4.y, n4.z, c.r, c.g, c.b)
+
+            slice = slice + 1
+        }
+        ring = ring + 1
     }
     return
 }

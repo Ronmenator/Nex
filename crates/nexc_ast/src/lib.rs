@@ -56,6 +56,7 @@ pub struct TypeExpr {
 #[derive(Debug, Clone)]
 pub enum TypeExprKind {
     Named(String),
+    Generic(String, Vec<TypeExpr>),
     Var,
     Unit,
     Nullable(Box<TypeExpr>),
@@ -194,6 +195,8 @@ pub struct ForStmt {
     pub step: Option<Expr>,
     pub body: Box<Stmt>,
     pub span: Span,
+    /// For-each: `for (varName in iterable) { body }`
+    pub for_each: Option<(String, Box<Expr>)>,
 }
 
 #[derive(Debug, Clone)]

@@ -3,9 +3,13 @@
 
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::io::Cursor;
 use std::os::raw::c_char;
 use std::sync::Arc;
 use std::time::Instant;
+
+use gilrs::{Gilrs, Button as GilrsButton, Axis as GilrsAxis};
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 
 // -----------------------------------------------------------------------
 // UI overlay bridge: look up UI DLL symbols at runtime so the engine can
@@ -128,13 +132,15 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes};
 
 // -----------------------------------------------------------------------
-// Vertex format: position (xyz) + color (rgb), 6 floats = 24 bytes
+// Vertex format: position (xyz) + normal (xyz) + uv (xy) + color (rgb) = 44 bytes
 // -----------------------------------------------------------------------
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
+    normal: [f32; 3],
+    uv: [f32; 2],
     color: [f32; 3],
 }
 
@@ -154,9 +160,329 @@ impl Vertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x3,
                 },
+                wgpu::VertexAttribute {
+                    offset: 24,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: 32,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
             ],
         }
     }
+}
+
+// -----------------------------------------------------------------------
+// Skinned vertex (for skeletal animation)
+// -----------------------------------------------------------------------
+
+const MAX_BONES: usize = 128;
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct SkinnedVertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    uv: [f32; 2],
+    color: [f32; 3],
+    joint_indices: [u32; 4],
+    bone_weights: [f32; 4],
+}
+
+impl SkinnedVertex {
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<SkinnedVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute { offset: 0,  shader_location: 0, format: wgpu::VertexFormat::Float32x3 },
+                wgpu::VertexAttribute { offset: 12, shader_location: 1, format: wgpu::VertexFormat::Float32x3 },
+                wgpu::VertexAttribute { offset: 24, shader_location: 2, format: wgpu::VertexFormat::Float32x2 },
+                wgpu::VertexAttribute { offset: 32, shader_location: 3, format: wgpu::VertexFormat::Float32x3 },
+                wgpu::VertexAttribute { offset: 44, shader_location: 4, format: wgpu::VertexFormat::Uint32x4 },
+                wgpu::VertexAttribute { offset: 60, shader_location: 5, format: wgpu::VertexFormat::Float32x4 },
+            ],
+        }
+    }
+}
+
+// -----------------------------------------------------------------------
+// Skeletal animation data structures
+// -----------------------------------------------------------------------
+
+#[derive(Clone)]
+struct Joint {
+    parent: i32,                // -1 for root
+    inv_bind: [[f32; 4]; 4],   // inverse bind matrix (column-major)
+    local_translation: [f32; 3],
+    local_rotation: [f32; 4],   // quaternion (x,y,z,w)
+    local_scale: [f32; 3],
+}
+
+#[derive(Clone)]
+struct AnimKeyframe<T: Clone> {
+    time: f32,
+    value: T,
+}
+
+#[derive(Clone)]
+struct AnimChannel {
+    joint_index: usize,
+    translations: Vec<AnimKeyframe<[f32; 3]>>,
+    rotations: Vec<AnimKeyframe<[f32; 4]>>,
+    scales: Vec<AnimKeyframe<[f32; 3]>>,
+}
+
+#[derive(Clone)]
+struct AnimClip {
+    #[allow(dead_code)]
+    name: String,
+    duration: f32,
+    channels: Vec<AnimChannel>,
+}
+
+struct AnimState {
+    clip_index: usize,
+    time: f32,
+    speed: f32,
+    looping: bool,
+    playing: bool,
+}
+
+struct AnimatedModel {
+    skinned_vertices: Vec<SkinnedVertex>,
+    joints: Vec<Joint>,
+    animations: Vec<AnimClip>,
+    anim_state: AnimState,
+    bone_buffer: wgpu::Buffer,
+    bone_bind_group: wgpu::BindGroup,
+}
+
+// -----------------------------------------------------------------------
+// Math helpers for skeletal animation
+// -----------------------------------------------------------------------
+
+fn quat_slerp(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
+    let mut dot = a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3];
+    let mut b2 = b;
+    if dot < 0.0 {
+        dot = -dot;
+        b2 = [-b[0], -b[1], -b[2], -b[3]];
+    }
+    if dot > 0.9995 {
+        // Near-parallel: normalized lerp
+        let r = [
+            a[0] + (b2[0] - a[0]) * t,
+            a[1] + (b2[1] - a[1]) * t,
+            a[2] + (b2[2] - a[2]) * t,
+            a[3] + (b2[3] - a[3]) * t,
+        ];
+        let len = (r[0]*r[0] + r[1]*r[1] + r[2]*r[2] + r[3]*r[3]).sqrt();
+        return [r[0]/len, r[1]/len, r[2]/len, r[3]/len];
+    }
+    let theta = dot.acos();
+    let sin_theta = theta.sin();
+    let wa = ((1.0 - t) * theta).sin() / sin_theta;
+    let wb = (t * theta).sin() / sin_theta;
+    [
+        a[0]*wa + b2[0]*wb,
+        a[1]*wa + b2[1]*wb,
+        a[2]*wa + b2[2]*wb,
+        a[3]*wa + b2[3]*wb,
+    ]
+}
+
+fn quat_to_mat4(q: [f32; 4]) -> [[f32; 4]; 4] {
+    let (x, y, z, w) = (q[0], q[1], q[2], q[3]);
+    let x2 = x+x; let y2 = y+y; let z2 = z+z;
+    let xx = x*x2; let xy = x*y2; let xz = x*z2;
+    let yy = y*y2; let yz = y*z2; let zz = z*z2;
+    let wx = w*x2; let wy = w*y2; let wz = w*z2;
+    [
+        [1.0-yy-zz, xy+wz,     xz-wy,     0.0],
+        [xy-wz,     1.0-xx-zz, yz+wx,     0.0],
+        [xz+wy,     yz-wx,     1.0-xx-yy, 0.0],
+        [0.0,       0.0,       0.0,       1.0],
+    ]
+}
+
+fn mat4x4_identity() -> [[f32; 4]; 4] {
+    [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
+fn mat4_mul(a: &[[f32; 4]; 4], b: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
+    let mut r = [[0.0f32; 4]; 4];
+    for i in 0..4 {
+        for j in 0..4 {
+            r[i][j] = a[i][0]*b[0][j] + a[i][1]*b[1][j] + a[i][2]*b[2][j] + a[i][3]*b[3][j];
+        }
+    }
+    r
+}
+
+fn compose_trs(t: [f32; 3], r: [f32; 4], s: [f32; 3]) -> [[f32; 4]; 4] {
+    let mut m = quat_to_mat4(r);
+    // Apply scale
+    m[0][0] *= s[0]; m[0][1] *= s[0]; m[0][2] *= s[0];
+    m[1][0] *= s[1]; m[1][1] *= s[1]; m[1][2] *= s[1];
+    m[2][0] *= s[2]; m[2][1] *= s[2]; m[2][2] *= s[2];
+    // Apply translation
+    m[3][0] = t[0]; m[3][1] = t[1]; m[3][2] = t[2];
+    m
+}
+
+fn lerp3(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+    [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]
+}
+
+fn sample_keyframes_vec3(keys: &[AnimKeyframe<[f32; 3]>], time: f32) -> [f32; 3] {
+    if keys.is_empty() { return [0.0, 0.0, 0.0]; }
+    if keys.len() == 1 || time <= keys[0].time { return keys[0].value; }
+    if time >= keys.last().unwrap().time { return keys.last().unwrap().value; }
+    for i in 0..keys.len()-1 {
+        if time >= keys[i].time && time < keys[i+1].time {
+            let t = (time - keys[i].time) / (keys[i+1].time - keys[i].time);
+            return lerp3(keys[i].value, keys[i+1].value, t);
+        }
+    }
+    keys.last().unwrap().value
+}
+
+fn sample_keyframes_quat(keys: &[AnimKeyframe<[f32; 4]>], time: f32) -> [f32; 4] {
+    if keys.is_empty() { return [0.0, 0.0, 0.0, 1.0]; }
+    if keys.len() == 1 || time <= keys[0].time { return keys[0].value; }
+    if time >= keys.last().unwrap().time { return keys.last().unwrap().value; }
+    for i in 0..keys.len()-1 {
+        if time >= keys[i].time && time < keys[i+1].time {
+            let t = (time - keys[i].time) / (keys[i+1].time - keys[i].time);
+            return quat_slerp(keys[i].value, keys[i+1].value, t);
+        }
+    }
+    keys.last().unwrap().value
+}
+
+/// Compute final bone matrices for the current animation frame.
+fn compute_bone_matrices(model: &AnimatedModel) -> Vec<[[f32; 4]; 4]> {
+    let num_joints = model.joints.len();
+    let mut local_transforms: Vec<[[f32; 4]; 4]> = Vec::with_capacity(num_joints);
+
+    // Start with bind pose
+    for joint in &model.joints {
+        local_transforms.push(compose_trs(
+            joint.local_translation,
+            joint.local_rotation,
+            joint.local_scale,
+        ));
+    }
+
+    // Override with animation data
+    let state = &model.anim_state;
+    if state.clip_index < model.animations.len() {
+        let clip = &model.animations[state.clip_index];
+        for channel in &clip.channels {
+            let ji = channel.joint_index;
+            if ji >= num_joints { continue; }
+
+            let t = if !channel.translations.is_empty() {
+                sample_keyframes_vec3(&channel.translations, state.time)
+            } else {
+                model.joints[ji].local_translation
+            };
+            let r = if !channel.rotations.is_empty() {
+                sample_keyframes_quat(&channel.rotations, state.time)
+            } else {
+                model.joints[ji].local_rotation
+            };
+            let s = if !channel.scales.is_empty() {
+                sample_keyframes_vec3(&channel.scales, state.time)
+            } else {
+                model.joints[ji].local_scale
+            };
+            local_transforms[ji] = compose_trs(t, r, s);
+        }
+    }
+
+    // Compose global transforms (parent chain)
+    let mut global_transforms = vec![mat4x4_identity(); num_joints];
+    for i in 0..num_joints {
+        let parent = model.joints[i].parent;
+        if parent >= 0 && (parent as usize) < num_joints {
+            global_transforms[i] = mat4_mul(&global_transforms[parent as usize], &local_transforms[i]);
+        } else {
+            global_transforms[i] = local_transforms[i];
+        }
+    }
+
+    // Apply inverse bind matrices → final bone matrices
+    let mut final_matrices = vec![mat4x4_identity(); MAX_BONES];
+    for i in 0..num_joints.min(MAX_BONES) {
+        final_matrices[i] = mat4_mul(&global_transforms[i], &model.joints[i].inv_bind);
+    }
+
+    final_matrices
+}
+
+// -----------------------------------------------------------------------
+// Light data (CPU side)
+// -----------------------------------------------------------------------
+
+const MAX_LIGHTS: usize = 8;
+
+#[derive(Copy, Clone)]
+struct LightData {
+    light_type: u32,        // 0=off, 1=directional, 2=point, 3=spot
+    enabled: bool,
+    position: [f32; 3],
+    direction: [f32; 3],
+    color: [f32; 3],
+    intensity: f32,
+    range: f32,
+    inner_cone_cos: f32,
+    outer_cone_cos: f32,
+}
+
+impl LightData {
+    fn new() -> Self {
+        Self {
+            light_type: 0,
+            enabled: false,
+            position: [0.0, 0.0, 0.0],
+            direction: [0.0, -1.0, 0.0],
+            color: [1.0, 1.0, 1.0],
+            intensity: 1.0,
+            range: 10.0,
+            inner_cone_cos: 0.9063, // ~25 degrees
+            outer_cone_cos: 0.8192, // ~35 degrees
+        }
+    }
+}
+
+// GPU-side uniform layout for a single light (64 bytes, WGSL-aligned)
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct GpuLight {
+    position_and_type: [f32; 4],    // xyz=position, w=light_type
+    direction_and_intensity: [f32; 4], // xyz=direction, w=intensity
+    color_and_enabled: [f32; 4],    // rgb=color, a=enabled (1.0/0.0)
+    params: [f32; 4],              // x=range, y=inner_cone_cos, z=outer_cone_cos, w=0
+}
+
+// Full uniform buffer layout (608 bytes)
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct Uniforms {
+    view_proj: [f32; 16],          // 64 bytes
+    camera_pos: [f32; 4],          // 16 bytes (w=unused)
+    ambient_and_count: [f32; 4],   // 16 bytes (rgb=ambient, w=num_lights)
+    lights: [GpuLight; MAX_LIGHTS], // 512 bytes
 }
 
 // -----------------------------------------------------------------------
@@ -164,47 +490,292 @@ impl Vertex {
 // -----------------------------------------------------------------------
 
 const SHADER_SRC: &str = r#"
+struct Light {
+    position_and_type: vec4<f32>,
+    direction_and_intensity: vec4<f32>,
+    color_and_enabled: vec4<f32>,
+    params: vec4<f32>,
+};
+
 struct Uniforms {
-view_proj: mat4x4<f32>,
+    view_proj: mat4x4<f32>,
+    camera_pos: vec4<f32>,
+    ambient_and_count: vec4<f32>,
+    lights: array<Light, 8>,
 };
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
+// Texture bind group (1x1 white default when no texture is bound)
+@group(1) @binding(0) var diffuse_texture: texture_2d<f32>;
+@group(1) @binding(1) var diffuse_sampler: sampler;
+
 struct VertexInput {
-@location(0) position: vec3<f32>,
-@location(1) color: vec3<f32>,
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) color: vec3<f32>,
 };
 
 struct VertexOutput {
-@builtin(position) clip_position: vec4<f32>,
-@location(0) color: vec3<f32>,
-@location(1) world_pos: vec3<f32>,
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec3<f32>,
+    @location(1) world_pos: vec3<f32>,
+    @location(2) world_normal: vec3<f32>,
+    @location(3) uv: vec2<f32>,
 };
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
-var out: VertexOutput;
-out.clip_position = uniforms.view_proj * vec4<f32>(in.position, 1.0);
-out.color = in.color;
-out.world_pos = in.position;
-return out;
+    var out: VertexOutput;
+    out.clip_position = uniforms.view_proj * vec4<f32>(in.position, 1.0);
+    out.color = in.color;
+    out.world_pos = in.position;
+    out.world_normal = in.normal;
+    out.uv = in.uv;
+    return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-// Compute flat face normal from screen-space derivatives of world position
-let dx = dpdx(in.world_pos);
-let dy = dpdy(in.world_pos);
-let normal = normalize(cross(dx, dy));
+    // Sample texture (1x1 white if no texture bound → just vertex color)
+    let tex_color = textureSample(diffuse_texture, diffuse_sampler, in.uv);
+    let base_color = in.color * tex_color.rgb;
+    let base_alpha = tex_color.a;
 
-// Directional light from upper-right-front
-let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
-let ndotl = max(dot(normal, light_dir), 0.0);
+    // Determine normal: use vertex normal if provided, else compute from derivatives
+    var normal: vec3<f32>;
+    let nlen = dot(in.world_normal, in.world_normal);
+    if (nlen < 0.001) {
+        let dx = dpdx(in.world_pos);
+        let dy = dpdy(in.world_pos);
+        normal = normalize(cross(dx, dy));
+    } else {
+        normal = normalize(in.world_normal);
+    }
 
-let ambient = 0.25;
-let diffuse = 0.75 * ndotl;
-let lit = in.color * (ambient + diffuse);
+    let num_lights = i32(uniforms.ambient_and_count.w);
+    let ambient_color = uniforms.ambient_and_count.xyz;
+    let camera_pos = uniforms.camera_pos.xyz;
+    let view_dir = normalize(camera_pos - in.world_pos);
 
-return vec4<f32>(lit, 1.0);
+    var total_light = ambient_color;
+
+    // If no lights are active, use legacy fixed lighting
+    if (num_lights == 0) {
+        let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
+        let ndotl = max(dot(normal, light_dir), 0.0);
+        let legacy_ambient = 0.25;
+        let legacy_diffuse = 0.75 * ndotl;
+        return vec4<f32>(base_color * (legacy_ambient + legacy_diffuse), base_alpha);
+    }
+
+    let specular_power = 32.0;
+
+    for (var i = 0; i < num_lights; i = i + 1) {
+        let light = uniforms.lights[i];
+        let light_type = i32(light.position_and_type.w);
+        let enabled = light.color_and_enabled.w;
+
+        if (light_type == 0 || enabled < 0.5) {
+            continue;
+        }
+
+        let light_color = light.color_and_enabled.xyz;
+        let intensity = light.direction_and_intensity.w;
+        let light_pos = light.position_and_type.xyz;
+        let light_dir_raw = light.direction_and_intensity.xyz;
+        let light_range = light.params.x;
+        let inner_cos = light.params.y;
+        let outer_cos = light.params.z;
+
+        var light_dir: vec3<f32>;
+        var attenuation = 1.0;
+
+        if (light_type == 1) {
+            light_dir = normalize(-light_dir_raw);
+        } else {
+            let to_light = light_pos - in.world_pos;
+            let dist = length(to_light);
+            light_dir = to_light / max(dist, 0.0001);
+            let ratio = dist / max(light_range, 0.0001);
+            attenuation = max(1.0 - ratio * ratio, 0.0);
+            attenuation = attenuation * attenuation;
+
+            if (light_type == 3) {
+                let spot_dir = normalize(light_dir_raw);
+                let cos_angle = dot(-light_dir, spot_dir);
+                let spot_factor = clamp(
+                    (cos_angle - outer_cos) / max(inner_cos - outer_cos, 0.0001),
+                    0.0, 1.0
+                );
+                attenuation = attenuation * spot_factor;
+            }
+        }
+
+        let ndotl = max(dot(normal, light_dir), 0.0);
+        let diffuse = light_color * intensity * ndotl * attenuation;
+
+        let half_vec = normalize(light_dir + view_dir);
+        let ndoth = max(dot(normal, half_vec), 0.0);
+        let spec = pow(ndoth, specular_power) * attenuation * intensity;
+        let specular = light_color * spec * step(0.001, ndotl);
+
+        total_light = total_light + diffuse + specular;
+    }
+
+    let lit = base_color * total_light;
+    return vec4<f32>(lit, base_alpha);
+}
+"#;
+
+// -----------------------------------------------------------------------
+// Skinned WGSL shader (extends main shader with bone matrices)
+// -----------------------------------------------------------------------
+
+const SKINNED_SHADER_SRC: &str = r#"
+struct Light {
+    position_and_type: vec4<f32>,
+    direction_and_intensity: vec4<f32>,
+    color_and_enabled: vec4<f32>,
+    params: vec4<f32>,
+};
+
+struct Uniforms {
+    view_proj: mat4x4<f32>,
+    camera_pos: vec4<f32>,
+    ambient_and_count: vec4<f32>,
+    lights: array<Light, 8>,
+};
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+@group(1) @binding(0) var diffuse_texture: texture_2d<f32>;
+@group(1) @binding(1) var diffuse_sampler: sampler;
+
+@group(2) @binding(0) var<storage, read> bone_matrices: array<mat4x4<f32>, 128>;
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) color: vec3<f32>,
+    @location(4) joint_indices: vec4<u32>,
+    @location(5) bone_weights: vec4<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec3<f32>,
+    @location(1) world_pos: vec3<f32>,
+    @location(2) world_normal: vec3<f32>,
+    @location(3) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var skinned_pos = vec3<f32>(0.0, 0.0, 0.0);
+    var skinned_normal = vec3<f32>(0.0, 0.0, 0.0);
+
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let w = in.bone_weights[i];
+        if (w > 0.0) {
+            let bone = bone_matrices[in.joint_indices[i]];
+            skinned_pos = skinned_pos + (bone * vec4<f32>(in.position, 1.0)).xyz * w;
+            skinned_normal = skinned_normal + (bone * vec4<f32>(in.normal, 0.0)).xyz * w;
+        }
+    }
+
+    var out: VertexOutput;
+    out.clip_position = uniforms.view_proj * vec4<f32>(skinned_pos, 1.0);
+    out.color = in.color;
+    out.world_pos = skinned_pos;
+    out.world_normal = skinned_normal;
+    out.uv = in.uv;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let tex_color = textureSample(diffuse_texture, diffuse_sampler, in.uv);
+    let base_color = in.color * tex_color.rgb;
+    let base_alpha = tex_color.a;
+
+    var normal: vec3<f32>;
+    let nlen = dot(in.world_normal, in.world_normal);
+    if (nlen < 0.001) {
+        let dx = dpdx(in.world_pos);
+        let dy = dpdy(in.world_pos);
+        normal = normalize(cross(dx, dy));
+    } else {
+        normal = normalize(in.world_normal);
+    }
+
+    let num_lights = i32(uniforms.ambient_and_count.w);
+    let ambient_color = uniforms.ambient_and_count.xyz;
+    let camera_pos = uniforms.camera_pos.xyz;
+    let view_dir = normalize(camera_pos - in.world_pos);
+
+    var total_light = ambient_color;
+
+    if (num_lights == 0) {
+        let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
+        let ndotl = max(dot(normal, light_dir), 0.0);
+        let legacy_ambient = 0.25;
+        let legacy_diffuse = 0.75 * ndotl;
+        return vec4<f32>(base_color * (legacy_ambient + legacy_diffuse), base_alpha);
+    }
+
+    let specular_power = 32.0;
+
+    for (var i = 0; i < num_lights; i = i + 1) {
+        let light = uniforms.lights[i];
+        let light_type = i32(light.position_and_type.w);
+        let enabled = light.color_and_enabled.w;
+        if (light_type == 0 || enabled < 0.5) { continue; }
+
+        let light_color = light.color_and_enabled.xyz;
+        let intensity = light.direction_and_intensity.w;
+        let light_pos = light.position_and_type.xyz;
+        let light_dir_raw = light.direction_and_intensity.xyz;
+        let light_range = light.params.x;
+        let inner_cos = light.params.y;
+        let outer_cos = light.params.z;
+
+        var light_dir: vec3<f32>;
+        var attenuation = 1.0;
+
+        if (light_type == 1) {
+            light_dir = normalize(-light_dir_raw);
+        } else {
+            let to_light = light_pos - in.world_pos;
+            let dist = length(to_light);
+            light_dir = to_light / max(dist, 0.0001);
+            let ratio = dist / max(light_range, 0.0001);
+            attenuation = max(1.0 - ratio * ratio, 0.0);
+            attenuation = attenuation * attenuation;
+            if (light_type == 3) {
+                let spot_dir = normalize(light_dir_raw);
+                let cos_angle = dot(-light_dir, spot_dir);
+                let spot_factor = clamp(
+                    (cos_angle - outer_cos) / max(inner_cos - outer_cos, 0.0001),
+                    0.0, 1.0
+                );
+                attenuation = attenuation * spot_factor;
+            }
+        }
+
+        let ndotl = max(dot(normal, light_dir), 0.0);
+        let diffuse = light_color * intensity * ndotl * attenuation;
+
+        let half_vec = normalize(light_dir + view_dir);
+        let ndoth = max(dot(normal, half_vec), 0.0);
+        let spec = pow(ndoth, specular_power) * attenuation * intensity;
+        let specular = light_color * spec * step(0.001, ndotl);
+
+        total_light = total_light + diffuse + specular;
+    }
+
+    let lit = base_color * total_light;
+    return vec4<f32>(lit, base_alpha);
 }
 "#;
 
@@ -410,6 +981,29 @@ return textureSample(fb_texture, fb_sampler, in.uv);
 // Engine state
 // -----------------------------------------------------------------------
 
+// Loaded texture data
+struct LoadedTexture {
+    #[allow(dead_code)]
+    texture: wgpu::Texture,
+    bind_group: wgpu::BindGroup,
+    width: u32,
+    height: u32,
+}
+
+struct LoadedModel {
+    vertices: Vec<Vertex>,
+}
+
+#[allow(dead_code)]
+struct RenderTargetData {
+    color_texture: wgpu::Texture,
+    color_view: wgpu::TextureView,
+    depth_view: wgpu::TextureView,
+    bind_group: wgpu::BindGroup,  // for sampling as texture
+    width: u32,
+    height: u32,
+}
+
 struct EngineState {
     // Window
     title: String,
@@ -430,6 +1024,12 @@ struct EngineState {
     bind_group: Option<wgpu::BindGroup>,
     depth_view: Option<wgpu::TextureView>,
 
+    // Texture system
+    texture_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    default_texture_bind_group: Option<wgpu::BindGroup>,
+    textures: Vec<LoadedTexture>,
+    active_texture: Option<usize>,
+
     // Clear color
     clear_color: [f64; 4],
 
@@ -438,6 +1038,10 @@ struct EngineState {
 
     // Vertices accumulated this frame
     vertices: Vec<Vertex>,
+
+    // Lighting
+    lights: [LightData; MAX_LIGHTS],
+    ambient_color: [f32; 3],
 
     // Camera
     camera_pos: [f64; 3],
@@ -462,6 +1066,7 @@ struct EngineState {
     prev_mouse_y: f64,
     mouse_buttons_down: HashSet<u32>,
     mouse_buttons_pressed: HashSet<u32>,
+    mouse_scroll_delta: f64,
 
     // Timing
     start_time: Instant,
@@ -479,6 +1084,27 @@ struct EngineState {
     ui_bind_group: Option<wgpu::BindGroup>,
     ui_fb_width: u32,
     ui_fb_height: u32,
+
+    // Audio (rodio)
+    audio_stream: Option<(OutputStream, OutputStreamHandle)>,
+    audio_buffers: Vec<Arc<Vec<u8>>>,   // loaded audio file bytes
+    audio_sinks: Vec<Option<Sink>>,     // playback sinks (1 per loaded sound)
+
+    // Gamepad (gilrs)
+    gilrs: Option<Gilrs>,
+
+    // Render targets
+    render_targets: Vec<RenderTargetData>,
+    active_render_target: Option<usize>,
+
+    // Loaded OBJ models
+    models: Vec<LoadedModel>,
+
+    // Skeletal animation
+    skinned_pipeline: Option<wgpu::RenderPipeline>,
+    bone_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    anim_models: Vec<AnimatedModel>,
+    skinned_draw_calls: Vec<usize>,  // model indices to draw this frame
 }
 
 impl EngineState {
@@ -498,9 +1124,15 @@ impl EngineState {
             uniform_buffer: None,
             bind_group: None,
             depth_view: None,
+            texture_bind_group_layout: None,
+            default_texture_bind_group: None,
+            textures: Vec::new(),
+            active_texture: None,
             clear_color: [0.1, 0.1, 0.15, 1.0],
             update_fn: None,
             vertices: Vec::with_capacity(4096),
+            lights: [LightData::new(); MAX_LIGHTS],
+            ambient_color: [0.1, 0.1, 0.1],
             camera_pos: [0.0, 2.0, 5.0],
             camera_target: [0.0, 0.0, 0.0],
             camera_up: [0.0, 1.0, 0.0],
@@ -519,6 +1151,7 @@ impl EngineState {
             prev_mouse_y: 0.0,
             mouse_buttons_down: HashSet::new(),
             mouse_buttons_pressed: HashSet::new(),
+            mouse_scroll_delta: 0.0,
             start_time: now,
             last_frame_time: now,
             delta_time: 0.0,
@@ -532,6 +1165,22 @@ impl EngineState {
             ui_bind_group: None,
             ui_fb_width: 0,
             ui_fb_height: 0,
+
+            audio_stream: None,
+            audio_buffers: Vec::new(),
+            audio_sinks: Vec::new(),
+
+            gilrs: None,
+
+            render_targets: Vec::new(),
+            active_render_target: None,
+
+            models: Vec::new(),
+
+            skinned_pipeline: None,
+            bone_bind_group_layout: None,
+            anim_models: Vec::new(),
+            skinned_draw_calls: Vec::new(),
         }
     }
 
@@ -658,22 +1307,22 @@ impl ApplicationHandler for EngineApp {
                     source: wgpu::ShaderSource::Wgsl(SHADER_SRC.into()),
                 });
 
-            // Uniform buffer (4x4 matrix = 64 bytes)
+            // Uniform buffer: view_proj(64) + camera_pos(16) + ambient(16) + lights(512) = 608 bytes
             let uniform_buffer =
                 device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("uniform_buffer"),
-                    size: 64,
+                    size: std::mem::size_of::<Uniforms>() as u64,
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 });
 
-            // Bind group layout & bind group
+            // Bind group layout (group 0: uniforms)
             let bind_group_layout =
                 device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                     label: Some("bind_group_layout"),
                     entries: &[wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
@@ -693,11 +1342,79 @@ impl ApplicationHandler for EngineApp {
                     }],
                 });
 
-            // Pipeline layout
+            // Texture bind group layout (group 1: texture + sampler)
+            let texture_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("texture_bind_group_layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                    ],
+                });
+
+            // Default 1x1 white texture (used when no texture is bound)
+            let default_tex = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("default_white_texture"),
+                size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            queue.write_texture(
+                wgpu::ImageCopyTexture {
+                    texture: &default_tex,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &[255u8, 255, 255, 255], // solid white
+                wgpu::ImageDataLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) },
+                wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            );
+            let default_tex_view = default_tex.create_view(&Default::default());
+            let default_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("default_sampler"),
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            });
+            let default_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("default_texture_bg"),
+                layout: &texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&default_tex_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&default_tex_sampler),
+                    },
+                ],
+            });
+
+            // Pipeline layout (group 0: uniforms, group 1: texture)
             let pipeline_layout =
                 device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("pipeline_layout"),
-                    bind_group_layouts: &[&bind_group_layout],
+                    bind_group_layouts: &[&bind_group_layout, &texture_bind_group_layout],
                     push_constant_ranges: &[],
                 });
 
@@ -823,6 +1540,79 @@ impl ApplicationHandler for EngineApp {
                 ..Default::default()
             });
 
+            // ---- Skinned pipeline for skeletal animation ----
+            let bone_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("bone_bind_group_layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    }],
+                });
+
+            let skinned_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("skinned_shader"),
+                source: wgpu::ShaderSource::Wgsl(SKINNED_SHADER_SRC.into()),
+            });
+
+            let skinned_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("skinned_pipeline_layout"),
+                    bind_group_layouts: &[
+                        &bind_group_layout,
+                        &texture_bind_group_layout,
+                        &bone_bind_group_layout,
+                    ],
+                    push_constant_ranges: &[],
+                });
+
+            let skinned_pipeline =
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("skinned_render_pipeline"),
+                    layout: Some(&skinned_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &skinned_shader,
+                        entry_point: Some("vs_main"),
+                        buffers: &[SkinnedVertex::layout()],
+                        compilation_options: Default::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &skinned_shader,
+                        entry_point: Some("fs_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: Default::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: wgpu::FrontFace::Ccw,
+                        cull_mode: None,
+                        polygon_mode: wgpu::PolygonMode::Fill,
+                        unclipped_depth: false,
+                        conservative: false,
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth32Float,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Less,
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
+                    }),
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview: None,
+                    cache: None,
+                });
+
             state.window = Some(window);
             state.surface =
                 Some(unsafe { std::mem::transmute::<_, wgpu::Surface<'static>>(surface) });
@@ -833,9 +1623,13 @@ impl ApplicationHandler for EngineApp {
             state.uniform_buffer = Some(uniform_buffer);
             state.bind_group = Some(bind_group);
             state.depth_view = Some(depth_view);
+            state.texture_bind_group_layout = Some(texture_bind_group_layout);
+            state.default_texture_bind_group = Some(default_texture_bind_group);
             state.ui_blit_pipeline = Some(ui_blit_pipeline);
             state.ui_blit_bind_group_layout = Some(ui_blit_bind_group_layout);
             state.ui_blit_sampler = Some(ui_blit_sampler);
+            state.skinned_pipeline = Some(skinned_pipeline);
+            state.bone_bind_group_layout = Some(bone_bind_group_layout);
         });
     }
 
@@ -931,6 +1725,14 @@ impl ApplicationHandler for EngineApp {
                 }
             }
 
+            WindowEvent::MouseWheel { delta, .. } => {
+                let dy = match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_, y) => y as f64,
+                    winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y / 30.0,
+                };
+                with_state(|s| s.mouse_scroll_delta += dy);
+            }
+
             WindowEvent::RedrawRequested => {
                 with_state(|state| {
                     // -- Timing --
@@ -1009,11 +1811,43 @@ impl ApplicationHandler for EngineApp {
                     );
                     let view_proj = mat4_multiply(&proj, &view);
 
-                    // Upload uniform
+                    // -- Build GPU light array --
+                    let mut gpu_lights = [GpuLight {
+                        position_and_type: [0.0; 4],
+                        direction_and_intensity: [0.0; 4],
+                        color_and_enabled: [0.0; 4],
+                        params: [0.0; 4],
+                    }; MAX_LIGHTS];
+                    let mut num_lights: u32 = 0;
+                    for i in 0..MAX_LIGHTS {
+                        let l = &state.lights[i];
+                        if l.light_type != 0 && l.enabled {
+                            gpu_lights[i] = GpuLight {
+                                position_and_type: [l.position[0], l.position[1], l.position[2], l.light_type as f32],
+                                direction_and_intensity: [l.direction[0], l.direction[1], l.direction[2], l.intensity],
+                                color_and_enabled: [l.color[0], l.color[1], l.color[2], 1.0],
+                                params: [l.range, l.inner_cone_cos, l.outer_cone_cos, 0.0],
+                            };
+                            num_lights = (i + 1) as u32;
+                        }
+                    }
+
+                    // -- Build and upload uniforms --
+                    let uniforms = Uniforms {
+                        view_proj,
+                        camera_pos: [eye[0], eye[1], eye[2], 0.0],
+                        ambient_and_count: [
+                            state.ambient_color[0],
+                            state.ambient_color[1],
+                            state.ambient_color[2],
+                            num_lights as f32,
+                        ],
+                        lights: gpu_lights,
+                    };
                     queue.write_buffer(
                         uniform_buf,
                         0,
-                        bytemuck::cast_slice(&view_proj),
+                        bytemuck::bytes_of(&uniforms),
                     );
 
                     // -- Create vertex buffer from accumulated vertices --
@@ -1073,8 +1907,62 @@ impl ApplicationHandler for EngineApp {
                             if let Some(ref vb) = vertex_buffer {
                                 rpass.set_pipeline(pipeline);
                                 rpass.set_bind_group(0, bind_group, &[]);
+                                // Bind texture (active or default white)
+                                let tex_bg = if let Some(idx) = state.active_texture {
+                                    state.textures.get(idx).map(|t| &t.bind_group)
+                                } else {
+                                    None
+                                };
+                                let tex_bg = tex_bg.or(state.default_texture_bind_group.as_ref());
+                                if let Some(tbg) = tex_bg {
+                                    rpass.set_bind_group(1, tbg, &[]);
+                                }
                                 rpass.set_vertex_buffer(0, vb.slice(..));
                                 rpass.draw(0..vertex_count, 0..1);
+                            }
+
+                            // -- Skinned mesh rendering --
+                            if let Some(ref skinned_pl) = state.skinned_pipeline {
+                                let draw_calls: Vec<usize> = state.skinned_draw_calls.clone();
+                                if !draw_calls.is_empty() {
+                                    rpass.set_pipeline(skinned_pl);
+                                    rpass.set_bind_group(0, bind_group, &[]);
+
+                                    let default_tex = state.default_texture_bind_group.as_ref();
+                                    if let Some(tbg) = default_tex {
+                                        rpass.set_bind_group(1, tbg, &[]);
+                                    }
+
+                                    for &model_idx in &draw_calls {
+                                        if model_idx >= state.anim_models.len() { continue; }
+                                        let model = &state.anim_models[model_idx];
+                                        if model.skinned_vertices.is_empty() { continue; }
+
+                                        // Upload bone matrices
+                                        let bone_mats = compute_bone_matrices(model);
+                                        let bone_data: Vec<f32> = bone_mats.iter()
+                                            .flat_map(|m| m.iter().flat_map(|r| r.iter().copied()))
+                                            .collect();
+                                        queue.write_buffer(
+                                            &model.bone_buffer,
+                                            0,
+                                            bytemuck::cast_slice(&bone_data),
+                                        );
+
+                                        // Create skinned vertex buffer
+                                        let svb = device.create_buffer_init(
+                                            &wgpu::util::BufferInitDescriptor {
+                                                label: Some("skinned_vb"),
+                                                contents: bytemuck::cast_slice(&model.skinned_vertices),
+                                                usage: wgpu::BufferUsages::VERTEX,
+                                            },
+                                        );
+
+                                        rpass.set_bind_group(2, &model.bone_bind_group, &[]);
+                                        rpass.set_vertex_buffer(0, svb.slice(..));
+                                        rpass.draw(0..model.skinned_vertices.len() as u32, 0..1);
+                                    }
+                                }
                             }
                         }
 
@@ -1201,6 +2089,8 @@ impl ApplicationHandler for EngineApp {
                     state.keys_pressed.clear();
                     state.keys_released.clear();
                     state.mouse_buttons_pressed.clear();
+                    state.mouse_scroll_delta = 0.0;
+                    state.skinned_draw_calls.clear();
                 });
             }
 
@@ -1435,6 +2325,41 @@ pub unsafe extern "C" fn nex_engine_push_vertex(
     try_with_state(|s| {
         s.vertices.push(Vertex {
             position: [x as f32, y as f32, z as f32],
+            normal: [0.0, 0.0, 0.0],
+            uv: [0.0, 0.0],
+            color: [r as f32, g as f32, b as f32],
+        });
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_push_vertex_lit(
+    x: f64, y: f64, z: f64,
+    nx: f64, ny: f64, nz: f64,
+    r: f64, g: f64, b: f64,
+) {
+    try_with_state(|s| {
+        s.vertices.push(Vertex {
+            position: [x as f32, y as f32, z as f32],
+            normal: [nx as f32, ny as f32, nz as f32],
+            uv: [0.0, 0.0],
+            color: [r as f32, g as f32, b as f32],
+        });
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_push_vertex_uv(
+    x: f64, y: f64, z: f64,
+    nx: f64, ny: f64, nz: f64,
+    u: f64, v: f64,
+    r: f64, g: f64, b: f64,
+) {
+    try_with_state(|s| {
+        s.vertices.push(Vertex {
+            position: [x as f32, y as f32, z as f32],
+            normal: [nx as f32, ny as f32, nz as f32],
+            uv: [u as f32, v as f32],
             color: [r as f32, g as f32, b as f32],
         });
     });
@@ -1445,6 +2370,1438 @@ pub unsafe extern "C" fn nex_engine_draw_triangles() {
     // Vertices are drawn during RedrawRequested; this is a no-op marker.
     // The vertices are already accumulated via push_vertex and will be
     // rendered on the next frame.
+}
+
+// =======================================================================
+// FFI: Lighting
+// =======================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_set_ambient_color(r: f64, g: f64, b: f64) {
+    try_with_state(|s| {
+        s.ambient_color = [r as f32, g as f32, b as f32];
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_type(slot: i64, light_type: i64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].light_type = light_type as u32;
+            if light_type != 0 {
+                s.lights[idx].enabled = true;
+            }
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_enabled(slot: i64, enabled: i64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].enabled = enabled != 0;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_position(slot: i64, x: f64, y: f64, z: f64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].position = [x as f32, y as f32, z as f32];
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_direction(slot: i64, dx: f64, dy: f64, dz: f64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].direction = [dx as f32, dy as f32, dz as f32];
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_color(slot: i64, r: f64, g: f64, b: f64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].color = [r as f32, g as f32, b as f32];
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_intensity(slot: i64, intensity: f64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].intensity = intensity as f32;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_range(slot: i64, range: f64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].range = range as f32;
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_light_set_spot_angles(slot: i64, inner_deg: f64, outer_deg: f64) {
+    try_with_state(|s| {
+        let idx = slot as usize;
+        if idx < MAX_LIGHTS {
+            s.lights[idx].inner_cone_cos = (inner_deg as f32).to_radians().cos();
+            s.lights[idx].outer_cone_cos = (outer_deg as f32).to_radians().cos();
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_clear_lights() {
+    try_with_state(|s| {
+        for i in 0..MAX_LIGHTS {
+            s.lights[i] = LightData::new();
+        }
+    });
+}
+
+// =======================================================================
+// FFI: Texture2D
+// =======================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_texture_load(path_ptr: *const c_char) -> i64 {
+    let path = cstr_to_string(path_ptr);
+    let img = match image::open(&path) {
+        Ok(img) => img.to_rgba8(),
+        Err(_) => return -1,
+    };
+    let (w, h) = img.dimensions();
+    let data = img.into_raw();
+
+    with_state(|s| {
+        let (Some(ref device), Some(ref queue), Some(ref layout)) =
+            (&s.device, &s.queue, &s.texture_bind_group_layout)
+        else {
+            return -1;
+        };
+
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("loaded_texture"),
+            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &data,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * w),
+                rows_per_image: Some(h),
+            },
+            wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        );
+
+        let view = texture.create_view(&Default::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("texture_sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("texture_bg"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+
+        let handle = s.textures.len() as i64;
+        s.textures.push(LoadedTexture { texture, bind_group, width: w, height: h });
+        handle
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_texture_bind(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx < s.textures.len() {
+            s.active_texture = Some(idx);
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_texture_unbind() {
+    try_with_state(|s| {
+        s.active_texture = None;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_texture_width(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        s.textures.get(idx).map(|t| t.width as i64).unwrap_or(0)
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_texture_height(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        s.textures.get(idx).map(|t| t.height as i64).unwrap_or(0)
+    })
+}
+
+// =======================================================================
+// FFI: SpriteBatch (2D textured quads using orthographic projection)
+// =======================================================================
+
+// SpriteBatch mode: saves/restores 3D camera state and renders with ortho projection
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_spritebatch_begin() {
+    // No-op: batching is implicit. The Nex side will save camera state.
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_spritebatch_end() {
+    // No-op: batching is implicit. The Nex side will restore camera state.
+}
+
+/// Draw a textured quad: tex_handle, dest_x, dest_y, dest_w, dest_h, r, g, b, a
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_spritebatch_draw(
+    tex: i64, dx: f64, dy: f64, dw: f64, dh: f64,
+    r: f64, g: f64, b: f64, _a: f64,
+) {
+    try_with_state(|s| {
+        // Bind this texture for the quad
+        let idx = tex as usize;
+        if idx < s.textures.len() {
+            s.active_texture = Some(idx);
+        }
+        let x0 = dx as f32;
+        let y0 = dy as f32;
+        let x1 = (dx + dw) as f32;
+        let y1 = (dy + dh) as f32;
+        let rf = r as f32;
+        let gf = g as f32;
+        let bf = b as f32;
+        // Two triangles forming a quad, UV mapped [0,1]
+        s.vertices.push(Vertex { position: [x0, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.0, 0.0], color: [rf, gf, bf] });
+        s.vertices.push(Vertex { position: [x1, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [1.0, 0.0], color: [rf, gf, bf] });
+        s.vertices.push(Vertex { position: [x1, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [1.0, 1.0], color: [rf, gf, bf] });
+        s.vertices.push(Vertex { position: [x0, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.0, 0.0], color: [rf, gf, bf] });
+        s.vertices.push(Vertex { position: [x1, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [1.0, 1.0], color: [rf, gf, bf] });
+        s.vertices.push(Vertex { position: [x0, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.0, 1.0], color: [rf, gf, bf] });
+    });
+}
+
+/// Draw with source rectangle: tex_handle, src_x, src_y, src_w, src_h, dest_x, dest_y, dest_w, dest_h
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_spritebatch_draw_src(
+    tex: i64,
+    sx: f64, sy: f64, sw: f64, sh: f64,
+    dx: f64, dy: f64, dw: f64, dh: f64,
+) {
+    try_with_state(|s| {
+        let idx = tex as usize;
+        if idx >= s.textures.len() { return; }
+        let tw = s.textures[idx].width as f32;
+        let th = s.textures[idx].height as f32;
+        s.active_texture = Some(idx);
+        // Compute UV from source rect
+        let u0 = sx as f32 / tw;
+        let v0 = sy as f32 / th;
+        let u1 = (sx as f32 + sw as f32) / tw;
+        let v1 = (sy as f32 + sh as f32) / th;
+        let x0 = dx as f32;
+        let y0 = dy as f32;
+        let x1 = (dx + dw) as f32;
+        let y1 = (dy + dh) as f32;
+        s.vertices.push(Vertex { position: [x0, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [u0, v0], color: [1.0, 1.0, 1.0] });
+        s.vertices.push(Vertex { position: [x1, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [u1, v0], color: [1.0, 1.0, 1.0] });
+        s.vertices.push(Vertex { position: [x1, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [u1, v1], color: [1.0, 1.0, 1.0] });
+        s.vertices.push(Vertex { position: [x0, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [u0, v0], color: [1.0, 1.0, 1.0] });
+        s.vertices.push(Vertex { position: [x1, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [u1, v1], color: [1.0, 1.0, 1.0] });
+        s.vertices.push(Vertex { position: [x0, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [u0, v1], color: [1.0, 1.0, 1.0] });
+    });
+}
+
+// =======================================================================
+// FFI: SpriteFont (built-in 8x8 bitmap font)
+// =======================================================================
+
+// Font texture handle (-1 = not yet created)
+static FONT_TEX: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(-1);
+
+fn ensure_font_texture() {
+    use std::sync::atomic::Ordering;
+    if FONT_TEX.load(Ordering::Relaxed) >= 0 { return; }
+
+    // Generate a 128x64 texture with ASCII chars 32-126 arranged in a 16x6 grid.
+    // Each cell is 8x8 pixels. We generate a simple recognizable font procedurally.
+    let tw: u32 = 128;
+    let th: u32 = 64;
+    let mut pixels = vec![0u8; (tw * th * 4) as usize];
+
+    // Use a simple procedural font: each ASCII char mapped to a basic pattern
+    // For now, create white rectangles with character shapes
+    for ch in 32u8..127 {
+        let idx = (ch - 32) as u32;
+        let cx = (idx % 16) * 8;
+        let cy = (idx / 16) * 8;
+
+        // Simple: draw the character outline — a minimal recognizable pattern
+        // For a real font, this would be a proper bitmap. This gives something visible.
+        let pattern = simple_char_pattern(ch);
+        for row in 0..8u32 {
+            let byte = pattern[row as usize];
+            for col in 0..8u32 {
+                if (byte >> (7 - col)) & 1 != 0 {
+                    let px = cx + col;
+                    let py = cy + row;
+                    let off = ((py * tw + px) * 4) as usize;
+                    pixels[off] = 255;
+                    pixels[off + 1] = 255;
+                    pixels[off + 2] = 255;
+                    pixels[off + 3] = 255;
+                }
+            }
+        }
+    }
+
+    // Upload to GPU
+    with_state(|s| {
+        let (Some(ref device), Some(ref queue), Some(ref layout)) =
+            (&s.device, &s.queue, &s.texture_bind_group_layout)
+        else { return; };
+
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("font_texture"),
+            size: wgpu::Extent3d { width: tw, height: th, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::ImageCopyTexture { texture: &texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            &pixels,
+            wgpu::ImageDataLayout { offset: 0, bytes_per_row: Some(4 * tw), rows_per_image: Some(th) },
+            wgpu::Extent3d { width: tw, height: th, depth_or_array_layers: 1 },
+        );
+        let view = texture.create_view(&Default::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("font_sampler"),
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("font_bg"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&sampler) },
+            ],
+        });
+        let handle = s.textures.len() as i64;
+        s.textures.push(LoadedTexture { texture, bind_group, width: tw, height: th });
+        FONT_TEX.store(handle, Ordering::Relaxed);
+    });
+}
+
+/// Return an 8-byte pattern for a printable ASCII character.
+fn simple_char_pattern(ch: u8) -> [u8; 8] {
+    // Minimal built-in 5x7 font patterns for common chars
+    match ch {
+        b' ' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        b'!' => [0x10, 0x10, 0x10, 0x10, 0x10, 0x00, 0x10, 0x00],
+        b'"' => [0x28, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        b'#' => [0x28, 0x7C, 0x28, 0x28, 0x7C, 0x28, 0x00, 0x00],
+        b'$' => [0x10, 0x3C, 0x50, 0x38, 0x14, 0x78, 0x10, 0x00],
+        b'%' => [0x44, 0x08, 0x10, 0x20, 0x44, 0x00, 0x00, 0x00],
+        b'&' => [0x30, 0x48, 0x30, 0x50, 0x4C, 0x34, 0x00, 0x00],
+        b'\'' => [0x10, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        b'(' => [0x08, 0x10, 0x20, 0x20, 0x20, 0x10, 0x08, 0x00],
+        b')' => [0x20, 0x10, 0x08, 0x08, 0x08, 0x10, 0x20, 0x00],
+        b'*' => [0x00, 0x28, 0x10, 0x7C, 0x10, 0x28, 0x00, 0x00],
+        b'+' => [0x00, 0x10, 0x10, 0x7C, 0x10, 0x10, 0x00, 0x00],
+        b',' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x20],
+        b'-' => [0x00, 0x00, 0x00, 0x7C, 0x00, 0x00, 0x00, 0x00],
+        b'.' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00],
+        b'/' => [0x04, 0x08, 0x10, 0x20, 0x40, 0x00, 0x00, 0x00],
+        b'0' => [0x38, 0x44, 0x4C, 0x54, 0x64, 0x44, 0x38, 0x00],
+        b'1' => [0x10, 0x30, 0x10, 0x10, 0x10, 0x10, 0x38, 0x00],
+        b'2' => [0x38, 0x44, 0x04, 0x18, 0x20, 0x40, 0x7C, 0x00],
+        b'3' => [0x38, 0x44, 0x04, 0x18, 0x04, 0x44, 0x38, 0x00],
+        b'4' => [0x08, 0x18, 0x28, 0x48, 0x7C, 0x08, 0x08, 0x00],
+        b'5' => [0x7C, 0x40, 0x78, 0x04, 0x04, 0x44, 0x38, 0x00],
+        b'6' => [0x18, 0x20, 0x40, 0x78, 0x44, 0x44, 0x38, 0x00],
+        b'7' => [0x7C, 0x04, 0x08, 0x10, 0x20, 0x20, 0x20, 0x00],
+        b'8' => [0x38, 0x44, 0x44, 0x38, 0x44, 0x44, 0x38, 0x00],
+        b'9' => [0x38, 0x44, 0x44, 0x3C, 0x04, 0x08, 0x30, 0x00],
+        b':' => [0x00, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00, 0x00],
+        b';' => [0x00, 0x18, 0x18, 0x00, 0x18, 0x08, 0x10, 0x00],
+        b'<' => [0x04, 0x08, 0x10, 0x20, 0x10, 0x08, 0x04, 0x00],
+        b'=' => [0x00, 0x00, 0x7C, 0x00, 0x7C, 0x00, 0x00, 0x00],
+        b'>' => [0x40, 0x20, 0x10, 0x08, 0x10, 0x20, 0x40, 0x00],
+        b'?' => [0x38, 0x44, 0x04, 0x08, 0x10, 0x00, 0x10, 0x00],
+        b'@' => [0x38, 0x44, 0x5C, 0x54, 0x5C, 0x40, 0x3C, 0x00],
+        b'A' => [0x38, 0x44, 0x44, 0x7C, 0x44, 0x44, 0x44, 0x00],
+        b'B' => [0x78, 0x44, 0x44, 0x78, 0x44, 0x44, 0x78, 0x00],
+        b'C' => [0x38, 0x44, 0x40, 0x40, 0x40, 0x44, 0x38, 0x00],
+        b'D' => [0x78, 0x44, 0x44, 0x44, 0x44, 0x44, 0x78, 0x00],
+        b'E' => [0x7C, 0x40, 0x40, 0x78, 0x40, 0x40, 0x7C, 0x00],
+        b'F' => [0x7C, 0x40, 0x40, 0x78, 0x40, 0x40, 0x40, 0x00],
+        b'G' => [0x38, 0x44, 0x40, 0x5C, 0x44, 0x44, 0x3C, 0x00],
+        b'H' => [0x44, 0x44, 0x44, 0x7C, 0x44, 0x44, 0x44, 0x00],
+        b'I' => [0x38, 0x10, 0x10, 0x10, 0x10, 0x10, 0x38, 0x00],
+        b'J' => [0x1C, 0x08, 0x08, 0x08, 0x08, 0x48, 0x30, 0x00],
+        b'K' => [0x44, 0x48, 0x50, 0x60, 0x50, 0x48, 0x44, 0x00],
+        b'L' => [0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x7C, 0x00],
+        b'M' => [0x44, 0x6C, 0x54, 0x44, 0x44, 0x44, 0x44, 0x00],
+        b'N' => [0x44, 0x64, 0x54, 0x4C, 0x44, 0x44, 0x44, 0x00],
+        b'O' => [0x38, 0x44, 0x44, 0x44, 0x44, 0x44, 0x38, 0x00],
+        b'P' => [0x78, 0x44, 0x44, 0x78, 0x40, 0x40, 0x40, 0x00],
+        b'Q' => [0x38, 0x44, 0x44, 0x44, 0x54, 0x48, 0x34, 0x00],
+        b'R' => [0x78, 0x44, 0x44, 0x78, 0x50, 0x48, 0x44, 0x00],
+        b'S' => [0x38, 0x44, 0x40, 0x38, 0x04, 0x44, 0x38, 0x00],
+        b'T' => [0x7C, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x00],
+        b'U' => [0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x38, 0x00],
+        b'V' => [0x44, 0x44, 0x44, 0x44, 0x28, 0x28, 0x10, 0x00],
+        b'W' => [0x44, 0x44, 0x44, 0x54, 0x54, 0x6C, 0x44, 0x00],
+        b'X' => [0x44, 0x44, 0x28, 0x10, 0x28, 0x44, 0x44, 0x00],
+        b'Y' => [0x44, 0x44, 0x28, 0x10, 0x10, 0x10, 0x10, 0x00],
+        b'Z' => [0x7C, 0x04, 0x08, 0x10, 0x20, 0x40, 0x7C, 0x00],
+        b'[' => [0x38, 0x20, 0x20, 0x20, 0x20, 0x20, 0x38, 0x00],
+        b'\\' => [0x40, 0x20, 0x10, 0x08, 0x04, 0x00, 0x00, 0x00],
+        b']' => [0x38, 0x08, 0x08, 0x08, 0x08, 0x08, 0x38, 0x00],
+        b'^' => [0x10, 0x28, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00],
+        b'_' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7C, 0x00],
+        b'`' => [0x20, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        b'a' => [0x00, 0x00, 0x38, 0x04, 0x3C, 0x44, 0x3C, 0x00],
+        b'b' => [0x40, 0x40, 0x78, 0x44, 0x44, 0x44, 0x78, 0x00],
+        b'c' => [0x00, 0x00, 0x38, 0x44, 0x40, 0x44, 0x38, 0x00],
+        b'd' => [0x04, 0x04, 0x3C, 0x44, 0x44, 0x44, 0x3C, 0x00],
+        b'e' => [0x00, 0x00, 0x38, 0x44, 0x7C, 0x40, 0x38, 0x00],
+        b'f' => [0x18, 0x24, 0x20, 0x70, 0x20, 0x20, 0x20, 0x00],
+        b'g' => [0x00, 0x00, 0x3C, 0x44, 0x44, 0x3C, 0x04, 0x38],
+        b'h' => [0x40, 0x40, 0x78, 0x44, 0x44, 0x44, 0x44, 0x00],
+        b'i' => [0x10, 0x00, 0x30, 0x10, 0x10, 0x10, 0x38, 0x00],
+        b'j' => [0x08, 0x00, 0x18, 0x08, 0x08, 0x08, 0x48, 0x30],
+        b'k' => [0x40, 0x40, 0x48, 0x50, 0x60, 0x50, 0x48, 0x00],
+        b'l' => [0x30, 0x10, 0x10, 0x10, 0x10, 0x10, 0x38, 0x00],
+        b'm' => [0x00, 0x00, 0x68, 0x54, 0x54, 0x44, 0x44, 0x00],
+        b'n' => [0x00, 0x00, 0x78, 0x44, 0x44, 0x44, 0x44, 0x00],
+        b'o' => [0x00, 0x00, 0x38, 0x44, 0x44, 0x44, 0x38, 0x00],
+        b'p' => [0x00, 0x00, 0x78, 0x44, 0x44, 0x78, 0x40, 0x40],
+        b'q' => [0x00, 0x00, 0x3C, 0x44, 0x44, 0x3C, 0x04, 0x04],
+        b'r' => [0x00, 0x00, 0x58, 0x64, 0x40, 0x40, 0x40, 0x00],
+        b's' => [0x00, 0x00, 0x3C, 0x40, 0x38, 0x04, 0x78, 0x00],
+        b't' => [0x20, 0x20, 0x70, 0x20, 0x20, 0x24, 0x18, 0x00],
+        b'u' => [0x00, 0x00, 0x44, 0x44, 0x44, 0x44, 0x3C, 0x00],
+        b'v' => [0x00, 0x00, 0x44, 0x44, 0x44, 0x28, 0x10, 0x00],
+        b'w' => [0x00, 0x00, 0x44, 0x44, 0x54, 0x54, 0x28, 0x00],
+        b'x' => [0x00, 0x00, 0x44, 0x28, 0x10, 0x28, 0x44, 0x00],
+        b'y' => [0x00, 0x00, 0x44, 0x44, 0x44, 0x3C, 0x04, 0x38],
+        b'z' => [0x00, 0x00, 0x7C, 0x08, 0x10, 0x20, 0x7C, 0x00],
+        b'{' => [0x0C, 0x10, 0x10, 0x60, 0x10, 0x10, 0x0C, 0x00],
+        b'|' => [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x00],
+        b'}' => [0x60, 0x10, 0x10, 0x0C, 0x10, 0x10, 0x60, 0x00],
+        b'~' => [0x00, 0x24, 0x54, 0x48, 0x00, 0x00, 0x00, 0x00],
+        _ => [0x7C, 0x44, 0x44, 0x44, 0x44, 0x44, 0x7C, 0x00], // box for unknown
+    }
+}
+
+/// Draw text: text_ptr, text_len, x, y, scale, r, g, b
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_font_draw_text(
+    text_ptr: *const c_char,
+    x: f64, y: f64, scale: f64,
+    r: f64, g: f64, b: f64,
+) {
+    ensure_font_texture();
+    let font_handle = FONT_TEX.load(std::sync::atomic::Ordering::Relaxed);
+    if font_handle < 0 { return; }
+
+    let text = cstr_to_string(text_ptr);
+    let char_w = 8.0 * scale;
+    let char_h = 8.0 * scale;
+    let tex_w = 128.0_f32;
+    let tex_h = 64.0_f32;
+
+    try_with_state(|s| {
+        let idx = font_handle as usize;
+        if idx >= s.textures.len() { return; }
+        s.active_texture = Some(idx);
+        let rf = r as f32;
+        let gf = g as f32;
+        let bf = b as f32;
+
+        for (i, ch) in text.bytes().enumerate() {
+            if ch < 32 || ch > 126 { continue; }
+            let ci = (ch - 32) as u32;
+            let cu = (ci % 16) as f32 * 8.0 / tex_w;
+            let cv = (ci / 16) as f32 * 8.0 / tex_h;
+            let cu1 = cu + 8.0 / tex_w;
+            let cv1 = cv + 8.0 / tex_h;
+            let x0 = (x + i as f64 * char_w) as f32;
+            let y0 = y as f32;
+            let x1 = x0 + char_w as f32;
+            let y1 = y0 + char_h as f32;
+
+            s.vertices.push(Vertex { position: [x0, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [cu, cv], color: [rf, gf, bf] });
+            s.vertices.push(Vertex { position: [x1, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [cu1, cv], color: [rf, gf, bf] });
+            s.vertices.push(Vertex { position: [x1, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [cu1, cv1], color: [rf, gf, bf] });
+            s.vertices.push(Vertex { position: [x0, y0, 0.0], normal: [0.0, 0.0, 1.0], uv: [cu, cv], color: [rf, gf, bf] });
+            s.vertices.push(Vertex { position: [x1, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [cu1, cv1], color: [rf, gf, bf] });
+            s.vertices.push(Vertex { position: [x0, y1, 0.0], normal: [0.0, 0.0, 1.0], uv: [cu, cv1], color: [rf, gf, bf] });
+        }
+    });
+}
+
+/// Measure text width: text_ptr → pixel width at scale
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_font_measure_text(text_ptr: *const c_char, scale: f64) -> f64 {
+    let text = cstr_to_string(text_ptr);
+    let count = text.bytes().filter(|&b| b >= 32 && b <= 126).count();
+    count as f64 * 8.0 * scale
+}
+
+// =======================================================================
+// FFI: Skeletal Animation (glTF)
+// =======================================================================
+
+/// Load a glTF/GLB model with skeleton and animations. Returns handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_model_load(path_ptr: *const c_char) -> i64 {
+    let path = cstr_to_string(path_ptr);
+    let (document, buffers, _images) = match gltf::import(&path) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[nex3d] anim: failed to load '{}': {}", path, e);
+            return -1;
+        }
+    };
+
+    let mut skinned_vertices: Vec<SkinnedVertex> = Vec::new();
+    let mut joints: Vec<Joint> = Vec::new();
+    let mut animations: Vec<AnimClip> = Vec::new();
+
+    // Build node index → joint index mapping
+    let skin = document.skins().next(); // use first skin
+
+    // Collect joint nodes and inverse bind matrices
+    if let Some(ref skin) = skin {
+        let joint_nodes: Vec<usize> = skin.joints().map(|j| j.index()).collect();
+        let reader = skin.reader(|buf| Some(&buffers[buf.index()]));
+
+        let inv_bind_mats: Vec<[[f32; 4]; 4]> = reader
+            .read_inverse_bind_matrices()
+            .map(|iter| iter.collect())
+            .unwrap_or_else(|| vec![mat4x4_identity(); joint_nodes.len()]);
+
+        // Build joint hierarchy
+        for (ji, &node_idx) in joint_nodes.iter().enumerate() {
+            let node = document.nodes().nth(node_idx).unwrap();
+            let (t, r, s) = node.transform().decomposed();
+
+            // Find parent joint index
+            let parent = find_parent_joint(&document, node_idx, &joint_nodes);
+
+            joints.push(Joint {
+                parent,
+                inv_bind: inv_bind_mats.get(ji).copied().unwrap_or(mat4x4_identity()),
+                local_translation: t,
+                local_rotation: r,
+                local_scale: s,
+            });
+        }
+
+        // Extract mesh data with joint attributes
+        for mesh in document.meshes() {
+            for primitive in mesh.primitives() {
+                let reader = primitive.reader(|buf| Some(&buffers[buf.index()]));
+
+                let positions: Vec<[f32; 3]> = reader
+                    .read_positions()
+                    .map(|iter| iter.collect())
+                    .unwrap_or_default();
+
+                let normals: Vec<[f32; 3]> = reader
+                    .read_normals()
+                    .map(|iter| iter.collect())
+                    .unwrap_or_else(|| vec![[0.0, 1.0, 0.0]; positions.len()]);
+
+                let tex_coords: Vec<[f32; 2]> = reader
+                    .read_tex_coords(0)
+                    .map(|iter| iter.into_f32().collect())
+                    .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
+
+                let joint_indices: Vec<[u16; 4]> = reader
+                    .read_joints(0)
+                    .map(|iter| iter.into_u16().collect())
+                    .unwrap_or_else(|| vec![[0, 0, 0, 0]; positions.len()]);
+
+                let weights: Vec<[f32; 4]> = reader
+                    .read_weights(0)
+                    .map(|iter| iter.into_f32().collect())
+                    .unwrap_or_else(|| vec![[1.0, 0.0, 0.0, 0.0]; positions.len()]);
+
+                // Build vertex list
+                let mut verts: Vec<SkinnedVertex> = Vec::with_capacity(positions.len());
+                for i in 0..positions.len() {
+                    verts.push(SkinnedVertex {
+                        position: positions[i],
+                        normal: normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]),
+                        uv: tex_coords.get(i).copied().unwrap_or([0.0, 0.0]),
+                        color: [1.0, 1.0, 1.0],
+                        joint_indices: [
+                            joint_indices[i][0] as u32,
+                            joint_indices[i][1] as u32,
+                            joint_indices[i][2] as u32,
+                            joint_indices[i][3] as u32,
+                        ],
+                        bone_weights: weights.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 0.0]),
+                    });
+                }
+
+                // Apply indices if present
+                if let Some(indices) = reader.read_indices() {
+                    let indices: Vec<u32> = indices.into_u32().collect();
+                    let indexed: Vec<SkinnedVertex> = indices.iter().map(|&idx| {
+                        verts.get(idx as usize).copied().unwrap_or(SkinnedVertex {
+                            position: [0.0, 0.0, 0.0],
+                            normal: [0.0, 1.0, 0.0],
+                            uv: [0.0, 0.0],
+                            color: [1.0, 1.0, 1.0],
+                            joint_indices: [0, 0, 0, 0],
+                            bone_weights: [1.0, 0.0, 0.0, 0.0],
+                        })
+                    }).collect();
+                    skinned_vertices.extend_from_slice(&indexed);
+                } else {
+                    skinned_vertices.extend_from_slice(&verts);
+                }
+            }
+        }
+
+        // Extract animations
+        let joint_nodes: Vec<usize> = skin.joints().map(|j| j.index()).collect();
+        for anim in document.animations() {
+            let mut channels: Vec<AnimChannel> = Vec::new();
+            let mut duration: f32 = 0.0;
+
+            for channel in anim.channels() {
+                let target_node = channel.target().node().index();
+                // Map node index to joint index
+                let joint_idx = match joint_nodes.iter().position(|&n| n == target_node) {
+                    Some(idx) => idx,
+                    None => continue,
+                };
+
+                let reader = channel.reader(|buf| Some(&buffers[buf.index()]));
+                let times: Vec<f32> = reader.read_inputs().map(|iter| iter.collect()).unwrap_or_default();
+                if let Some(&last) = times.last() {
+                    duration = duration.max(last);
+                }
+
+                // Find or create channel for this joint
+                let ch_idx = channels.iter().position(|c| c.joint_index == joint_idx)
+                    .unwrap_or_else(|| {
+                        channels.push(AnimChannel {
+                            joint_index: joint_idx,
+                            translations: Vec::new(),
+                            rotations: Vec::new(),
+                            scales: Vec::new(),
+                        });
+                        channels.len() - 1
+                    });
+
+                match reader.read_outputs() {
+                    Some(gltf::animation::util::ReadOutputs::Translations(iter)) => {
+                        let values: Vec<[f32; 3]> = iter.collect();
+                        for (i, &t) in times.iter().enumerate() {
+                            if let Some(&v) = values.get(i) {
+                                channels[ch_idx].translations.push(AnimKeyframe { time: t, value: v });
+                            }
+                        }
+                    }
+                    Some(gltf::animation::util::ReadOutputs::Rotations(iter)) => {
+                        let values: Vec<[f32; 4]> = iter.into_f32().collect();
+                        for (i, &t) in times.iter().enumerate() {
+                            if let Some(&v) = values.get(i) {
+                                channels[ch_idx].rotations.push(AnimKeyframe { time: t, value: v });
+                            }
+                        }
+                    }
+                    Some(gltf::animation::util::ReadOutputs::Scales(iter)) => {
+                        let values: Vec<[f32; 3]> = iter.collect();
+                        for (i, &t) in times.iter().enumerate() {
+                            if let Some(&v) = values.get(i) {
+                                channels[ch_idx].scales.push(AnimKeyframe { time: t, value: v });
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            animations.push(AnimClip {
+                name: anim.name().unwrap_or("unnamed").to_string(),
+                duration,
+                channels,
+            });
+        }
+    }
+
+    // Create GPU resources
+    with_state(|s| {
+        let device = match s.device.as_ref() { Some(d) => d, None => return -1 };
+        let layout = match s.bone_bind_group_layout.as_ref() { Some(l) => l, None => return -1 };
+
+        let bone_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("bone_buffer"),
+            size: (MAX_BONES * 16 * 4) as u64, // 128 * mat4x4<f32>
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let bone_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("bone_bind_group"),
+            layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: bone_buffer.as_entire_binding(),
+            }],
+        });
+
+        let handle = s.anim_models.len() as i64;
+        s.anim_models.push(AnimatedModel {
+            skinned_vertices,
+            joints,
+            animations,
+            anim_state: AnimState {
+                clip_index: 0,
+                time: 0.0,
+                speed: 1.0,
+                looping: true,
+                playing: false,
+            },
+            bone_buffer,
+            bone_bind_group,
+        });
+        handle
+    })
+}
+
+/// Helper: find parent joint index for a given node
+fn find_parent_joint(document: &gltf::Document, node_idx: usize, joint_nodes: &[usize]) -> i32 {
+    for node in document.nodes() {
+        for child in node.children() {
+            if child.index() == node_idx {
+                if let Some(pos) = joint_nodes.iter().position(|&n| n == node.index()) {
+                    return pos as i32;
+                }
+                // Parent not a joint — recurse
+                return find_parent_joint(document, node.index(), joint_nodes);
+            }
+        }
+    }
+    -1 // root
+}
+
+/// Draw animated model: update animation + queue for skinned rendering.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_model_draw(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+
+        // Advance animation time
+        let dt = s.delta_time as f32;
+        let model = &mut s.anim_models[idx];
+        if model.anim_state.playing {
+            model.anim_state.time += dt * model.anim_state.speed;
+            if model.anim_state.clip_index < model.animations.len() {
+                let duration = model.animations[model.anim_state.clip_index].duration;
+                if duration > 0.0 {
+                    if model.anim_state.looping {
+                        model.anim_state.time %= duration;
+                    } else if model.anim_state.time > duration {
+                        model.anim_state.time = duration;
+                        model.anim_state.playing = false;
+                    }
+                }
+            }
+        }
+
+        s.skinned_draw_calls.push(idx);
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_play(handle: i64, clip: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].anim_state.clip_index = clip as usize;
+        s.anim_models[idx].anim_state.time = 0.0;
+        s.anim_models[idx].anim_state.playing = true;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_stop(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].anim_state.playing = false;
+        s.anim_models[idx].anim_state.time = 0.0;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_pause(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].anim_state.playing = false;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_set_speed(handle: i64, speed_bits: i64) {
+    let speed = f64::from_bits(speed_bits as u64) as f32;
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].anim_state.speed = speed;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_set_looping(handle: i64, flag: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].anim_state.looping = flag != 0;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_set_time(handle: i64, time_bits: i64) {
+    let time = f64::from_bits(time_bits as u64) as f32;
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].anim_state.time = time;
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_get_time(handle: i64) -> f64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return 0.0; }
+        s.anim_models[idx].anim_state.time as f64
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_clip_count(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return 0; }
+        s.anim_models[idx].animations.len() as i64
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_clip_duration(handle: i64, clip: i64) -> f64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return 0.0; }
+        let ci = clip as usize;
+        if ci >= s.anim_models[idx].animations.len() { return 0.0; }
+        s.anim_models[idx].animations[ci].duration as f64
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_joint_count(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return 0; }
+        s.anim_models[idx].joints.len() as i64
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_anim_model_free(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.anim_models.len() { return; }
+        s.anim_models[idx].skinned_vertices.clear();
+        s.anim_models[idx].joints.clear();
+        s.anim_models[idx].animations.clear();
+    });
+}
+
+// =======================================================================
+// FFI: Render States
+// =======================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_set_blend_mode(_mode: i64) {
+    // 0=opaque, 1=alpha, 2=additive, 3=multiply
+    // Pipeline recreation would be needed for a real impl.
+    // For now this is a stub that will be enhanced when pipeline caching is added.
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_set_cull_mode(_mode: i64) {
+    // 0=none, 1=back, 2=front
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_set_fill_mode(_mode: i64) {
+    // 0=solid, 1=wireframe
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_set_depth_enabled(_enabled: i64) {
+    // 0=disabled, 1=enabled
+}
+
+// =======================================================================
+// FFI: Mouse scroll
+// =======================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_mouse_scroll_delta() -> f64 {
+    with_state(|s| s.mouse_scroll_delta)
+}
+
+// =======================================================================
+// FFI: Audio (rodio)
+// =======================================================================
+
+/// Ensure the audio output stream is initialized.
+fn ensure_audio_stream(s: &mut EngineState) {
+    if s.audio_stream.is_none() {
+        match OutputStream::try_default() {
+            Ok((stream, handle)) => {
+                s.audio_stream = Some((stream, handle));
+            }
+            Err(e) => {
+                eprintln!("[nex3d] audio: failed to open output stream: {}", e);
+            }
+        }
+    }
+}
+
+/// Load an audio file (wav, mp3, ogg, flac) from disk. Returns handle (index).
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_load(path_ptr: *const c_char) -> i64 {
+    let path = cstr_to_string(path_ptr);
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            // Verify the data is decodable
+            if Decoder::new(Cursor::new(bytes.clone())).is_err() {
+                eprintln!("[nex3d] audio: failed to decode '{}'", path);
+                return -1;
+            }
+            with_state(|s| {
+                ensure_audio_stream(s);
+                let handle = s.audio_buffers.len() as i64;
+                s.audio_buffers.push(Arc::new(bytes));
+                s.audio_sinks.push(None);
+                handle
+            })
+        }
+        Err(e) => {
+            eprintln!("[nex3d] audio: failed to load '{}': {}", path, e);
+            -1
+        }
+    }
+}
+
+/// Play the sound (non-looping). Stops any previous playback on this handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_play(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.audio_buffers.len() { return; }
+        let (_, stream_handle) = match s.audio_stream.as_ref() {
+            Some(sh) => sh,
+            None => return,
+        };
+        let data: Vec<u8> = s.audio_buffers[idx].as_ref().clone();
+        if let Ok(source) = Decoder::new(Cursor::new(data)) {
+            let sink = match Sink::try_new(stream_handle) {
+                Ok(sink) => sink,
+                Err(_) => return,
+            };
+            sink.append(source);
+            s.audio_sinks[idx] = Some(sink);
+        }
+    });
+}
+
+/// Play the sound looping. Stops any previous playback on this handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_play_looped(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.audio_buffers.len() { return; }
+        let (_, stream_handle) = match s.audio_stream.as_ref() {
+            Some(sh) => sh,
+            None => return,
+        };
+        let data: Vec<u8> = s.audio_buffers[idx].as_ref().clone();
+        if let Ok(source) = Decoder::new(Cursor::new(data)) {
+            let sink = match Sink::try_new(stream_handle) {
+                Ok(sink) => sink,
+                Err(_) => return,
+            };
+            sink.append(source.repeat_infinite());
+            s.audio_sinks[idx] = Some(sink);
+        }
+    });
+}
+
+/// Stop playback for the given handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_stop(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.audio_sinks.len() { return; }
+        if let Some(sink) = s.audio_sinks[idx].take() {
+            sink.stop();
+        }
+    });
+}
+
+/// Set volume for the given handle (0.0 to 1.0, passed as f64 bits).
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_set_volume(handle: i64, volume_bits: i64) {
+    let volume = f64::from_bits(volume_bits as u64);
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.audio_sinks.len() { return; }
+        if let Some(ref sink) = s.audio_sinks[idx] {
+            sink.set_volume(volume as f32);
+        }
+    });
+}
+
+/// Returns 1 if the sound is currently playing, 0 otherwise.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_is_playing(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.audio_sinks.len() { return 0; }
+        match &s.audio_sinks[idx] {
+            Some(sink) => if sink.empty() { 0 } else { 1 },
+            None => 0,
+        }
+    })
+}
+
+/// Free the audio resource for the given handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_audio_free(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.audio_sinks.len() { return; }
+        if let Some(sink) = s.audio_sinks[idx].take() {
+            sink.stop();
+        }
+    });
+}
+
+// =======================================================================
+// FFI: OBJ Model Loading (tobj)
+// =======================================================================
+
+/// Load an OBJ model from disk. Returns handle (index).
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_model_load(path_ptr: *const c_char) -> i64 {
+    let path = cstr_to_string(path_ptr);
+    let load_options = tobj::LoadOptions {
+        triangulate: true,
+        single_index: true,
+        ..Default::default()
+    };
+    let (models, _materials) = match tobj::load_obj(&path, &load_options) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[nex3d] model: failed to load '{}': {}", path, e);
+            return -1;
+        }
+    };
+
+    let mut vertices = Vec::new();
+    for model in &models {
+        let mesh = &model.mesh;
+        let num_vertices = mesh.positions.len() / 3;
+        for i in 0..num_vertices {
+            let px = mesh.positions[i * 3] as f32;
+            let py = mesh.positions[i * 3 + 1] as f32;
+            let pz = mesh.positions[i * 3 + 2] as f32;
+
+            let (nx, ny, nz) = if !mesh.normals.is_empty() {
+                (
+                    mesh.normals[i * 3] as f32,
+                    mesh.normals[i * 3 + 1] as f32,
+                    mesh.normals[i * 3 + 2] as f32,
+                )
+            } else {
+                (0.0, 1.0, 0.0)
+            };
+
+            let (u, v) = if !mesh.texcoords.is_empty() {
+                (
+                    mesh.texcoords[i * 2] as f32,
+                    1.0 - mesh.texcoords[i * 2 + 1] as f32, // flip V
+                )
+            } else {
+                (0.0, 0.0)
+            };
+
+            vertices.push(Vertex {
+                position: [px, py, pz],
+                normal: [nx, ny, nz],
+                uv: [u, v],
+                color: [1.0, 1.0, 1.0],
+            });
+        }
+
+        // Re-index using the face indices
+        if !mesh.indices.is_empty() {
+            let indexed_verts: Vec<Vertex> = mesh.indices.iter().map(|&idx| {
+                let i = idx as usize;
+                if i < vertices.len() {
+                    vertices[i]
+                } else {
+                    Vertex {
+                        position: [0.0, 0.0, 0.0],
+                        normal: [0.0, 1.0, 0.0],
+                        uv: [0.0, 0.0],
+                        color: [1.0, 1.0, 1.0],
+                    }
+                }
+            }).collect();
+            vertices = indexed_verts;
+        }
+    }
+
+    with_state(|s| {
+        let handle = s.models.len() as i64;
+        s.models.push(LoadedModel { vertices });
+        handle
+    })
+}
+
+/// Draw the model by pushing all its vertices into the current frame's vertex buffer.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_model_draw(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.models.len() { return; }
+        let model = &s.models[idx];
+        s.vertices.extend_from_slice(&model.vertices);
+    });
+}
+
+/// Get vertex count for a loaded model.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_model_vertex_count(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.models.len() { return 0; }
+        s.models[idx].vertices.len() as i64
+    })
+}
+
+/// Free a loaded model.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_model_free(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.models.len() { return; }
+        s.models[idx].vertices.clear();
+    });
+}
+
+// =======================================================================
+// FFI: RenderTarget2D
+// =======================================================================
+
+/// Create an off-screen render target with the given dimensions. Returns handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_create(w: i64, h: i64) -> i64 {
+    with_state(|s| {
+        let device = match s.device.as_ref() { Some(d) => d, None => return -1 };
+        let width = w.max(1) as u32;
+        let height = h.max(1) as u32;
+
+        // Color texture (render target + texture binding for sampling)
+        let color_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("rendertarget_color"),
+            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let color_view = color_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Depth texture
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("rendertarget_depth"),
+            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Bind group for sampling this RT as a texture (uses same layout as textures)
+        let layout = match s.texture_bind_group_layout.as_ref() {
+            Some(l) => l,
+            None => return -1,
+        };
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("rendertarget_bind_group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&color_view) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&sampler) },
+            ],
+        });
+
+        let handle = s.render_targets.len() as i64;
+        s.render_targets.push(RenderTargetData {
+            color_texture,
+            color_view,
+            depth_view,
+            bind_group,
+            width,
+            height,
+        });
+        handle
+    })
+}
+
+/// Bind a render target so subsequent draws go to it instead of the screen.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_bind(handle: i64) {
+    try_with_state(|s| {
+        let idx = handle as usize;
+        if idx < s.render_targets.len() {
+            s.active_render_target = Some(idx);
+        }
+    });
+}
+
+/// Unbind the current render target (go back to drawing to the screen).
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_unbind() {
+    try_with_state(|s| {
+        s.active_render_target = None;
+    });
+}
+
+/// Get the render target as a texture handle for drawing.
+/// This registers it into the textures array and returns the texture handle.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_as_texture(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.render_targets.len() { return -1; }
+        let _rt = &s.render_targets[idx];
+        // Return a negative handle that encodes the RT index (offset by -1000)
+        // The texture_bind function can check for this
+        -(idx as i64) - 1000
+    })
+}
+
+/// Get render target width.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_width(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.render_targets.len() { return 0; }
+        s.render_targets[idx].width as i64
+    })
+}
+
+/// Get render target height.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_height(handle: i64) -> i64 {
+    with_state(|s| {
+        let idx = handle as usize;
+        if idx >= s.render_targets.len() { return 0; }
+        s.render_targets[idx].height as i64
+    })
+}
+
+/// Free a render target.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_rendertarget_free(_handle: i64) {
+    // Render targets are stored in a Vec; freeing just drops the GPU resources
+    // when the EngineState is dropped. For a real impl we'd use a slot allocator.
+}
+
+// =======================================================================
+// FFI: Gamepad (gilrs)
+// =======================================================================
+
+/// Ensure gilrs is initialized.
+fn ensure_gilrs(s: &mut EngineState) {
+    if s.gilrs.is_none() {
+        match Gilrs::new() {
+            Ok(g) => { s.gilrs = Some(g); }
+            Err(e) => { eprintln!("[nex3d] gamepad: gilrs init failed: {}", e); }
+        }
+    }
+}
+
+/// Map integer button code to gilrs Button enum.
+fn map_button(code: i64) -> Option<GilrsButton> {
+    match code {
+        0 => Some(GilrsButton::South),        // A / Cross
+        1 => Some(GilrsButton::East),         // B / Circle
+        2 => Some(GilrsButton::West),         // X / Square
+        3 => Some(GilrsButton::North),        // Y / Triangle
+        4 => Some(GilrsButton::LeftTrigger),   // LB
+        5 => Some(GilrsButton::RightTrigger),  // RB
+        6 => Some(GilrsButton::LeftTrigger2),  // LT (digital)
+        7 => Some(GilrsButton::RightTrigger2), // RT (digital)
+        8 => Some(GilrsButton::Select),        // Back / Select
+        9 => Some(GilrsButton::Start),
+        10 => Some(GilrsButton::LeftThumb),
+        11 => Some(GilrsButton::RightThumb),
+        12 => Some(GilrsButton::DPadUp),
+        13 => Some(GilrsButton::DPadDown),
+        14 => Some(GilrsButton::DPadLeft),
+        15 => Some(GilrsButton::DPadRight),
+        _ => None,
+    }
+}
+
+/// Map integer axis code to gilrs Axis enum.
+fn map_axis(code: i64) -> Option<GilrsAxis> {
+    match code {
+        0 => Some(GilrsAxis::LeftStickX),
+        1 => Some(GilrsAxis::LeftStickY),
+        2 => Some(GilrsAxis::RightStickX),
+        3 => Some(GilrsAxis::RightStickY),
+        _ => None,
+    }
+}
+
+/// Returns 1 if gamepad for `player` (0-based) is connected.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_gamepad_connected(player: i64) -> i64 {
+    with_state(|s| {
+        ensure_gilrs(s);
+        let gilrs = match s.gilrs.as_mut() { Some(g) => g, None => return 0 };
+        // Drain events so state is up-to-date
+        while gilrs.next_event().is_some() {}
+        let mut idx = 0i64;
+        for (_id, gp) in gilrs.gamepads() {
+            if idx == player && gp.is_connected() { return 1; }
+            idx += 1;
+        }
+        0
+    })
+}
+
+/// Returns 1 if the given button is currently pressed on gamepad `player`.
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_gamepad_button(player: i64, button: i64) -> i64 {
+    with_state(|s| {
+        ensure_gilrs(s);
+        let gilrs = match s.gilrs.as_mut() { Some(g) => g, None => return 0 };
+        while gilrs.next_event().is_some() {}
+        let btn = match map_button(button) { Some(b) => b, None => return 0 };
+        let mut idx = 0i64;
+        for (_id, gp) in gilrs.gamepads() {
+            if idx == player {
+                return if gp.is_pressed(btn) { 1 } else { 0 };
+            }
+            idx += 1;
+        }
+        0
+    })
+}
+
+/// Returns axis value (-1.0 to 1.0) for gamepad `player`, axis code.
+/// Axis codes: 0=LeftX, 1=LeftY, 2=RightX, 3=RightY
+#[no_mangle]
+pub unsafe extern "C" fn nex_engine_gamepad_axis(player: i64, axis: i64) -> f64 {
+    with_state(|s| {
+        ensure_gilrs(s);
+        let gilrs = match s.gilrs.as_mut() { Some(g) => g, None => return 0.0 };
+        while gilrs.next_event().is_some() {}
+        let ax = match map_axis(axis) { Some(a) => a, None => return 0.0 };
+        let mut idx = 0i64;
+        for (_id, gp) in gilrs.gamepads() {
+            if idx == player {
+                return gp.value(ax) as f64;
+            }
+            idx += 1;
+        }
+        0.0
+    })
 }
 
 // =======================================================================
