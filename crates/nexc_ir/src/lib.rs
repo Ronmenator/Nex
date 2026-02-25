@@ -84,7 +84,7 @@ pub struct IrBlock {
 #[derive(Debug, Clone)]
 pub struct IrFunction {
     pub name: String,
-    pub params: Vec<(String, String)>,
+    pub params: Vec<(String, Type)>,
     pub return_type: Type,
     pub blocks: Vec<IrBlock>,
     pub span: Option<Span>,
@@ -199,16 +199,16 @@ impl IrLowering {
             }
         }
 
-        let params: Vec<(String, String)> = func
+        let params: Vec<(String, Type)> = func
             .params
             .iter()
             .map(|p| {
-                let ty_str = p
+                let ty = p
                     .type_hint
                     .as_ref()
-                    .map(|t| format!("{:?}", t.kind))
-                    .unwrap_or_else(|| "Unknown".into());
-                (p.name.clone(), ty_str)
+                    .map(|t| type_expr_to_type(t))
+                    .unwrap_or(Type::Unknown);
+                (p.name.clone(), ty)
             })
             .collect();
 
@@ -1463,6 +1463,39 @@ pub fn lower_typed_module_with_prefix(
                     ir_fn.file = Some(file_path.clone());
                     functions.push(ir_fn);
                 }
+                // Synthesize init if no explicit init method exists
+                let has_init = class.methods.iter().any(|m| m.name == "init");
+                if !has_init && !class.fields.is_empty() {
+                    let params: Vec<(String, Type)> = class
+                        .fields
+                        .iter()
+                        .map(|f| {
+                            let ty = f.ty.as_ref()
+                                .map(|t| type_expr_to_type(t))
+                                .unwrap_or(Type::Unknown);
+                            (f.name.clone(), ty)
+                        })
+                        .collect();
+                    let mut init_body = Vec::new();
+                    for field in &class.fields {
+                        init_body.push(IrInstruction::Store {
+                            dst: format!("%{}.{}", class.name, field.name),
+                            src: IrValue::Register(format!("%{}", field.name)),
+                        });
+                    }
+                    init_body.push(IrInstruction::Return(None));
+                    functions.push(IrFunction {
+                        name: prefix_name(format!("{}::init", class.name)),
+                        params,
+                        return_type: Type::Unit,
+                        blocks: vec![IrBlock {
+                            label: "entry".into(),
+                            instructions: init_body,
+                        }],
+                        span: Some(class.span),
+                        file: Some(file_path.clone()),
+                    });
+                }
             }
             nexc_ast::Item::Struct(s) => {
                 lowering.current_class = Some(s.name.clone());
@@ -1475,10 +1508,15 @@ pub fn lower_typed_module_with_prefix(
                 // Synthesize init if no explicit init method exists
                 let has_init = s.methods.iter().any(|m| m.name == "init");
                 if !has_init && !s.fields.is_empty() {
-                    let params: Vec<(String, String)> = s
+                    let params: Vec<(String, Type)> = s
                         .fields
                         .iter()
-                        .map(|f| (f.name.clone(), "auto".into()))
+                        .map(|f| {
+                            let ty = f.ty.as_ref()
+                                .map(|t| type_expr_to_type(t))
+                                .unwrap_or(Type::Unknown);
+                            (f.name.clone(), ty)
+                        })
                         .collect();
                     let mut init_body = Vec::new();
                     for field in &s.fields {
@@ -1552,10 +1590,27 @@ pub fn lower_typed_module_with_prefix(
         });
     }
 
+    // Build module types: start with typed module's types, then add class/struct
+    // field types so the codegen knows e.g. `%Node.name` is a String.
+    let mut types = typed.types.clone();
+    for item in &typed.file.items {
+        let (class_name, fields) = match item {
+            nexc_ast::Item::Class(c) => (&c.name, &c.fields),
+            nexc_ast::Item::Struct(s) => (&s.name, &s.fields),
+            _ => continue,
+        };
+        for field in fields {
+            if let Some(ty_expr) = &field.ty {
+                let ty = type_expr_to_type(ty_expr);
+                types.insert(format!("{class_name}.{}", field.name), ty);
+            }
+        }
+    }
+
     IrModule {
         name: typed.file.path.clone(),
         functions,
-        types: typed.types.clone(),
+        types,
         layouts: layouts
             .iter()
             .map(|l| (l.class_name.clone(), l.clone()))

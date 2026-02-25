@@ -858,6 +858,19 @@ fn build_reg_type_map(
         };
         map.insert(format!("%{name}"), reg_ty);
     }
+    // Seed with function parameter types so that e.g. `println(msg)` inside a
+    // user-defined function correctly dispatches to nex_print_str when msg: String.
+    for (name, ty) in &ir_func.params {
+        let reg_ty = match ty {
+            Type::String => RegType::String,
+            Type::Int | Type::Int64 | Type::Byte => RegType::Int,
+            Type::Float | Type::Double => RegType::Float,
+            Type::Bool => RegType::Bool,
+            _ => RegType::Unknown,
+        };
+        map.insert(format!("%param.{name}"), reg_ty);
+        map.insert(format!("%{name}"), reg_ty);
+    }
     // Cross-function global type inference: scan ALL functions for globals stored
     // from string constants (e.g. class field initializers like `name_value = ""`
     // prepended into main). This lets functions that only READ a string global
@@ -897,15 +910,6 @@ fn build_reg_type_map(
                         })
                         .or_else(|| runtime_func_return_type(target.as_str()));
                     let rt = rt.unwrap_or(RegType::Unknown);
-                    // #region agent log
-                    if target == "ui_get_text" {
-                        if rt == RegType::String {
-                            eprintln!("[codegen] ui_get_text -> RegType::String (fix applied)");
-                        } else {
-                            eprintln!("[codegen] ui_get_text -> {:?} (NOT String!)", rt);
-                        }
-                    }
-                    // #endregion
                     map.insert(dst.clone(), rt);
                 }
                 IrInstruction::BinOp { dst, op, lhs, rhs, .. } => {
@@ -933,6 +937,12 @@ fn build_reg_type_map(
                         _ => RegType::Bool,
                     };
                     map.insert(dst.clone(), ty);
+                }
+                IrInstruction::Load { dst, src } => {
+                    // Propagate type from the source (e.g. %Node.name) to dst.
+                    if let Some(&ty) = map.get(src) {
+                        map.insert(dst.clone(), ty);
+                    }
                 }
                 _ => {}
             }
