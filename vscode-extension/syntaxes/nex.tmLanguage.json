@@ -80,7 +80,7 @@
         },
         {
           "name": "keyword.declaration.nex",
-          "match": "\\b(?:public|class|interface|struct|def|var|shared|virtual|override|static|alias|import|from|as|self)\\b"
+          "match": "\\b(?:public|class|interface|struct|def|var|shared|virtual|override|static|alias|import|from|as|self|operator)\\b"
         },
         {
           "name": "constant.language.nex",
@@ -100,15 +100,111 @@
       "patterns": [
         {
           "name": "storage.type.builtin.nex",
-          "match": "\\b(?:Bool|Byte|Int|Int64|Float|Double|Char|String|Unit|Var|Object|Disposable)\\b"
+          "match": "\\b(?:Bool|Byte|Int|Int8|Int16|Int32|Int64|Short|UInt|UInt8|UInt16|UInt32|UInt64|UShort|Long|ULong|Float|Float32|Double|Float64|Char|String|Unit|Var|Object|Disposable)\\b"
         }
       ]
     },
     "function-calls": {
       "patterns": [
         {
+          "comment": "std.core",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(print|println)\\b(?=\\s*\\()"
+        },
+        {
+          "comment": "std.math",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(abs_int|abs_float|min_int|max_int|min_float|max_float|clamp_int|clamp_float|floor|ceil|round|sqrt|pow|sin|cos|tan|log|log2|log10|exp|random|random_range)\\b"
+        },
+        {
+          "comment": "std.string",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(str_trim|str_trim_start|str_trim_end|starts_with|ends_with|contains|index_of|str_replace|to_upper|to_lower|str_repeat|char_at|str_reverse|str_split)\\b"
+        },
+        {
+          "comment": "std.convert",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(parse_int|parse_float|parse_bool|char_to_str|str_to_chars)\\b"
+        },
+        {
+          "comment": "std.env",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(env_get|env_set|env_has|env_args_count|env_args_get|env_cwd)\\b"
+        },
+        {
+          "comment": "std.time",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(now_millis|now_nanos|sleep_millis|elapsed_millis)\\b"
+        },
+        {
+          "comment": "std.io",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(read_line|file_exists|file_delete|file_rename|file_copy|file_size|file_read_bytes|file_write_bytes|mkdir|list_dir)\\b"
+        },
+        {
+          "comment": "std.path",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(path_join|path_parent|path_file_name|path_extension|path_stem|path_is_absolute|path_normalize|path_separator)\\b"
+        },
+        {
+          "comment": "std.json",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(json_parse|json_stringify|json_get_string|json_get_int|json_get_float|json_get_bool)\\b"
+        },
+        {
+          "comment": "std.regex",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(regex_new|regex_is_match|regex_find|regex_replace|regex_free)\\b"
+        },
+        {
+          "comment": "std.process",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(process_exec|process_exec_output|process_exit|process_pid|process_spawn|process_wait)\\b"
+        },
+        {
+          "comment": "std.net",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(tcp_connect|tcp_close|tcp_send|tcp_recv|tcp_listen|tcp_accept|udp_bind|udp_close|udp_send|udp_recv)\\b"
+        },
+        {
+          "comment": "std.http",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(http_get|http_post|http_response_status|http_response_body|http_response_header|http_response_free)\\b"
+        },
+        {
+          "comment": "std.threading",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(thread_spawn|thread_join|thread_sleep|thread_current_id|mutex_new|mutex_lock|mutex_unlock|mutex_free)\\b"
+        },
+        {
+          "comment": "std.crypto",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(sha256|sha512|md5|random_bytes|base64_encode|base64_decode|hmac_sha256)\\b"
+        },
+        {
+          "comment": "std.logging",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(log_debug|log_info|log_warn|log_error|log_set_level|log_with_tag)\\b"
+        },
+        {
+          "comment": "std.testing",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(assert|assert_eq_int|assert_eq_str|assert_eq_float|assert_eq_bool|assert_ne_int|assert_ne_str|assert_true)\\b"
+        },
+        {
+          "comment": "std.collections",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(list_new|list_add|list_get|list_set|list_length|list_remove|list_sort_int|list_reverse|list_clear|list_contains_int|list_index_of_int|map_new|map_put|map_get|map_try_get|map_contains|map_remove|map_size|set_new|set_add|set_contains|set_remove|set_size)\\b"
+        },
+        {
+          "comment": "std.ui",
           "name": "support.function.stdlib.nex",
           "match": "\\b(ui_app_create|ui_app_set_backend|ui_app_set_root|ui_app_run|ui_app_quit|ui_app_destroy|ui_is_running|ui_app_render|ui_render|ui_poll_event|ui_event_type|ui_event_widget|ui_text|ui_button|ui_text_input|ui_image|ui_checkbox|ui_slider|ui_row|ui_column|ui_stack|ui_scroll|ui_grid|ui_canvas|ui_add_child|ui_remove_child|ui_set_id|ui_get_id|ui_set_text|ui_get_text|ui_set_visible|ui_set_enabled|ui_get_value_float|ui_set_value_float|ui_set_width|ui_set_height|ui_set_min_width|ui_set_min_height|ui_set_max_width|ui_set_max_height|ui_set_padding|ui_set_padding_all|ui_set_margin|ui_set_margin_all|ui_set_bg_color|ui_set_fg_color|ui_set_font_size|ui_set_border|ui_set_border_radius|ui_set_border_width|ui_set_border_color|ui_set_flex_grow|ui_set_flex_shrink|ui_set_align_self|ui_set_h_align|ui_set_v_align|ui_set_justify_content|ui_set_align_items|ui_set_gap|ui_set_checked|ui_on_click|ui_on_change|ui_on_hover|ui_on_key|ui_canvas_fill_rect|ui_canvas_stroke_rect|ui_canvas_fill_circle|ui_canvas_draw_line|ui_canvas_draw_text|ui_canvas_clear|ui_dialog_message|ui_dialog_confirm|ui_dialog_open_file|ui_dialog_save_file)\\b"
+        },
+        {
+          "comment": "std.torch",
+          "name": "support.function.stdlib.nex",
+          "match": "\\b(tensor_zeros|tensor_ones|tensor_rand|tensor_randn|tensor_from_float_data|tensor_arange|tensor_eye|tensor_add|tensor_sub|tensor_mul|tensor_div|tensor_matmul|tensor_neg|tensor_exp|tensor_log|tensor_sum|tensor_mean|tensor_reshape|tensor_transpose|tensor_squeeze|tensor_unsqueeze|tensor_get_float|tensor_item_float|tensor_ndim|tensor_numel|tensor_shape_dim|tensor_print|tensor_backward|tensor_grad|tensor_requires_grad|tensor_to_device|nn_sequential_new|nn_linear|nn_conv2d|nn_relu|nn_sigmoid|nn_tanh|nn_softmax|nn_dropout|nn_batch_norm|nn_to_device|nn_forward|nn_free|loss_mse|loss_cross_entropy|optim_adam|optim_sgd|optim_step|optim_zero_grad|cuda_is_available|cuda_device_count|no_grad|set_num_threads|model_save|model_load|jit_load|torch_manual_seed)\\b"
         },
         {
           "name": "entity.name.function.call.nex",
@@ -120,7 +216,7 @@
       "patterns": [
         {
           "name": "keyword.operator.nex",
-          "match": "(::|->|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|=|<|>|\\+|-|\\*|/|!|\\.|,|:)"
+          "match": "(::|->|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|=|<|>|\\+|-|\\*|/|%|&|\\||\\^|!|\\?|\\.|,|:)"
         }
       ]
     }

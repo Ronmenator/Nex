@@ -497,6 +497,270 @@ pub unsafe extern "C" fn nex_torch_jit_forward(module: *mut tch::CModule, input:
 }
 
 // ---------------------------------------------------------------------------
+// Extended tensor operations — scalar arithmetic
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_add_scalar(t: *mut Tensor, scalar: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new(&*t + scalar))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_mul_scalar(t: *mut Tensor, scalar: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new(&*t * scalar))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_div_scalar(t: *mut Tensor, scalar: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).f_div_scalar(scalar).unwrap_or_else(|_| Tensor::zeros(&[], (Kind::Float, Device::Cpu)))))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_pow_scalar(t: *mut Tensor, exponent: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).pow_tensor_scalar(exponent)))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — element-wise math
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_sqrt(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).sqrt()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_abs(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).abs()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_clamp(t: *mut Tensor, min_val: f64, max_val: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).clamp(min_val, max_val)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_softmax(t: *mut Tensor, dim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).softmax(dim, Kind::Float)))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — comparison (return bool/uint8 tensors)
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_eq_scalar(t: *mut Tensor, value: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).eq(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_gt_scalar(t: *mut Tensor, value: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).gt(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_lt_scalar(t: *mut Tensor, value: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).lt(value)))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — masking and triangular
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_tril(t: *mut Tensor, diagonal: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).tril(diagonal)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_triu(t: *mut Tensor, diagonal: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).triu(diagonal)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_masked_fill(t: *mut Tensor, mask: *mut Tensor, value: f64) -> *mut Tensor {
+    if t.is_null() || mask.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).f_masked_fill(&*mask, value).unwrap_or_else(|_| (*t).shallow_clone())))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_where_self(condition: *mut Tensor, x: *mut Tensor, y: *mut Tensor) -> *mut Tensor {
+    if condition.is_null() || x.is_null() || y.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*x).f_where_self(&*condition, &*y).unwrap_or_else(|_| (*x).shallow_clone())))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — reduction with dimension
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_sum_dim(t: *mut Tensor, dim: i64, keepdim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).sum_dim_intlist(&[dim][..], keepdim != 0, Kind::Float)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_mean_dim(t: *mut Tensor, dim: i64, keepdim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).mean_dim(&[dim][..], keepdim != 0, Kind::Float)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_argmax(t: *mut Tensor, dim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).argmax(dim, false)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_max_dim(t: *mut Tensor, dim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    let (values, _indices) = (*t).max_dim(dim, false);
+    Box::into_raw(Box::new(values))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_min_dim(t: *mut Tensor, dim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    let (values, _indices) = (*t).min_dim(dim, false);
+    Box::into_raw(Box::new(values))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — shape and indexing
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_cat(a: *mut Tensor, b: *mut Tensor, dim: i64) -> *mut Tensor {
+    if a.is_null() || b.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new(Tensor::cat(&[&*a, &*b], dim)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_narrow(t: *mut Tensor, dim: i64, start: i64, length: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).narrow(dim, start, length)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_index_select(t: *mut Tensor, dim: i64, index: *mut Tensor) -> *mut Tensor {
+    if t.is_null() || index.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).index_select(dim, &*index)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_flatten(t: *mut Tensor, start_dim: i64, end_dim: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).flatten(start_dim, end_dim)))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — creation helpers
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_ones_like(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).ones_like()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_zeros_like(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).zeros_like()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_full_like(t: *mut Tensor, value: f64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).full_like(value)))
+}
+
+// ---------------------------------------------------------------------------
+// Extended tensor operations — utility
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_clone(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    let out = (*t).zeros_like();
+    Box::into_raw(Box::new(out + &*t))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_detach(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).detach()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_contiguous(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).contiguous()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_to_dtype_float(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).to_kind(Kind::Float)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_to_dtype_long(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).to_kind(Kind::Int64)))
+}
+
+// ---------------------------------------------------------------------------
+// Extended NN layers
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_layer_norm(module: *mut NexModule, normalized_shape: i64) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    let name = m.next_layer_name();
+    let path = m.vs.root() / &name;
+    let ln = nn::layer_norm(&path, vec![normalized_shape], Default::default());
+    m.seq = std::mem::replace(&mut m.seq, nn::seq())
+        .add_fn(move |t| t.apply(&ln));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_gelu(module: *mut NexModule) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    m.seq = std::mem::replace(&mut m.seq, nn::seq())
+        .add_fn(|t| t.gelu("none"));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_embedding(module: *mut NexModule, num_embeddings: i64, embedding_dim: i64) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    let name = m.next_layer_name();
+    let path = m.vs.root() / &name;
+    let emb = nn::embedding(&path, num_embeddings, embedding_dim, Default::default());
+    m.seq = std::mem::replace(&mut m.seq, nn::seq())
+        .add_fn(move |t| {
+            let indices = t.to_kind(Kind::Int64);
+            emb.forward(&indices)
+        });
+}
+
+// ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
 

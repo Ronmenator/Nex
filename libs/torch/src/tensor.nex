@@ -202,6 +202,186 @@ public def version() -> String {
 }
 
 // ===========================================================================
+// Scalar arithmetic
+// ===========================================================================
+
+public def add_scalar(t: Int64, scalar: Float) -> Int64 {
+    return tensor_add_scalar(t, scalar)
+}
+
+public def mul_scalar(t: Int64, scalar: Float) -> Int64 {
+    return tensor_mul_scalar(t, scalar)
+}
+
+public def div_scalar(t: Int64, scalar: Float) -> Int64 {
+    return tensor_div_scalar(t, scalar)
+}
+
+public def pow_scalar(t: Int64, exponent: Float) -> Int64 {
+    return tensor_pow_scalar(t, exponent)
+}
+
+// ===========================================================================
+// Element-wise math (extended)
+// ===========================================================================
+
+public def sqrt(t: Int64) -> Int64 {
+    return tensor_sqrt(t)
+}
+
+public def abs(t: Int64) -> Int64 {
+    return tensor_abs(t)
+}
+
+public def clamp(t: Int64, min_val: Float, max_val: Float) -> Int64 {
+    return tensor_clamp(t, min_val, max_val)
+}
+
+// Applies softmax along the given dimension (tensor-level, not nn module).
+public def softmax(t: Int64, dim: Int64) -> Int64 {
+    return tensor_softmax(t, dim)
+}
+
+// ===========================================================================
+// Comparison (return boolean/uint8 tensors)
+// ===========================================================================
+
+public def eq_scalar(t: Int64, value: Float) -> Int64 {
+    return tensor_eq_scalar(t, value)
+}
+
+public def gt_scalar(t: Int64, value: Float) -> Int64 {
+    return tensor_gt_scalar(t, value)
+}
+
+public def lt_scalar(t: Int64, value: Float) -> Int64 {
+    return tensor_lt_scalar(t, value)
+}
+
+// ===========================================================================
+// Masking and triangular
+// ===========================================================================
+
+// Returns the lower triangular part of a matrix. Elements above
+// the given diagonal are set to zero.
+public def tril(t: Int64, diagonal: Int64) -> Int64 {
+    return tensor_tril(t, diagonal)
+}
+
+// Returns the upper triangular part of a matrix. Elements below
+// the given diagonal are set to zero.
+public def triu(t: Int64, diagonal: Int64) -> Int64 {
+    return tensor_triu(t, diagonal)
+}
+
+// Fills elements of the tensor where mask is non-zero with value.
+public def masked_fill(t: Int64, mask: Int64, value: Float) -> Int64 {
+    return tensor_masked_fill(t, mask, value)
+}
+
+// Element-wise conditional: selects from x where condition is true, y otherwise.
+public def where_self(condition: Int64, x: Int64, y: Int64) -> Int64 {
+    return tensor_where_self(condition, x, y)
+}
+
+// ===========================================================================
+// Reduction with dimension
+// ===========================================================================
+
+public def sum_dim(t: Int64, dim: Int64, keepdim: Int64) -> Int64 {
+    return tensor_sum_dim(t, dim, keepdim)
+}
+
+public def mean_dim(t: Int64, dim: Int64, keepdim: Int64) -> Int64 {
+    return tensor_mean_dim(t, dim, keepdim)
+}
+
+public def argmax(t: Int64, dim: Int64) -> Int64 {
+    return tensor_argmax(t, dim)
+}
+
+public def max_dim(t: Int64, dim: Int64) -> Int64 {
+    return tensor_max_dim(t, dim)
+}
+
+public def min_dim(t: Int64, dim: Int64) -> Int64 {
+    return tensor_min_dim(t, dim)
+}
+
+// ===========================================================================
+// Shape and indexing (extended)
+// ===========================================================================
+
+// Concatenates two tensors along the given dimension.
+public def cat(a: Int64, b: Int64, dim: Int64) -> Int64 {
+    return tensor_cat(a, b, dim)
+}
+
+// Returns a narrowed view: a slice of length elements starting at start
+// along the given dimension.
+public def narrow(t: Int64, dim: Int64, start: Int64, length: Int64) -> Int64 {
+    return tensor_narrow(t, dim, start, length)
+}
+
+// Selects elements along dim using the given index tensor.
+public def index_select(t: Int64, dim: Int64, index: Int64) -> Int64 {
+    return tensor_index_select(t, dim, index)
+}
+
+// Flattens dimensions from start_dim to end_dim (inclusive).
+public def flatten(t: Int64, start_dim: Int64, end_dim: Int64) -> Int64 {
+    return tensor_flatten(t, start_dim, end_dim)
+}
+
+// ===========================================================================
+// Creation helpers (extended)
+// ===========================================================================
+
+// Returns a tensor of ones with the same shape and device as the input.
+public def ones_like(t: Int64) -> Int64 {
+    return tensor_ones_like(t)
+}
+
+// Returns a tensor of zeros with the same shape and device as the input.
+public def zeros_like(t: Int64) -> Int64 {
+    return tensor_zeros_like(t)
+}
+
+// Returns a tensor filled with value, same shape and device as the input.
+public def full_like(t: Int64, value: Float) -> Int64 {
+    return tensor_full_like(t, value)
+}
+
+// ===========================================================================
+// Utility (extended)
+// ===========================================================================
+
+// Returns a deep copy of the tensor.
+public def clone(t: Int64) -> Int64 {
+    return tensor_clone(t)
+}
+
+// Detaches the tensor from the computation graph.
+public def detach(t: Int64) -> Int64 {
+    return tensor_detach(t)
+}
+
+// Returns a contiguous tensor in memory.
+public def contiguous(t: Int64) -> Int64 {
+    return tensor_contiguous(t)
+}
+
+// Casts the tensor to float (f32/f64) dtype.
+public def to_dtype_float(t: Int64) -> Int64 {
+    return tensor_to_dtype_float(t)
+}
+
+// Casts the tensor to long (int64) dtype.
+public def to_dtype_long(t: Int64) -> Int64 {
+    return tensor_to_dtype_long(t)
+}
+
+// ===========================================================================
 // Convenience functions
 // ===========================================================================
 

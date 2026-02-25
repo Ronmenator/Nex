@@ -4,7 +4,7 @@ use std::os::windows::ffi::OsStrExt;
 
 use cranelift_codegen::ir::types;
 use cranelift_codegen::ir::{
-    AbiParam, Function, InstBuilder, Signature, UserFuncName,
+    AbiParam, Function, FuncRef, InstBuilder, MemFlags, Signature, UserFuncName,
 };
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_codegen::Context;
@@ -582,6 +582,43 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_manual_seed",
     "nex_torch_version",
     "nex_torch_tensor_to_string",
+    // torch — extended tensor ops
+    "nex_torch_tensor_add_scalar",
+    "nex_torch_tensor_mul_scalar",
+    "nex_torch_tensor_div_scalar",
+    "nex_torch_tensor_pow_scalar",
+    "nex_torch_tensor_sqrt",
+    "nex_torch_tensor_abs",
+    "nex_torch_tensor_clamp",
+    "nex_torch_tensor_softmax",
+    "nex_torch_tensor_eq_scalar",
+    "nex_torch_tensor_gt_scalar",
+    "nex_torch_tensor_lt_scalar",
+    "nex_torch_tensor_tril",
+    "nex_torch_tensor_triu",
+    "nex_torch_tensor_masked_fill",
+    "nex_torch_tensor_where_self",
+    "nex_torch_tensor_sum_dim",
+    "nex_torch_tensor_mean_dim",
+    "nex_torch_tensor_argmax",
+    "nex_torch_tensor_max_dim",
+    "nex_torch_tensor_min_dim",
+    "nex_torch_tensor_cat",
+    "nex_torch_tensor_narrow",
+    "nex_torch_tensor_index_select",
+    "nex_torch_tensor_flatten",
+    "nex_torch_tensor_ones_like",
+    "nex_torch_tensor_zeros_like",
+    "nex_torch_tensor_full_like",
+    "nex_torch_tensor_clone",
+    "nex_torch_tensor_detach",
+    "nex_torch_tensor_contiguous",
+    "nex_torch_tensor_to_dtype_float",
+    "nex_torch_tensor_to_dtype_long",
+    // torch — extended NN layers
+    "nex_torch_nn_layer_norm",
+    "nex_torch_nn_gelu",
+    "nex_torch_nn_embedding",
     // crypto
     "nex_crypto_sha256",
     "nex_crypto_sha512",
@@ -703,6 +740,16 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
         || name.contains("ui_get_text")
     {
         return Some(RegType::String);
+    }
+    // Math / torch functions that return f64.
+    match name {
+        "abs_float" | "min_float" | "max_float" | "clamp_float"
+        | "floor" | "ceil" | "round" | "sqrt" | "pow"
+        | "sin" | "cos" | "tan" | "log" | "log2" | "log10" | "exp"
+        | "math_random"
+        | "parse_float"
+        | "tensor_item_float" | "tensor_get_float" => return Some(RegType::Float),
+        _ => {}
     }
     None
 }
@@ -1162,7 +1209,8 @@ fn emit_instruction<M: Module>(
                 let arg_val = resolve_value(builder, module, &args[0], vars, strings, func_ids, global_data);
                 if let Some(&fid) = func_ids.get(rt_name) {
                     let func_ref = module.declare_func_in_func(fid, builder.func);
-                    builder.ins().call(func_ref, &[arg_val]);
+                    let coerced = coerce_call_args(builder, func_ref, &[arg_val]);
+                    builder.ins().call(func_ref, &coerced);
                 }
                 if let Some(d) = dst {
                     let z = builder.ins().iconst(types::I64, 0);
@@ -1179,14 +1227,10 @@ fn emit_instruction<M: Module>(
                     .collect();
                 if let Some(&fid) = func_ids.get(rt_name) {
                     let func_ref = module.declare_func_in_func(fid, builder.func);
-                    let call = builder.ins().call(func_ref, &arg_vals);
+                    let coerced = coerce_call_args(builder, func_ref, &arg_vals);
+                    let call = builder.ins().call(func_ref, &coerced);
                     if let Some(d) = dst {
-                        let results = builder.inst_results(call);
-                        let rv = if !results.is_empty() {
-                            results[0]
-                        } else {
-                            builder.ins().iconst(types::I64, 0)
-                        };
+                        let rv = coerce_return_value(builder, call);
                         set_var(builder, module, d, rv, vars, global_data);
                     }
                 }
@@ -1238,16 +1282,17 @@ fn emit_instruction<M: Module>(
 
         IrInstruction::Print { value } => {
             let v = resolve_value(builder, module, value, vars, strings, func_ids, global_data);
-            let callee = match value {
-                IrValue::StringConst(_) => "nex_println_str",
-                IrValue::IntConst(_) => "nex_println_int",
-                IrValue::FloatConst(_) => "nex_println_double",
-                IrValue::BoolConst(_) => "nex_println_bool",
+            let ty = irvalue_reg_type(value, reg_types);
+            let callee = match ty {
+                RegType::String => "nex_println_str",
+                RegType::Float => "nex_println_double",
+                RegType::Bool => "nex_println_bool",
                 _ => "nex_println_int",
             };
             if let Some(&fid) = func_ids.get(callee) {
                 let func_ref = module.declare_func_in_func(fid, builder.func);
-                builder.ins().call(func_ref, &[v]);
+                let coerced = coerce_call_args(builder, func_ref, &[v]);
+                builder.ins().call(func_ref, &coerced);
             }
             false
         }
@@ -1458,9 +1503,9 @@ fn call_runtime1<M: Module>(
 ) -> cranelift_codegen::ir::Value {
     if let Some(&fid) = func_ids.get(name) {
         let func_ref = module.declare_func_in_func(fid, builder.func);
-        let call = builder.ins().call(func_ref, &[arg]);
-        let results = builder.inst_results(call);
-        if !results.is_empty() { results[0] } else { builder.ins().iconst(types::I64, 0) }
+        let coerced = coerce_call_args(builder, func_ref, &[arg]);
+        let call = builder.ins().call(func_ref, &coerced);
+        coerce_return_value(builder, call)
     } else {
         builder.ins().iconst(types::I64, 0)
     }
@@ -1477,11 +1522,58 @@ fn call_runtime2<M: Module>(
 ) -> cranelift_codegen::ir::Value {
     if let Some(&fid) = func_ids.get(name) {
         let func_ref = module.declare_func_in_func(fid, builder.func);
-        let call = builder.ins().call(func_ref, &[a, b]);
-        let results = builder.inst_results(call);
-        if !results.is_empty() { results[0] } else { builder.ins().iconst(types::I64, 0) }
+        let coerced = coerce_call_args(builder, func_ref, &[a, b]);
+        let call = builder.ins().call(func_ref, &coerced);
+        coerce_return_value(builder, call)
     } else {
         builder.ins().iconst(types::I64, 0)
+    }
+}
+
+/// Bitcast call arguments from I64 to F64 where the function signature expects
+/// F64. This is needed because the Nex IR represents all values as I64 bit
+/// patterns, but the C ABI on Windows x64 passes floats in xmm registers.
+fn coerce_call_args(
+    builder: &mut FunctionBuilder,
+    func_ref: FuncRef,
+    args: &[cranelift_codegen::ir::Value],
+) -> Vec<cranelift_codegen::ir::Value> {
+    let sig = builder.func.dfg.ext_funcs[func_ref].signature;
+    // Collect param types up front to avoid borrowing builder.func across the loop.
+    let param_types: Vec<cranelift_codegen::ir::Type> = builder.func.dfg.signatures[sig]
+        .params
+        .iter()
+        .map(|p| p.value_type)
+        .collect();
+    args.iter()
+        .enumerate()
+        .map(|(i, &v)| {
+            if i < param_types.len()
+                && param_types[i] == types::F64
+                && builder.func.dfg.value_type(v) == types::I64
+            {
+                builder.ins().bitcast(types::F64, MemFlags::new(), v)
+            } else {
+                v
+            }
+        })
+        .collect()
+}
+
+/// If a call returns F64, bitcast the result back to I64 for the Nex IR.
+fn coerce_return_value(
+    builder: &mut FunctionBuilder,
+    call_inst: cranelift_codegen::ir::Inst,
+) -> cranelift_codegen::ir::Value {
+    let results = builder.inst_results(call_inst);
+    if results.is_empty() {
+        return builder.ins().iconst(types::I64, 0);
+    }
+    let ret = results[0];
+    if builder.func.dfg.value_type(ret) == types::F64 {
+        builder.ins().bitcast(types::I64, MemFlags::new(), ret)
+    } else {
+        ret
     }
 }
 
@@ -1907,6 +1999,50 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "model_load" => Some("nex_torch_model_load"),
         "jit_load" => Some("nex_torch_jit_load"),
         "jit_forward" => Some("nex_torch_jit_forward"),
+        // Extended tensor ops — scalar arithmetic
+        "tensor_add_scalar" => Some("nex_torch_tensor_add_scalar"),
+        "tensor_mul_scalar" => Some("nex_torch_tensor_mul_scalar"),
+        "tensor_div_scalar" => Some("nex_torch_tensor_div_scalar"),
+        "tensor_pow_scalar" => Some("nex_torch_tensor_pow_scalar"),
+        // Extended tensor ops — element-wise math
+        "tensor_sqrt" => Some("nex_torch_tensor_sqrt"),
+        "tensor_abs" => Some("nex_torch_tensor_abs"),
+        "tensor_clamp" => Some("nex_torch_tensor_clamp"),
+        "tensor_softmax" => Some("nex_torch_tensor_softmax"),
+        // Extended tensor ops — comparison
+        "tensor_eq_scalar" => Some("nex_torch_tensor_eq_scalar"),
+        "tensor_gt_scalar" => Some("nex_torch_tensor_gt_scalar"),
+        "tensor_lt_scalar" => Some("nex_torch_tensor_lt_scalar"),
+        // Extended tensor ops — masking and triangular
+        "tensor_tril" => Some("nex_torch_tensor_tril"),
+        "tensor_triu" => Some("nex_torch_tensor_triu"),
+        "tensor_masked_fill" => Some("nex_torch_tensor_masked_fill"),
+        "tensor_where_self" => Some("nex_torch_tensor_where_self"),
+        // Extended tensor ops — reduction with dimension
+        "tensor_sum_dim" => Some("nex_torch_tensor_sum_dim"),
+        "tensor_mean_dim" => Some("nex_torch_tensor_mean_dim"),
+        "tensor_argmax" => Some("nex_torch_tensor_argmax"),
+        "tensor_max_dim" => Some("nex_torch_tensor_max_dim"),
+        "tensor_min_dim" => Some("nex_torch_tensor_min_dim"),
+        // Extended tensor ops — shape and indexing
+        "tensor_cat" => Some("nex_torch_tensor_cat"),
+        "tensor_narrow" => Some("nex_torch_tensor_narrow"),
+        "tensor_index_select" => Some("nex_torch_tensor_index_select"),
+        "tensor_flatten" => Some("nex_torch_tensor_flatten"),
+        // Extended tensor ops — creation helpers
+        "tensor_ones_like" => Some("nex_torch_tensor_ones_like"),
+        "tensor_zeros_like" => Some("nex_torch_tensor_zeros_like"),
+        "tensor_full_like" => Some("nex_torch_tensor_full_like"),
+        // Extended tensor ops — utility
+        "tensor_clone" => Some("nex_torch_tensor_clone"),
+        "tensor_detach" => Some("nex_torch_tensor_detach"),
+        "tensor_contiguous" => Some("nex_torch_tensor_contiguous"),
+        "tensor_to_dtype_float" => Some("nex_torch_tensor_to_dtype_float"),
+        "tensor_to_dtype_long" => Some("nex_torch_tensor_to_dtype_long"),
+        // Extended NN layers
+        "nn_layer_norm" => Some("nex_torch_nn_layer_norm"),
+        "nn_gelu" => Some("nex_torch_nn_gelu"),
+        "nn_embedding" => Some("nex_torch_nn_embedding"),
         // Utility
         "torch_manual_seed" => Some("nex_torch_manual_seed"),
         "torch_version" => Some("nex_torch_version"),
@@ -2190,6 +2326,82 @@ fn declare_runtime_imports<M: Module>(
     for _ in 0..5 { sig_ptr_ptr5.params.push(AbiParam::new(types::I64)); }
     sig_ptr_ptr5.returns.push(AbiParam::new(types::I64));
 
+    // --- F64-aware signatures for correct Windows x64 calling convention ---
+
+    // void(f64) – print_double, println_double
+    let mut sig_void_f64 = Signature::new(cc);
+    sig_void_f64.params.push(AbiParam::new(types::F64));
+
+    // f64(f64) – abs_float, floor, ceil, round, sqrt, sin, cos, tan, log, ...
+    let mut sig_f64_ret_f64 = Signature::new(cc);
+    sig_f64_ret_f64.params.push(AbiParam::new(types::F64));
+    sig_f64_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // f64(f64, f64) – min_float, max_float, pow
+    let mut sig_f64x2_ret_f64 = Signature::new(cc);
+    sig_f64x2_ret_f64.params.push(AbiParam::new(types::F64));
+    sig_f64x2_ret_f64.params.push(AbiParam::new(types::F64));
+    sig_f64x2_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // f64(f64, f64, f64) – clamp_float
+    let mut sig_f64x3_ret_f64 = Signature::new(cc);
+    sig_f64x3_ret_f64.params.push(AbiParam::new(types::F64));
+    sig_f64x3_ret_f64.params.push(AbiParam::new(types::F64));
+    sig_f64x3_ret_f64.params.push(AbiParam::new(types::F64));
+    sig_f64x3_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // i64(f64, f64, f64) – tensor_arange
+    let mut sig_f64x3_ret_i64 = Signature::new(cc);
+    sig_f64x3_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_f64x3_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_f64x3_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_f64x3_ret_i64.returns.push(AbiParam::new(types::I64));
+
+    // i64(f64) – double_to_str
+    let mut sig_f64_ret_i64 = Signature::new(cc);
+    sig_f64_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_f64_ret_i64.returns.push(AbiParam::new(types::I64));
+
+    // f64() – math_random
+    let mut sig_ret_f64 = Signature::new(cc);
+    sig_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // f64(i64) – tensor_item_float, parse_float
+    let mut sig_i64_ret_f64 = Signature::new(cc);
+    sig_i64_ret_f64.params.push(AbiParam::new(types::I64));
+    sig_i64_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // f64(i64, i64) – tensor_get_float
+    let mut sig_i64x2_ret_f64 = Signature::new(cc);
+    sig_i64x2_ret_f64.params.push(AbiParam::new(types::I64));
+    sig_i64x2_ret_f64.params.push(AbiParam::new(types::I64));
+    sig_i64x2_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // i64(i64, f64) – optim_sgd, optim_adam, add_scalar, mul_scalar, ...
+    let mut sig_i64_f64_ret_i64 = Signature::new(cc);
+    sig_i64_f64_ret_i64.params.push(AbiParam::new(types::I64));
+    sig_i64_f64_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64_ret_i64.returns.push(AbiParam::new(types::I64));
+
+    // i64(i64, f64, f64) – tensor_clamp
+    let mut sig_i64_f64x2_ret_i64 = Signature::new(cc);
+    sig_i64_f64x2_ret_i64.params.push(AbiParam::new(types::I64));
+    sig_i64_f64x2_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64x2_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64x2_ret_i64.returns.push(AbiParam::new(types::I64));
+
+    // i64(i64, i64, f64) – tensor_masked_fill
+    let mut sig_i64x2_f64_ret_i64 = Signature::new(cc);
+    sig_i64x2_f64_ret_i64.params.push(AbiParam::new(types::I64));
+    sig_i64x2_f64_ret_i64.params.push(AbiParam::new(types::I64));
+    sig_i64x2_f64_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64x2_f64_ret_i64.returns.push(AbiParam::new(types::I64));
+
+    // void(i64, f64) – nn_dropout
+    let mut sig_void_i64_f64 = Signature::new(cc);
+    sig_void_i64_f64.params.push(AbiParam::new(types::I64));
+    sig_void_i64_f64.params.push(AbiParam::new(types::F64));
+
     let imports: Vec<(&str, &Signature)> = vec![
         ("nex_gc_alloc", &sig_gc_alloc),
         ("nex_gc_collect", &sig_void),
@@ -2199,15 +2411,15 @@ fn declare_runtime_imports<M: Module>(
         ("nex_println_str", &sig_void_ptr),
         ("nex_print_int", &sig_void_ptr),
         ("nex_println_int", &sig_void_ptr),
-        ("nex_print_double", &sig_void_ptr),
-        ("nex_println_double", &sig_void_ptr),
+        ("nex_print_double", &sig_void_f64),
+        ("nex_println_double", &sig_void_f64),
         ("nex_print_bool", &sig_void_ptr),
         ("nex_println_bool", &sig_void_ptr),
         ("nex_print_char", &sig_void_ptr),
         ("nex_println_char", &sig_void_ptr),
         ("nex_str_concat", &sig_ptr_ptr2),
         ("nex_int_to_str", &sig_ptr_ptr),
-        ("nex_double_to_str", &sig_ptr_ptr),
+        ("nex_double_to_str", &sig_f64_ret_i64),
         ("nex_bool_to_str", &sig_ptr_ptr),
         ("nex_str_length", &sig_ptr_ptr),
         ("nex_str_substring", &sig_substring),
@@ -2215,26 +2427,26 @@ fn declare_runtime_imports<M: Module>(
         ("puts", &sig_void_ptr),
         // std.math
         ("nex_math_abs_int", &sig_ptr_ptr),
-        ("nex_math_abs_float", &sig_ptr_ptr),
+        ("nex_math_abs_float", &sig_f64_ret_f64),
         ("nex_math_min_int", &sig_ptr_ptr2),
         ("nex_math_max_int", &sig_ptr_ptr2),
-        ("nex_math_min_float", &sig_ptr_ptr2),
-        ("nex_math_max_float", &sig_ptr_ptr2),
+        ("nex_math_min_float", &sig_f64x2_ret_f64),
+        ("nex_math_max_float", &sig_f64x2_ret_f64),
         ("nex_math_clamp_int", &sig_ptr_ptr3),
-        ("nex_math_clamp_float", &sig_ptr_ptr3),
-        ("nex_math_floor", &sig_ptr_ptr),
-        ("nex_math_ceil", &sig_ptr_ptr),
-        ("nex_math_round", &sig_ptr_ptr),
-        ("nex_math_sqrt", &sig_ptr_ptr),
-        ("nex_math_pow", &sig_ptr_ptr2),
-        ("nex_math_sin", &sig_ptr_ptr),
-        ("nex_math_cos", &sig_ptr_ptr),
-        ("nex_math_tan", &sig_ptr_ptr),
-        ("nex_math_log", &sig_ptr_ptr),
-        ("nex_math_log2", &sig_ptr_ptr),
-        ("nex_math_log10", &sig_ptr_ptr),
-        ("nex_math_exp", &sig_ptr_ptr),
-        ("nex_math_random", &sig_ret_ptr),
+        ("nex_math_clamp_float", &sig_f64x3_ret_f64),
+        ("nex_math_floor", &sig_f64_ret_f64),
+        ("nex_math_ceil", &sig_f64_ret_f64),
+        ("nex_math_round", &sig_f64_ret_f64),
+        ("nex_math_sqrt", &sig_f64_ret_f64),
+        ("nex_math_pow", &sig_f64x2_ret_f64),
+        ("nex_math_sin", &sig_f64_ret_f64),
+        ("nex_math_cos", &sig_f64_ret_f64),
+        ("nex_math_tan", &sig_f64_ret_f64),
+        ("nex_math_log", &sig_f64_ret_f64),
+        ("nex_math_log2", &sig_f64_ret_f64),
+        ("nex_math_log10", &sig_f64_ret_f64),
+        ("nex_math_exp", &sig_f64_ret_f64),
+        ("nex_math_random", &sig_ret_f64),
         ("nex_math_random_range", &sig_ptr_ptr2),
         // std.string
         ("nex_str_split", &sig_ptr_ptr2),
@@ -2253,7 +2465,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_str_reverse", &sig_ptr_ptr),
         // std.convert
         ("nex_parse_int", &sig_ptr_ptr),
-        ("nex_parse_float", &sig_ptr_ptr),
+        ("nex_parse_float", &sig_i64_ret_f64),
         ("nex_parse_bool", &sig_ptr_ptr),
         ("nex_char_to_str", &sig_ptr_ptr),
         ("nex_str_to_chars", &sig_ptr_ptr),
@@ -2533,7 +2745,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_tensor_rand", &sig_ptr_ptr2),
         ("nex_torch_tensor_randn", &sig_ptr_ptr2),
         ("nex_torch_tensor_from_float_data", &sig_ptr_ptr3),
-        ("nex_torch_tensor_arange", &sig_ptr_ptr3),
+        ("nex_torch_tensor_arange", &sig_f64x3_ret_i64),
         ("nex_torch_tensor_eye", &sig_ptr_ptr),
         ("nex_torch_tensor_free", &sig_void_ptr),
         // Tensor operations
@@ -2554,8 +2766,8 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_tensor_print", &sig_void_ptr),
         ("nex_torch_tensor_shape_dim", &sig_ptr_ptr2),
         // Tensor data access
-        ("nex_torch_tensor_get_float", &sig_ptr_ptr2),
-        ("nex_torch_tensor_item_float", &sig_ptr_ptr),
+        ("nex_torch_tensor_get_float", &sig_i64x2_ret_f64),
+        ("nex_torch_tensor_item_float", &sig_i64_ret_f64),
         ("nex_torch_tensor_ndim", &sig_ptr_ptr),
         ("nex_torch_tensor_numel", &sig_ptr_ptr),
         // Device management
@@ -2576,7 +2788,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_nn_sigmoid", &sig_void_ptr),
         ("nex_torch_nn_tanh", &sig_void_ptr),
         ("nex_torch_nn_softmax", &sig_void_ptr2),
-        ("nex_torch_nn_dropout", &sig_void_ptr2),
+        ("nex_torch_nn_dropout", &sig_void_i64_f64),
         ("nex_torch_nn_batch_norm", &sig_void_ptr2),
         ("nex_torch_nn_to_device", &sig_void_ptr2),
         ("nex_torch_nn_forward", &sig_ptr_ptr2),
@@ -2586,8 +2798,8 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_loss_cross_entropy", &sig_ptr_ptr2),
         ("nex_torch_loss_bce", &sig_ptr_ptr2),
         // Optimizers
-        ("nex_torch_optim_sgd", &sig_ptr_ptr2),
-        ("nex_torch_optim_adam", &sig_ptr_ptr2),
+        ("nex_torch_optim_sgd", &sig_i64_f64_ret_i64),
+        ("nex_torch_optim_adam", &sig_i64_f64_ret_i64),
         ("nex_torch_optim_step", &sig_void_ptr),
         ("nex_torch_optim_zero_grad", &sig_void_ptr),
         ("nex_torch_optim_free", &sig_void_ptr),
@@ -2596,6 +2808,50 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_model_load", &sig_void_ptr2),
         ("nex_torch_jit_load", &sig_ptr_ptr),
         ("nex_torch_jit_forward", &sig_ptr_ptr2),
+        // Extended tensor ops — scalar arithmetic
+        ("nex_torch_tensor_add_scalar", &sig_i64_f64_ret_i64),
+        ("nex_torch_tensor_mul_scalar", &sig_i64_f64_ret_i64),
+        ("nex_torch_tensor_div_scalar", &sig_i64_f64_ret_i64),
+        ("nex_torch_tensor_pow_scalar", &sig_i64_f64_ret_i64),
+        // Extended tensor ops — element-wise math
+        ("nex_torch_tensor_sqrt", &sig_ptr_ptr),
+        ("nex_torch_tensor_abs", &sig_ptr_ptr),
+        ("nex_torch_tensor_clamp", &sig_i64_f64x2_ret_i64),
+        ("nex_torch_tensor_softmax", &sig_ptr_ptr2),
+        // Extended tensor ops — comparison
+        ("nex_torch_tensor_eq_scalar", &sig_i64_f64_ret_i64),
+        ("nex_torch_tensor_gt_scalar", &sig_i64_f64_ret_i64),
+        ("nex_torch_tensor_lt_scalar", &sig_i64_f64_ret_i64),
+        // Extended tensor ops — masking and triangular
+        ("nex_torch_tensor_tril", &sig_ptr_ptr2),
+        ("nex_torch_tensor_triu", &sig_ptr_ptr2),
+        ("nex_torch_tensor_masked_fill", &sig_i64x2_f64_ret_i64),
+        ("nex_torch_tensor_where_self", &sig_ptr_ptr3),
+        // Extended tensor ops — reduction with dimension
+        ("nex_torch_tensor_sum_dim", &sig_ptr_ptr3),
+        ("nex_torch_tensor_mean_dim", &sig_ptr_ptr3),
+        ("nex_torch_tensor_argmax", &sig_ptr_ptr2),
+        ("nex_torch_tensor_max_dim", &sig_ptr_ptr2),
+        ("nex_torch_tensor_min_dim", &sig_ptr_ptr2),
+        // Extended tensor ops — shape and indexing
+        ("nex_torch_tensor_cat", &sig_ptr_ptr3),
+        ("nex_torch_tensor_narrow", &sig_ptr_ptr4),
+        ("nex_torch_tensor_index_select", &sig_ptr_ptr3),
+        ("nex_torch_tensor_flatten", &sig_ptr_ptr3),
+        // Extended tensor ops — creation helpers
+        ("nex_torch_tensor_ones_like", &sig_ptr_ptr),
+        ("nex_torch_tensor_zeros_like", &sig_ptr_ptr),
+        ("nex_torch_tensor_full_like", &sig_i64_f64_ret_i64),
+        // Extended tensor ops — utility
+        ("nex_torch_tensor_clone", &sig_ptr_ptr),
+        ("nex_torch_tensor_detach", &sig_ptr_ptr),
+        ("nex_torch_tensor_contiguous", &sig_ptr_ptr),
+        ("nex_torch_tensor_to_dtype_float", &sig_ptr_ptr),
+        ("nex_torch_tensor_to_dtype_long", &sig_ptr_ptr),
+        // Extended NN layers
+        ("nex_torch_nn_layer_norm", &sig_void_ptr2),
+        ("nex_torch_nn_gelu", &sig_void_ptr),
+        ("nex_torch_nn_embedding", &sig_void_ptr3),
         // Utility
         ("nex_torch_manual_seed", &sig_void_ptr),
         ("nex_torch_version", &sig_ret_ptr),

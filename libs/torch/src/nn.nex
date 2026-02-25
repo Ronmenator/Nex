@@ -57,6 +57,25 @@ public def batch_norm(module: Int64, features: Int64) {
     return
 }
 
+// Adds a layer normalization layer (normalizes across the feature dimension).
+public def layer_norm(module: Int64, normalized_shape: Int64) {
+    nn_layer_norm(module, normalized_shape)
+    return
+}
+
+// Adds a GELU activation layer (Gaussian Error Linear Unit).
+public def gelu(module: Int64) {
+    nn_gelu(module)
+    return
+}
+
+// Adds an embedding layer (maps integer indices to dense vectors).
+// Input tensors are cast to int64 internally.
+public def embedding(module: Int64, num_embeddings: Int64, embedding_dim: Int64) {
+    nn_embedding(module, num_embeddings, embedding_dim)
+    return
+}
+
 // Moves a module (and all its parameters) to a device ("cpu" or "cuda").
 public def to_device(module: Int64, device: String) {
     nn_to_device(module, device)
