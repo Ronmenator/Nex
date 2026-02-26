@@ -20,6 +20,7 @@ This downloads the latest release, extracts it to `~/.nex/`, and adds it to your
 - **Closures & lambdas** — `|x| x + 1` anonymous functions with variable capture
 - **Async/await** — concurrent programming with async functions
 - **Ternary expressions** — `value if condition else other` Python-style conditionals
+- **Reflection** — runtime type introspection with `[Reflectable]` attribute and `Reflect` API
 - **Native performance** — compiles to machine code via Cranelift (AOT and JIT)
 - **Garbage collected** with deterministic cleanup via `using` blocks
 - **Rich standard library** — collections, I/O, networking, JSON, crypto, threading, and more

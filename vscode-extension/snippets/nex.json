@@ -254,5 +254,29 @@
       "$$\"${1:text} {${2:expr}}${3:more text}\""
     ],
     "description": "Interpolated string"
+  },
+  "Reflectable Class": {
+    "prefix": "rclass",
+    "body": [
+      "[Reflectable]",
+      "class ${1:ClassName} {",
+      "\t${2:field}: ${3:Type}",
+      "",
+      "\tdef ${4:method}() -> ${5:Unit} {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Class with [Reflectable] attribute"
+  },
+  "Reflect Find Type": {
+    "prefix": "reflect",
+    "body": [
+      "var ${1:ti} = Reflect.findType(\"${2:TypeName}\")",
+      "println(Reflect.typeName(${1}))",
+      "println(Reflect.fieldCount(${1}))",
+      "$0"
+    ],
+    "description": "Reflect type introspection"
   }
 }

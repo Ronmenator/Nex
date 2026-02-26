@@ -28,6 +28,7 @@
 18b. [String Interpolation](#18b-string-interpolation)
 18c. [Closures & Lambdas](#18c-closures--lambdas)
 18d. [Async / Await](#18d-async--await)
+18e. [Reflection](#18e-reflection)
 19. [Standard Library Reference](#19-standard-library-reference)
 20. [Collections (List, Map, Set)](#20-collections-list-map-set)
 21. [File I/O](#21-file-io)
@@ -1482,6 +1483,112 @@ See [Section 8.6](#86-closures--lambdas) for full documentation of closure and l
 ## 18d. Async / Await
 
 See [Section 8.7](#87-async-functions) for full documentation of async function declarations and await expressions.
+
+---
+
+## 18e. Reflection
+
+Nex provides runtime type introspection via the built-in `Reflect` API. Types marked with the `[Reflectable]` attribute expose their fields, methods, and variants at runtime.
+
+### The [Reflectable] Attribute
+
+Add `[Reflectable]` before a class, struct, enum, or interface to opt in to full reflection:
+
+```nex
+[Reflectable]
+class Animal {
+    name: String
+    age: Int
+
+    def speak() -> String {
+        return "Hello"
+    }
+}
+```
+
+All declared types are registered in the type registry at startup. However, only `[Reflectable]` types expose their fields and methods through `Reflect.fieldCount`, `Reflect.methodCount`, etc.
+
+### Type Lookup
+
+```nex
+var ti = Reflect.findType("Animal")  // Returns type ID (Int), or -1 if not found
+println(Reflect.typeName(ti))        // "Animal"
+```
+
+### Reflect API Reference
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Reflect.findType(name)` | `Int` | Look up type by name; returns type ID or -1 |
+| `Reflect.typeName(typeId)` | `String` | Name of the type |
+| `Reflect.typeModule(typeId)` | `String` | Module the type was declared in |
+| `Reflect.typeKind(typeId)` | `Int` | Kind: 0=Class, 1=Struct, 2=Enum, 3=Interface |
+| `Reflect.isReflectable(typeId)` | `Int` | 1 if [Reflectable], 0 otherwise |
+| `Reflect.fieldCount(typeId)` | `Int` | Number of fields (0 if not reflectable) |
+| `Reflect.fieldName(typeId, index)` | `String` | Name of field at index |
+| `Reflect.fieldType(typeId, index)` | `String` | Type name of field at index |
+| `Reflect.methodCount(typeId)` | `Int` | Number of methods (0 if not reflectable) |
+| `Reflect.methodName(typeId, index)` | `String` | Name of method at index |
+| `Reflect.methodReturnType(typeId, index)` | `String` | Return type of method |
+| `Reflect.implements(typeId, name)` | `Int` | 1 if type implements the interface/base class |
+| `Reflect.interfaces(typeId)` | `String` | Comma-separated list of interfaces |
+| `Reflect.typeCount()` | `Int` | Total number of registered types |
+| `Reflect.typeNameAt(index)` | `String` | Name of type at registry index |
+| `Reflect.invoke(typeId, methodName, args, argCount)` | `Int` | Call method dynamically (up to 8 args) |
+| `Reflect.createInstance(typeId, args, argCount)` | `Int` | Create instance via init method |
+
+### Complete Example
+
+```nex
+[Reflectable]
+class Animal {
+    name: String
+    age: Int
+
+    def speak() -> String {
+        return "Hello"
+    }
+}
+
+interface Skill {
+    def execute() -> Unit
+}
+
+[Reflectable]
+struct CalendarSkill : Skill {
+    def execute() -> Unit {
+        println("Running calendar")
+    }
+}
+
+[Reflectable]
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+def main() {
+    var ti = Reflect.findType("Animal")
+    println(Reflect.typeName(ti))           // Animal
+    println(Reflect.fieldCount(ti))         // 2
+    println(Reflect.fieldName(ti, 0))       // name
+    println(Reflect.fieldType(ti, 0))       // String
+    println(Reflect.methodCount(ti))        // 1
+    println(Reflect.methodName(ti, 0))      // speak
+
+    var si = Reflect.findType("CalendarSkill")
+    println(Reflect.implements(si, "Skill"))  // 1
+
+    // Enumerate all registered types
+    var count = Reflect.typeCount()
+    var i = 0
+    while (i < count) {
+        println(Reflect.typeNameAt(i))
+        i = i + 1
+    }
+}
+```
 
 ---
 

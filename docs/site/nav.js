@@ -39,7 +39,8 @@ const NAV_HTML = `
     <li><a href="function-types.html">Function Types</a></li>
     <li><a href="closures.html">Closures &amp; Lambdas</a></li>
     <li><a href="async-await.html">Async / Await</a></li>
-    <li><a href="annotations.html">Annotations</a></li>
+    <li><a href="annotations.html">Attributes</a></li>
+    <li><a href="reflection.html">Reflection</a></li>
   </ul>
 </div>
 

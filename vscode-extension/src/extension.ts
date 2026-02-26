@@ -240,6 +240,8 @@ const DOCS: Record<string, string> = {
   "await": "**await** — Waits for an async operation to complete.\n\n```nex\nresult = await fetch_data(url)\n```\n\nCan only be used to await async function calls.",
   "enum": "**enum** — Declares an enumerated type with named variants.\n\n```nex\nenum Color {\n    Red,\n    Green,\n    Blue\n}\n```\n\nAccess variants with `Color.Red`. Use with `match` for pattern matching.",
   "match": "**match** — Pattern matching expression. Compares a value against patterns.\n\n```nex\nmatch value {\n    1 -> println(\"one\")\n    2 -> println(\"two\")\n    _ -> println(\"other\")\n}\n```\n\nSupports literal, enum variant, wildcard (`_`), and binding patterns. Guards: `pattern if condition -> body`",
+  "Reflect": "**Reflect** — Built-in reflection API for runtime type introspection.\n\n```nex\nvar ti = Reflect.findType(\"Animal\")\nprintln(Reflect.typeName(ti))\nprintln(Reflect.fieldCount(ti))\n```\n\nMethods: `findType`, `typeName`, `typeModule`, `typeKind`, `fieldCount`, `fieldName`, `fieldType`, `methodCount`, `methodName`, `methodReturnType`, `implements`, `interfaces`, `typeCount`, `typeNameAt`, `isReflectable`, `invoke`, `createInstance`.\n\nTypes must be marked `[Reflectable]` to expose fields and methods.",
+  "Reflectable": "**[Reflectable]** — Attribute that enables full runtime reflection on a type.\n\n```nex\n[Reflectable]\nclass Animal {\n    name: String\n    age: Int\n}\n```\n\nWithout this attribute, the type is registered but its fields/methods are not exposed via `Reflect` queries.",
 
   // Built-in types
   "Bool": "**Bool** — boolean value type (`true` / `false`).",

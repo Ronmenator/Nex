@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reflection - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+</header>
+<nav class="sidebar"></nav>
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Advanced Topics<span class="sep">/</span>Reflection</div>
+
+  <h1>Reflection</h1>
+  <p class="page-subtitle">Runtime type introspection and dynamic invocation via the <code>Reflect</code> built-in API.</p>
+
+  <h2>Overview</h2>
+
+  <p>Nex provides a compile-time reflection system that registers metadata about your types at program startup. Types marked with the <code>[Reflectable]</code> attribute expose their fields, methods, and variants for runtime introspection through the built-in <code>Reflect</code> API.</p>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p>All declared types (classes, structs, enums, interfaces) are registered in the type registry at startup. However, only types marked <code>[Reflectable]</code> expose their fields and methods through queries like <code>Reflect.fieldCount</code> and <code>Reflect.methodCount</code>.</p>
+  </div>
+
+  <h2>The [Reflectable] Attribute</h2>
+
+  <p>Add <code>[Reflectable]</code> before any class, struct, enum, or interface declaration to opt in to full reflection:</p>
+
+  <pre><code>[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hello"</span>
+    }
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">struct</span> <span class="typ">Point</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">enum</span> <span class="typ">Color</span> {
+    Red,
+    Green,
+    Blue
+}</code></pre>
+
+  <h2>Type Lookup</h2>
+
+  <p>Use <code>Reflect.findType</code> to look up a type by name. It returns a type ID (an <code>Int</code>) used with all other <code>Reflect</code> methods:</p>
+
+  <pre><code><span class="kw">var</span> ti <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"Animal"</span>)
+<span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">typeName</span>(ti))  <span class="cmt">// "Animal"</span></code></pre>
+
+  <p>If the type is not found, <code>findType</code> returns <code>-1</code>.</p>
+
+  <h2>Querying Type Information</h2>
+
+  <h3>Basic Type Info</h3>
+
+  <table>
+    <tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+    <tr><td><code>Reflect.findType(name: String)</code></td><td><code>Int</code></td><td>Look up type by name; returns type ID or -1</td></tr>
+    <tr><td><code>Reflect.typeName(typeId: Int)</code></td><td><code>String</code></td><td>Name of the type</td></tr>
+    <tr><td><code>Reflect.typeModule(typeId: Int)</code></td><td><code>String</code></td><td>Module the type was declared in</td></tr>
+    <tr><td><code>Reflect.typeKind(typeId: Int)</code></td><td><code>Int</code></td><td>Kind: 0=Class, 1=Struct, 2=Enum, 3=Interface</td></tr>
+    <tr><td><code>Reflect.isReflectable(typeId: Int)</code></td><td><code>Int</code></td><td>1 if [Reflectable], 0 otherwise</td></tr>
+    <tr><td><code>Reflect.implements(typeId: Int, name: String)</code></td><td><code>Int</code></td><td>1 if type implements the interface/base class</td></tr>
+    <tr><td><code>Reflect.interfaces(typeId: Int)</code></td><td><code>String</code></td><td>Comma-separated list of implemented interfaces</td></tr>
+  </table>
+
+  <h3>Field Queries</h3>
+
+  <table>
+    <tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+    <tr><td><code>Reflect.fieldCount(typeId: Int)</code></td><td><code>Int</code></td><td>Number of fields (0 if not reflectable)</td></tr>
+    <tr><td><code>Reflect.fieldName(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Name of the field at index</td></tr>
+    <tr><td><code>Reflect.fieldType(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Type name of the field at index</td></tr>
+  </table>
+
+  <h3>Method Queries</h3>
+
+  <table>
+    <tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+    <tr><td><code>Reflect.methodCount(typeId: Int)</code></td><td><code>Int</code></td><td>Number of methods (0 if not reflectable)</td></tr>
+    <tr><td><code>Reflect.methodName(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Name of the method at index</td></tr>
+    <tr><td><code>Reflect.methodReturnType(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Return type name of the method</td></tr>
+  </table>
+
+  <h3>Type Enumeration</h3>
+
+  <table>
+    <tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+    <tr><td><code>Reflect.typeCount()</code></td><td><code>Int</code></td><td>Total number of registered types</td></tr>
+    <tr><td><code>Reflect.typeNameAt(index: Int)</code></td><td><code>String</code></td><td>Name of type at registry index</td></tr>
+  </table>
+
+  <h2>Inspecting Fields and Methods</h2>
+
+  <pre><code>[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hello"</span>
+    }
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() {
+    <span class="kw">var</span> ti <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"Animal"</span>)
+
+    <span class="cmt">// Enumerate fields</span>
+    <span class="kw">var</span> fc <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">fieldCount</span>(ti)
+    <span class="fn">println</span>(<span class="str">"Fields:"</span>, fc)
+    <span class="kw">for</span> (i <span class="op">=</span> <span class="num">0</span>; i <span class="op">&lt;</span> fc; i <span class="op">+=</span> <span class="num">1</span>) {
+        <span class="fn">println</span>(<span class="str">"  "</span>, <span class="fn">Reflect</span>.<span class="fn">fieldName</span>(ti, i), <span class="str">":"</span>, <span class="fn">Reflect</span>.<span class="fn">fieldType</span>(ti, i))
+    }
+
+    <span class="cmt">// Enumerate methods</span>
+    <span class="kw">var</span> mc <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">methodCount</span>(ti)
+    <span class="fn">println</span>(<span class="str">"Methods:"</span>, mc)
+    <span class="kw">for</span> (i <span class="op">=</span> <span class="num">0</span>; i <span class="op">&lt;</span> mc; i <span class="op">+=</span> <span class="num">1</span>) {
+        <span class="fn">println</span>(<span class="str">"  "</span>, <span class="fn">Reflect</span>.<span class="fn">methodName</span>(ti, i), <span class="str">"->"</span>, <span class="fn">Reflect</span>.<span class="fn">methodReturnType</span>(ti, i))
+    }
+}</code></pre>
+
+  <p>Output:</p>
+  <pre><code>Fields: 2
+  name : String
+  age : Int
+Methods: 1
+  speak -> String</code></pre>
+
+  <h2>Interface Checking</h2>
+
+  <p>Use <code>Reflect.implements</code> to check whether a type implements a given interface or extends a base class:</p>
+
+  <pre><code><span class="kw">interface</span> <span class="typ">Skill</span> {
+    <span class="kw">def</span> <span class="fn">execute</span>() <span class="op">-></span> <span class="typ">Unit</span>
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">struct</span> <span class="typ">CalendarSkill</span> : <span class="typ">Skill</span> {
+    <span class="kw">def</span> <span class="fn">execute</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="fn">println</span>(<span class="str">"Running calendar"</span>)
+    }
+}
+
+<span class="kw">var</span> si <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"CalendarSkill"</span>)
+<span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">implements</span>(si, <span class="str">"Skill"</span>))  <span class="cmt">// 1 (true)</span></code></pre>
+
+  <h2>Enumerating All Types</h2>
+
+  <p>You can iterate over every registered type in the program:</p>
+
+  <pre><code><span class="kw">var</span> count <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">typeCount</span>()
+<span class="kw">for</span> (i <span class="op">=</span> <span class="num">0</span>; i <span class="op">&lt;</span> count; i <span class="op">+=</span> <span class="num">1</span>) {
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">typeNameAt</span>(i))
+}</code></pre>
+
+  <h2>Dynamic Invocation</h2>
+
+  <p>The reflection system supports calling methods dynamically by name:</p>
+
+  <table>
+    <tr><th>Method</th><th>Description</th></tr>
+    <tr><td><code>Reflect.invoke(typeId, methodName, args, argCount)</code></td><td>Invoke a method by name on a type (up to 8 args)</td></tr>
+    <tr><td><code>Reflect.createInstance(typeId, args, argCount)</code></td><td>Create a new instance by calling the <code>init</code> method</td></tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">Tip</div>
+    <p>Method function pointers are automatically patched after JIT compilation, so <code>Reflect.invoke</code> works with any method defined on a <code>[Reflectable]</code> type.</p>
+  </div>
+
+  <h2>Complete Example</h2>
+
+  <pre><code>[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hello"</span>
+    }
+}
+
+<span class="kw">interface</span> <span class="typ">Skill</span> {
+    <span class="kw">def</span> <span class="fn">execute</span>() <span class="op">-></span> <span class="typ">Unit</span>
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">struct</span> <span class="typ">CalendarSkill</span> : <span class="typ">Skill</span> {
+    <span class="kw">def</span> <span class="fn">execute</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="fn">println</span>(<span class="str">"Running calendar"</span>)
+    }
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">enum</span> <span class="typ">Color</span> {
+    Red,
+    Green,
+    Blue
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() {
+    <span class="kw">var</span> ti <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"Animal"</span>)
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">typeName</span>(ti))       <span class="cmt">// Animal</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldCount</span>(ti))     <span class="cmt">// 2</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldName</span>(ti, <span class="num">0</span>))    <span class="cmt">// name</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldType</span>(ti, <span class="num">0</span>))    <span class="cmt">// String</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldName</span>(ti, <span class="num">1</span>))    <span class="cmt">// age</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldType</span>(ti, <span class="num">1</span>))    <span class="cmt">// Int</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">methodCount</span>(ti))    <span class="cmt">// 1</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">methodName</span>(ti, <span class="num">0</span>))   <span class="cmt">// speak</span>
+
+    <span class="kw">var</span> si <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"CalendarSkill"</span>)
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">typeName</span>(si))       <span class="cmt">// CalendarSkill</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">implements</span>(si, <span class="str">"Skill"</span>))  <span class="cmt">// 1</span>
+
+    <span class="kw">var</span> count <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">typeCount</span>()
+    <span class="fn">println</span>(count)                     <span class="cmt">// 4</span>
+    <span class="kw">var</span> i <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">while</span> (i <span class="op">&lt;</span> count) {
+        <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">typeNameAt</span>(i))
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="annotations.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Attributes</span>
+    </a>
+    <a href="stdlib-overview.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Standard Library Overview &rarr;</span>
+    </a>
+  </div>
+
+</main>
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

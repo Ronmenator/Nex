@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annotations - Nex Docs</title>
+  <title>Attributes - Nex Docs</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -16,117 +16,132 @@
 <nav class="sidebar"></nav>
 <main class="main-content">
 
-  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Annotations</div>
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Advanced Topics<span class="sep">/</span>Attributes</div>
 
-  <h1>Annotations</h1>
-  <p class="page-subtitle">Attach compile-time metadata to declarations with the <code>@</code> prefix syntax.</p>
+  <h1>Attributes</h1>
+  <p class="page-subtitle">Attach compile-time metadata to declarations with square-bracket <code>[Name]</code> syntax.</p>
 
   <h2>Syntax</h2>
 
-  <p>Annotations are placed immediately before a declaration using the <code>@</code> prefix:</p>
+  <p>Attributes are placed immediately before a declaration using square brackets:</p>
 
-  <pre><code><span class="op">@</span><span class="fn">annotation_name</span>
+  <pre><code>[<span class="fn">AttributeName</span>]
+<span class="kw">public</span> <span class="kw">class</span> <span class="typ">MyClass</span> {
+    <span class="cmt">// ...</span>
+}</code></pre>
+
+  <p>Attributes can take optional arguments in parentheses:</p>
+
+  <pre><code>[<span class="fn">AttributeName</span>(<span class="str">"arg1"</span>, <span class="str">"arg2"</span>)]
 <span class="kw">public</span> <span class="kw">def</span> <span class="fn">some_function</span>() <span class="op">-></span> <span class="typ">Unit</span> {
     <span class="cmt">// ...</span>
 }</code></pre>
 
-  <p>Annotations can be applied to functions, fields, classes, structs, and interfaces:</p>
+  <p>Attributes can be applied to classes, structs, enums, and interfaces:</p>
 
-  <pre><code><span class="op">@</span><span class="fn">allow_var_api</span>
-<span class="kw">public</span> <span class="kw">def</span> <span class="fn">process</span>(data: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
-    <span class="kw">return</span> data
+  <pre><code>[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
 }
 
-<span class="op">@</span><span class="fn">allow_var_api</span>
-<span class="kw">public</span> payload: <span class="typ">Var</span></code></pre>
+[<span class="fn">Reflectable</span>]
+<span class="kw">struct</span> <span class="typ">Point</span> {
+    x: <span class="typ">Float</span>
+    y: <span class="typ">Float</span>
+}
 
-  <h2>Built-in Annotations (v1)</h2>
+[<span class="fn">Reflectable</span>]
+<span class="kw">enum</span> <span class="typ">Color</span> {
+    Red, Green, Blue
+}</code></pre>
 
-  <p>Nex v1 ships with one built-in annotation:</p>
+  <h2>Built-in Attributes</h2>
 
   <table>
-    <tr><th>Annotation</th><th>Target</th><th>Effect</th></tr>
-    <tr><td><code>@allow_var_api</code></td><td>Functions, fields</td><td>Suppresses the lint warning when <code>Var</code> appears in a public API</td></tr>
+    <tr><th>Attribute</th><th>Target</th><th>Effect</th></tr>
+    <tr><td><code>[Reflectable]</code></td><td>Classes, structs, enums, interfaces</td><td>Enables runtime reflection &mdash; exposes fields, methods, and variants via the <code>Reflect</code> API</td></tr>
   </table>
 
-  <h3><code>@allow_var_api</code></h3>
+  <h3><code>[Reflectable]</code></h3>
 
-  <p>By default, the linter warns when a <code>public</code> function uses <code>Var</code> as a parameter type, return type, or when a <code>public</code> field is of type <code>Var</code>. This warning exists because <code>Var</code> bypasses compile-time type checking.</p>
+  <p>Marks a type for full runtime reflection. All types are registered in the type registry at startup, but only types with <code>[Reflectable]</code> expose their fields and methods through the <code>Reflect</code> API.</p>
 
-  <p>When the use of <code>Var</code> is intentional, annotate the declaration to suppress the warning:</p>
-
-  <pre><code><span class="cmt">// Without annotation: linter emits a warning</span>
-<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
-    <span class="cmt">// WARNING: public function parameter has type Var</span>
-    <span class="cmt">// WARNING: public function return type is Var</span>
-    <span class="kw">return</span> action
+  <pre><code><span class="cmt">// Without [Reflectable]: type is registered but fields/methods hidden</span>
+<span class="kw">class</span> <span class="typ">Internal</span> {
+    secret: <span class="typ">String</span>
 }
 
-<span class="cmt">// With annotation: no warning</span>
-<span class="op">@</span><span class="fn">allow_var_api</span>
-<span class="kw">public</span> <span class="kw">def</span> <span class="fn">dispatch</span>(action: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Var</span> {
-    <span class="kw">return</span> action
+<span class="cmt">// With [Reflectable]: full introspection available</span>
+[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
+
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hello"</span>
+    }
+}
+
+<span class="kw">var</span> ti <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"Animal"</span>)
+<span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldCount</span>(ti))   <span class="cmt">// 2</span>
+<span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldName</span>(ti, <span class="num">0</span>))  <span class="cmt">// name</span></code></pre>
+
+  <p>See the <a href="reflection.html">Reflection</a> page for the full <code>Reflect</code> API reference.</p>
+
+  <h2>Grammar</h2>
+
+  <pre><code>Attributes  = { "[" Ident [ "(" AttrArgList ")" ] "]" } ;
+AttrArgList = ( StringLiteral | Ident ) { "," ( StringLiteral | Ident ) } ;</code></pre>
+
+  <h2>Multiple Attributes</h2>
+
+  <p>A declaration can have multiple attributes, each in its own bracket pair:</p>
+
+  <pre><code>[<span class="fn">Reflectable</span>]
+[<span class="fn">Serializable</span>]
+<span class="kw">class</span> <span class="typ">Config</span> {
+    name: <span class="typ">String</span>
+    value: <span class="typ">Int</span>
 }</code></pre>
-
-  <h2>Compile-Time Only</h2>
-
-  <p>Annotations are <strong>compile-time metadata only</strong>. They influence compiler behavior (such as suppressing warnings or guiding optimizations) but have no effect at runtime. The compiled binary does not contain annotation data.</p>
-
-  <h2>Unknown Annotations</h2>
-
-  <p>If you use an annotation name that the compiler does not recognize, it produces a <strong>compile warning</strong> (not an error):</p>
-
-  <pre><code><span class="op">@</span><span class="fn">deprecated</span>
-<span class="kw">public</span> <span class="kw">def</span> <span class="fn">old_function</span>() <span class="op">-></span> <span class="typ">Unit</span> {
-    <span class="cmt">// WARNING: unknown annotation 'deprecated'</span>
-}</code></pre>
-
-  <p>This means your code still compiles and runs, but you are alerted that the annotation has no effect.</p>
-
-  <h2>v1 Limitations</h2>
-
-  <p>Nex v1 annotations have these limitations:</p>
-
-  <ul>
-    <li><strong>No annotation arguments</strong> &mdash; syntax like <code>@deprecated("use X instead")</code> is not supported in v1</li>
-    <li><strong>No custom annotations</strong> &mdash; you cannot define your own annotation types; only built-in annotations are recognized</li>
-    <li><strong>No runtime retention</strong> &mdash; annotations cannot be inspected at runtime</li>
-  </ul>
 
   <h2>Complete Example</h2>
 
-  <pre><code><span class="kw">import</span> std.collections
+  <pre><code>[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Animal</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
 
-<span class="cmt">// A dynamic event system that intentionally uses Var</span>
-<span class="kw">class</span> <span class="typ">EventBus</span> {
-    listeners: <span class="typ">List</span>[(<span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span>]
-
-    <span class="kw">def</span> <span class="fn">init</span>() <span class="op">-></span> <span class="typ">Unit</span> {
-        <span class="kw">self</span>.listeners <span class="op">=</span> <span class="typ">List</span>[(<span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span>]()
-        <span class="kw">return</span>
-    }
-
-    <span class="op">@</span><span class="fn">allow_var_api</span>
-    <span class="kw">public</span> <span class="kw">def</span> <span class="fn">emit</span>(event: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span> {
-        i <span class="op">=</span> <span class="num">0</span>
-        <span class="kw">while</span> (i <span class="op">&lt;</span> <span class="kw">self</span>.listeners.<span class="fn">length</span>()) {
-            listener <span class="op">=</span> <span class="kw">self</span>.listeners.<span class="fn">get</span>(i)
-            <span class="fn">listener</span>(event)
-            i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
-        }
-        <span class="kw">return</span>
+    <span class="kw">def</span> <span class="fn">speak</span>() <span class="op">-></span> <span class="typ">String</span> {
+        <span class="kw">return</span> <span class="str">"Hello"</span>
     }
 }
 
-<span class="kw">def</span> <span class="fn">log_event</span>(event: <span class="typ">Var</span>) <span class="op">-></span> <span class="typ">Unit</span> {
-    <span class="fn">println</span>(<span class="str">"Event: "</span> <span class="op">+</span> event)
-    <span class="kw">return</span>
+<span class="kw">interface</span> <span class="typ">Skill</span> {
+    <span class="kw">def</span> <span class="fn">execute</span>() <span class="op">-></span> <span class="typ">Unit</span>
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">struct</span> <span class="typ">CalendarSkill</span> : <span class="typ">Skill</span> {
+    <span class="kw">def</span> <span class="fn">execute</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+        <span class="fn">println</span>(<span class="str">"Running calendar"</span>)
+    }
+}
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">enum</span> <span class="typ">Color</span> {
+    Red, Green, Blue
 }
 
 <span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
-    bus <span class="op">=</span> <span class="typ">EventBus</span>()
-    bus.<span class="fn">emit</span>(<span class="str">"user_login"</span>)
-    bus.<span class="fn">emit</span>(<span class="num">42</span>)
+    <span class="kw">var</span> ti <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"Animal"</span>)
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">typeName</span>(ti))       <span class="cmt">// Animal</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">fieldCount</span>(ti))     <span class="cmt">// 2</span>
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">methodCount</span>(ti))    <span class="cmt">// 1</span>
+
+    <span class="kw">var</span> si <span class="op">=</span> <span class="fn">Reflect</span>.<span class="fn">findType</span>(<span class="str">"CalendarSkill"</span>)
+    <span class="fn">println</span>(<span class="fn">Reflect</span>.<span class="fn">implements</span>(si, <span class="str">"Skill"</span>))  <span class="cmt">// 1</span>
+    <span class="kw">return</span>
 }</code></pre>
 
   <div class="page-nav">
@@ -134,9 +149,9 @@
       <span class="nav-label">Previous</span>
       <span class="nav-title">&larr; Async / Await</span>
     </a>
-    <a href="stdlib-overview.html">
+    <a href="reflection.html">
       <span class="nav-label">Next</span>
-      <span class="nav-title">Standard Library Overview &rarr;</span>
+      <span class="nav-title">Reflection &rarr;</span>
     </a>
   </div>
 
