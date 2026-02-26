@@ -236,6 +236,10 @@ const DOCS: Record<string, string> = {
   "null": "**null** — the null literal, assignable to any nullable type `T?`.",
   "true": "**true** — boolean literal.",
   "false": "**false** — boolean literal.",
+  "async": "**async** — Declares an asynchronous function.\n\n```nex\nasync def fetch(url: String) -> String {\n    // async operation\n    return result\n}\n```\n\nAsync functions return a future. Use `await` to get the result.",
+  "await": "**await** — Waits for an async operation to complete.\n\n```nex\nresult = await fetch_data(url)\n```\n\nCan only be used to await async function calls.",
+  "enum": "**enum** — Declares an enumerated type with named variants.\n\n```nex\nenum Color {\n    Red,\n    Green,\n    Blue\n}\n```\n\nAccess variants with `Color.Red`. Use with `match` for pattern matching.",
+  "match": "**match** — Pattern matching expression. Compares a value against patterns.\n\n```nex\nmatch value {\n    1 -> println(\"one\")\n    2 -> println(\"two\")\n    _ -> println(\"other\")\n}\n```\n\nSupports literal, enum variant, wildcard (`_`), and binding patterns. Guards: `pattern if condition -> body`",
 
   // Built-in types
   "Bool": "**Bool** — boolean value type (`true` / `false`).",

@@ -24,6 +24,10 @@
 16. [Dynamic Typing (var)](#16-dynamic-typing-var)
 17. [Nullable Types](#17-nullable-types)
 18. [Operator Overloading](#18-operator-overloading)
+18a. [Enums](#18a-enums)
+18b. [String Interpolation](#18b-string-interpolation)
+18c. [Closures & Lambdas](#18c-closures--lambdas)
+18d. [Async / Await](#18d-async--await)
 19. [Standard Library Reference](#19-standard-library-reference)
 20. [Collections (List, Map, Set)](#20-collections-list-map-set)
 21. [File I/O](#21-file-io)
@@ -55,7 +59,11 @@
 - **Garbage collected** (tracing, mark-and-sweep)
 - **Automatic Semicolon Insertion (ASI)** — semicolons are optional
 - **Brace-delimited blocks** `{ }`
-- **No closures/lambdas** in v1 — function references only
+- **Closures/lambdas** supported via `|params| body` syntax
+- **String interpolation** via `$"text {expr}"`
+- **Pattern matching** via `match` expressions
+- **Enums** with named variants
+- **Async/await** for concurrency
 - **Comments**: `// line` and `/* block */`
 
 ### Hello World
@@ -512,6 +520,85 @@ def greet() -> Unit {
 }
 ```
 
+### 7.7 Ternary Expression
+
+Nex uses Python-style ternary expressions where the value comes first:
+
+```nex
+result = "yes" if condition else "no"
+
+// Equivalent to:
+// if (condition) { result = "yes" } else { result = "no" }
+
+max_val = a if a > b else b
+
+// Can be chained (right-associative):
+label = "high" if x > 100 else "mid" if x > 50 else "low"
+```
+
+**Rules:**
+- Syntax is `then_expr if condition else else_expr`
+- This is an **expression** that produces a value — it can be used in assignments, arguments, return values
+- The condition must evaluate to `Bool`
+- Both branches must produce compatible types
+
+### 7.8 Pattern Matching (match)
+
+The `match` expression compares a value against a set of patterns:
+
+```nex
+match status {
+    1 -> println("active")
+    2 -> println("inactive")
+    _ -> println("unknown")
+}
+```
+
+**Pattern kinds:**
+
+```nex
+// Literal patterns
+match x {
+    0 -> println("zero")
+    1 -> println("one")
+    _ -> println("other")
+}
+
+// String patterns
+match name {
+    "Alice" -> println("hi Alice")
+    "Bob" -> println("hi Bob")
+    _ -> println("who?")
+}
+
+// Enum variant patterns
+match color {
+    Color.Red -> println("red")
+    Color.Green -> println("green")
+    Color.Blue -> println("blue")
+}
+
+// Binding patterns (captures value into variable)
+match x {
+    val -> println(val)    // binds x to 'val'
+}
+
+// Guard clauses
+match score {
+    s if s >= 90 -> println("A")
+    s if s >= 80 -> println("B")
+    s if s >= 70 -> println("C")
+    _ -> println("F")
+}
+```
+
+**Rules:**
+- Each arm is `pattern [if guard] -> body`
+- `_` is the wildcard pattern (matches anything, discards value)
+- Guard clauses add an `if condition` after the pattern
+- Match is an **expression** — all arms should produce compatible types when used as a value
+- If no arm matches at runtime, behavior is undefined — always include a `_` wildcard
+
 ---
 
 ## 8. Functions
@@ -585,7 +672,61 @@ def on_click() {
 engine_set_update(on_click)
 ```
 
-**Note**: Nex v1 does not have closures or lambdas. Only named function references.
+### 8.6 Closures & Lambdas
+
+Nex supports anonymous functions (lambdas) with variable capture (closures):
+
+```nex
+// Simple lambda
+increment = |x| x + 1
+
+// With type annotations
+add = |a: Int, b: Int| -> Int { a + b }
+
+// No parameters
+greet = || println("Hello")
+
+// Closures capture variables from enclosing scope
+threshold = 10
+check = |x| x > threshold    // captures 'threshold'
+
+// Block body
+transform = |x: Int| -> Int {
+    var result = x * 2
+    result = result + 1
+    return result
+}
+```
+
+**Rules:**
+- Parameters are delimited by `|...|`
+- Each parameter can have an optional `: Type` annotation
+- Return type is optional: `|params| -> ReturnType { body }`
+- Body can be a single expression or a block `{ ... }`
+- Closures capture variables from the enclosing scope by reference
+- Empty parameter list: `|| expr`
+
+### 8.7 Async Functions
+
+Functions can be declared `async` for concurrent execution:
+
+```nex
+async def fetch_data(url: String) -> String {
+    // asynchronous operation
+    return result
+}
+
+def main() -> Unit {
+    data = await fetch_data("http://example.com")
+    println(data)
+    return
+}
+```
+
+**Rules:**
+- Add `async` before `def` to declare an async function
+- Use `await` to wait for the result of an async call
+- Async functions return a future that is resolved with `await`
 
 ---
 
@@ -1239,6 +1380,108 @@ v3 = v1 + v2          // Vec2(4.0, 6.0)
 ```
 
 **Overloadable Operators**: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `!` (unary)
+
+---
+
+## 18a. Enums
+
+Enums define a type with a fixed set of named variants.
+
+### Declaration
+
+```nex
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+public enum Color {
+    Red,
+    Green,
+    Blue
+}
+```
+
+### Usage
+
+```nex
+dir = Direction.North
+
+// Use with match
+match dir {
+    Direction.North -> println("going north")
+    Direction.South -> println("going south")
+    Direction.East -> println("going east")
+    Direction.West -> println("going west")
+}
+
+// Use with if/else
+if (dir == Direction.North) {
+    println("heading north")
+}
+```
+
+### With Attributes
+
+```nex
+[Reflectable]
+enum Status {
+    Active,
+    Inactive,
+    Pending
+}
+```
+
+**Rules:**
+- Variants are simple named identifiers (no associated data in v1)
+- Trailing comma after last variant is optional
+- Access variants via `EnumName.VariantName`
+- Enums can have `public` visibility for cross-module access
+- Enums can be decorated with `[Attribute]` annotations
+
+---
+
+## 18b. String Interpolation
+
+String interpolation allows embedding expressions inside string literals:
+
+```nex
+name = "World"
+greeting = $"Hello, {name}!"
+println(greeting)    // Hello, World!
+
+// Expressions inside braces
+x = 10
+y = 20
+result = $"sum = {x + y}"    // sum = 30
+
+// Multiple interpolations
+first = "Alice"
+age = 30
+bio = $"{first} is {age} years old"
+```
+
+**Rules:**
+- Interpolated strings start with `$"` and end with `"`
+- Expressions are placed inside `{...}` braces
+- Any valid expression can be used inside braces
+- Nested braces in expressions are tracked correctly
+- Standard escape sequences work: `\\`, `\"`, `\n`, `\t`, `\r`
+- The result is always a `String`
+
+---
+
+## 18c. Closures & Lambdas
+
+See [Section 8.6](#86-closures--lambdas) for full documentation of closure and lambda syntax.
+
+---
+
+## 18d. Async / Await
+
+See [Section 8.7](#87-async-functions) for full documentation of async function declarations and await expressions.
 
 ---
 
@@ -2622,21 +2865,14 @@ for (item in items) {
 
 ### Things Nex v1 Does NOT Have
 
-1. **No closures or lambdas** — use named function references only
-2. **No `++` or `--` operators** — use `i = i + 1`
-3. **No string interpolation** — use `+` concatenation
-4. **No pattern matching / switch** — use if/else chains
-5. **No async/await** — use threading for concurrency
-6. **No macros or metaprogramming**
-7. **No reflection** (only RTTI via `Var` dispatch)
-8. **No enums** — use integer constants or classes
-9. **No tuple types** — use structs
-10. **No destructuring** — access fields individually
-11. **No default parameter values** — all parameters required
-12. **No named arguments** — positional only
-13. **No generic constraints** — no `where T : Interface`
-14. **No implicit type conversions** — explicit casts needed
-15. **No ternary operator** — use if/else
+1. **No `++` or `--` operators** — use `i = i + 1`
+2. **No macros or metaprogramming**
+3. **No tuple types** — use structs
+4. **No destructuring** — access fields individually
+5. **No default parameter values** — all parameters required
+6. **No named arguments** — positional only
+7. **No generic constraints** — no `where T : Interface`
+8. **No implicit type conversions** — explicit casts needed
 
 ### Important Notes
 
@@ -2660,8 +2896,16 @@ Program           = { Item } EOF ;
 Item              = ImportDecl
                   | ClassDecl
                   | InterfaceDecl
+                  | StructDecl
+                  | EnumDecl
                   | FunctionDecl
                   | Statement ;
+
+EnumDecl          = [ Attributes ] [ "public" ] "enum" Ident "{" EnumVariant { "," EnumVariant } [ "," ] "}" ;
+EnumVariant       = Ident ;
+
+Attributes        = { "[" Ident [ "(" AttrArgList ")" ] "]" } ;
+AttrArgList       = ( StringLiteral | Ident ) { "," ( StringLiteral | Ident ) } ;
 
 ImportDecl        = "import" ModulePath [ "as" Ident ] Terminator
                   | "from" ModulePath "import" ImportList Terminator ;
@@ -2686,7 +2930,7 @@ StructMember      = FieldDecl Terminator | FunctionDecl ;
 
 FieldDecl         = [ "public" ] Ident ":" TypeRef [ "=" Expr ] ;
 
-FunctionDecl      = [ "public" ] [ "static" ] [ "virtual" ] [ "override" ]
+FunctionDecl      = [ Attributes ] [ "public" ] [ "static" ] [ "virtual" ] [ "override" ] [ "async" ]
                     "def" ( Ident | "operator" OperatorSymbol )
                     "(" [ Parameters ] ")" [ "->" TypeRef ] Block ;
 
@@ -2697,7 +2941,7 @@ TypeParams        = Ident { "," Ident } ;
 Block             = "{" { Statement } "}" ;
 
 Statement         = Block
-                  | IfStmt | WhileStmt | ForStmt
+                  | IfStmt | WhileStmt | ForStmt | MatchExpr
                   | TryStmt | UsingStmt
                   | ReturnStmt | BreakStmt | ContinueStmt | ThrowStmt
                   | VarStmt | ExprStmt ;
@@ -2713,7 +2957,8 @@ VarStmt           = "var" Ident [ ":" TypeRef ] "=" Expr Terminator ;
 ExprStmt          = Expr Terminator ;
 
 Expr              = Assignment ;
-Assignment        = LogicalOr [ ( "=" | "+=" | "-=" | "*=" | "/=" ) Assignment ] ;
+Assignment        = Ternary [ ( "=" | "+=" | "-=" | "*=" | "/=" ) Assignment ] ;
+Ternary           = LogicalOr [ "if" LogicalOr "else" Ternary ] ;
 LogicalOr         = LogicalAnd { "||" LogicalAnd } ;
 LogicalAnd        = Equality { "&&" Equality } ;
 Equality          = Relational { ( "==" | "!=" ) Relational } ;
@@ -2724,9 +2969,22 @@ Unary             = ( "!" | "-" | "+" ) Unary | Postfix ;
 Postfix           = Primary { "(" [ ArgList ] ")" | "." Ident | "::" Ident } ;
 ArgList           = Expr { "," Expr } ;
 
-Primary           = IntLiteral | FloatLiteral | StringLiteral | CharLiteral
+Primary           = IntLiteral | FloatLiteral | StringLiteral | InterpolatedString | CharLiteral
                   | "true" | "false" | "null"
+                  | MatchExpr | LambdaExpr | AwaitExpr
                   | Ident | "self" | "(" Expr ")" ;
+
+InterpolatedString = "$\"" { StringChars | "{" Expr "}" } "\"" ;
+
+MatchExpr         = "match" Expr "{" { MatchArm } "}" ;
+MatchArm          = Pattern [ "if" Expr ] "->" Expr ;
+Pattern           = "_" | Literal | Ident "." Ident | Ident ;
+
+LambdaExpr        = "|" [ LambdaParams ] "|" [ "->" TypeRef ] ( Expr | Block ) ;
+LambdaParams      = LambdaParam { "," LambdaParam } ;
+LambdaParam       = Ident [ ":" TypeRef ] ;
+
+AwaitExpr         = "await" Expr ;
 
 TypeRef           = BuiltinType | Ident [ "[" TypeRef { "," TypeRef } "]" ] [ "?" ] ;
 

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Async / Await - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+</header>
+
+<nav class="sidebar"></nav>
+
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Advanced Topics<span class="sep">/</span>Async / Await</div>
+
+  <h1>Async / Await</h1>
+  <p class="page-subtitle">Concurrent programming with async functions.</p>
+
+  <h2>Async Functions</h2>
+
+  <p>An async function is declared by placing the <code>async</code> keyword before <code>def</code>. Async functions can perform concurrent operations and return a future that must be awaited to retrieve the result:</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">fetch_data</span>(url: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="cmt">// Perform an asynchronous operation</span>
+    result <span class="op">=</span> <span class="kw">await</span> <span class="fn">http_get</span>(url)
+    <span class="kw">return</span> result
+}</code></pre>
+
+  <p>The return type annotation specifies the type of the value produced when the future completes. An <code>async def</code> that returns <code>String</code> produces a future that, when awaited, yields a <code>String</code>.</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">compute</span>() <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="cmt">// Simulate async computation</span>
+    <span class="kw">return</span> <span class="num">42</span>
+}</code></pre>
+
+  <p>Async functions without a meaningful return value use <code>Unit</code>:</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">log_message</span>(msg: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(msg)
+    <span class="kw">return</span>
+}</code></pre>
+
+  <h2>Await Expressions</h2>
+
+  <p>The <code>await</code> keyword suspends execution until the async operation completes, then produces the result value:</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">fetch_user</span>(id: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">return</span> <span class="str">$"User-{id}"</span>
+}
+
+<span class="kw">async</span> <span class="kw">def</span> <span class="fn">process</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    user <span class="op">=</span> <span class="kw">await</span> <span class="fn">fetch_user</span>(<span class="num">1</span>)
+    <span class="fn">println</span>(user)  <span class="cmt">// User-1</span>
+    <span class="kw">return</span>
+}</code></pre>
+
+  <p>You can <code>await</code> multiple async calls sequentially:</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">fetch_all</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    a <span class="op">=</span> <span class="kw">await</span> <span class="fn">fetch_user</span>(<span class="num">1</span>)
+    b <span class="op">=</span> <span class="kw">await</span> <span class="fn">fetch_user</span>(<span class="num">2</span>)
+    c <span class="op">=</span> <span class="kw">await</span> <span class="fn">fetch_user</span>(<span class="num">3</span>)
+
+    <span class="fn">println</span>(a)  <span class="cmt">// User-1</span>
+    <span class="fn">println</span>(b)  <span class="cmt">// User-2</span>
+    <span class="fn">println</span>(c)  <span class="cmt">// User-3</span>
+    <span class="kw">return</span>
+}</code></pre>
+
+  <p>Await can also be used inline within expressions:</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">get_total</span>() <span class="op">-></span> <span class="typ">Int</span> {
+    x <span class="op">=</span> <span class="kw">await</span> <span class="fn">compute_a</span>()
+    y <span class="op">=</span> <span class="kw">await</span> <span class="fn">compute_b</span>()
+    <span class="kw">return</span> x <span class="op">+</span> y
+}</code></pre>
+
+  <h2>Usage in Main</h2>
+
+  <p>To call async functions from <code>main</code>, use <code>await</code> at the call site:</p>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">load_config</span>() <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">return</span> <span class="str">"config loaded"</span>
+}
+
+<span class="kw">async</span> <span class="kw">def</span> <span class="fn">start_server</span>(config: <span class="typ">String</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">$"Starting with: {config}"</span>)
+    <span class="kw">return</span>
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    config <span class="op">=</span> <span class="kw">await</span> <span class="fn">load_config</span>()
+    <span class="kw">await</span> <span class="fn">start_server</span>(config)
+}
+<span class="cmt">// Starting with: config loaded</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Futures must be awaited</div>
+    <p>Async functions return a future that must be awaited to get the result. Calling an async function without <code>await</code> produces the future object itself, not the computed value. Always use <code>await</code> when you need the result.</p>
+  </div>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">async</span> <span class="kw">def</span> <span class="fn">fetch_name</span>(id: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">match</span> id {
+        <span class="num">1</span> <span class="op">-></span> <span class="kw">return</span> <span class="str">"Alice"</span>
+        <span class="num">2</span> <span class="op">-></span> <span class="kw">return</span> <span class="str">"Bob"</span>
+        _ <span class="op">-></span> <span class="kw">return</span> <span class="str">"Unknown"</span>
+    }
+}
+
+<span class="kw">async</span> <span class="kw">def</span> <span class="fn">greet_user</span>(id: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">String</span> {
+    name <span class="op">=</span> <span class="kw">await</span> <span class="fn">fetch_name</span>(id)
+    <span class="kw">return</span> <span class="str">$"Hello, {name}!"</span>
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    msg1 <span class="op">=</span> <span class="kw">await</span> <span class="fn">greet_user</span>(<span class="num">1</span>)
+    msg2 <span class="op">=</span> <span class="kw">await</span> <span class="fn">greet_user</span>(<span class="num">2</span>)
+    msg3 <span class="op">=</span> <span class="kw">await</span> <span class="fn">greet_user</span>(<span class="num">99</span>)
+
+    <span class="fn">println</span>(msg1)  <span class="cmt">// Hello, Alice!</span>
+    <span class="fn">println</span>(msg2)  <span class="cmt">// Hello, Bob!</span>
+    <span class="fn">println</span>(msg3)  <span class="cmt">// Hello, Unknown!</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="closures.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Closures &amp; Lambdas</span>
+    </a>
+    <a href="annotations.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Annotations &rarr;</span>
+    </a>
+  </div>
+
+</main>
+
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

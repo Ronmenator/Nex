@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Closures &amp; Lambdas - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+</header>
+
+<nav class="sidebar"></nav>
+
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Advanced Topics<span class="sep">/</span>Closures &amp; Lambdas</div>
+
+  <h1>Closures &amp; Lambdas</h1>
+  <p class="page-subtitle">Anonymous functions with variable capture.</p>
+
+  <h2>Lambda Syntax</h2>
+
+  <p>A lambda (also called a closure) is an anonymous function defined inline using pipe syntax. The basic form is <code>|params| body</code>:</p>
+
+  <pre><code>add <span class="op">=</span> |a, b| a <span class="op">+</span> b
+<span class="fn">println</span>(<span class="fn">add</span>(<span class="num">3</span>, <span class="num">4</span>))  <span class="cmt">// 7</span></code></pre>
+
+  <p>Parameters are listed between the <code>|</code> pipe characters, followed by the body expression.</p>
+
+  <h2>Type Annotations</h2>
+
+  <p>You can add type annotations to parameters and specify a return type:</p>
+
+  <pre><code>add <span class="op">=</span> |a: <span class="typ">Int</span>, b: <span class="typ">Int</span>| <span class="op">-></span> <span class="typ">Int</span> { a <span class="op">+</span> b }
+<span class="fn">println</span>(<span class="fn">add</span>(<span class="num">10</span>, <span class="num">20</span>))  <span class="cmt">// 30</span></code></pre>
+
+  <p>Type annotations are optional when the types can be inferred from context, but they can be helpful for clarity.</p>
+
+  <h2>Single Expression Body</h2>
+
+  <p>When the lambda body is a single expression, no braces are needed. The expression value is automatically returned:</p>
+
+  <pre><code>increment <span class="op">=</span> |x| x <span class="op">+</span> <span class="num">1</span>
+negate <span class="op">=</span> |x| <span class="num">0</span> <span class="op">-</span> x
+identity <span class="op">=</span> |x| x
+
+<span class="fn">println</span>(<span class="fn">increment</span>(<span class="num">5</span>))  <span class="cmt">// 6</span>
+<span class="fn">println</span>(<span class="fn">negate</span>(<span class="num">3</span>))     <span class="cmt">// -3</span>
+<span class="fn">println</span>(<span class="fn">identity</span>(<span class="num">42</span>))  <span class="cmt">// 42</span></code></pre>
+
+  <h2>Block Body</h2>
+
+  <p>For more complex logic, use braces to create a block body with multiple statements:</p>
+
+  <pre><code>compute <span class="op">=</span> |x| {
+    <span class="kw">var</span> r <span class="op">=</span> x <span class="op">*</span> <span class="num">2</span>
+    r <span class="op">=</span> r <span class="op">+</span> <span class="num">10</span>
+    <span class="kw">return</span> r
+}
+
+<span class="fn">println</span>(<span class="fn">compute</span>(<span class="num">5</span>))  <span class="cmt">// 20</span></code></pre>
+
+  <p>Use <code>return</code> to return a value from a block-body lambda.</p>
+
+  <h2>No Parameters</h2>
+
+  <p>A lambda with no parameters uses empty pipes <code>||</code>:</p>
+
+  <pre><code>say_hello <span class="op">=</span> || <span class="fn">println</span>(<span class="str">"hello"</span>)
+<span class="fn">say_hello</span>()  <span class="cmt">// hello</span>
+
+get_value <span class="op">=</span> || <span class="num">42</span>
+<span class="fn">println</span>(<span class="fn">get_value</span>())  <span class="cmt">// 42</span></code></pre>
+
+  <h2>Variable Capture</h2>
+
+  <p>Closures capture variables from their enclosing scope. The captured variables remain accessible even after the surrounding function returns:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">make_counter</span>() <span class="op">-></span> () <span class="op">-></span> <span class="typ">Int</span> {
+    count <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">return</span> || {
+        count <span class="op">=</span> count <span class="op">+</span> <span class="num">1</span>
+        <span class="kw">return</span> count
+    }
+}
+
+counter <span class="op">=</span> <span class="fn">make_counter</span>()
+<span class="fn">println</span>(<span class="fn">counter</span>())  <span class="cmt">// 1</span>
+<span class="fn">println</span>(<span class="fn">counter</span>())  <span class="cmt">// 2</span>
+<span class="fn">println</span>(<span class="fn">counter</span>())  <span class="cmt">// 3</span></code></pre>
+
+  <p>In this example, the lambda captures the <code>count</code> variable. Each call to the returned closure increments and returns the shared counter.</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">make_adder</span>(base: <span class="typ">Int</span>) <span class="op">-></span> (<span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> |x| base <span class="op">+</span> x
+}
+
+add5 <span class="op">=</span> <span class="fn">make_adder</span>(<span class="num">5</span>)
+add10 <span class="op">=</span> <span class="fn">make_adder</span>(<span class="num">10</span>)
+
+<span class="fn">println</span>(<span class="fn">add5</span>(<span class="num">3</span>))   <span class="cmt">// 8</span>
+<span class="fn">println</span>(<span class="fn">add10</span>(<span class="num">3</span>))  <span class="cmt">// 13</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Capture semantics</div>
+    <p>Closures capture variables from their enclosing scope by reference. Modifications to a captured variable inside the closure are visible outside, and vice versa.</p>
+  </div>
+
+  <h2>Passing as Arguments</h2>
+
+  <p>Lambdas are commonly passed as arguments to other functions, acting as callbacks or transformations:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">apply_twice</span>(f: (<span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span>, value: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> <span class="fn">f</span>(<span class="fn">f</span>(value))
+}
+
+result <span class="op">=</span> <span class="fn">apply_twice</span>(|x| x <span class="op">*</span> <span class="num">2</span>, <span class="num">3</span>)
+<span class="fn">println</span>(result)  <span class="cmt">// 12</span></code></pre>
+
+  <p>You can also store lambdas in variables and pass those:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">run_callback</span>(cb: () <span class="op">-></span> <span class="typ">Unit</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"before callback"</span>)
+    <span class="fn">cb</span>()
+    <span class="fn">println</span>(<span class="str">"after callback"</span>)
+    <span class="kw">return</span>
+}
+
+action <span class="op">=</span> || <span class="fn">println</span>(<span class="str">"running!"</span>)
+<span class="fn">run_callback</span>(action)
+<span class="cmt">// before callback</span>
+<span class="cmt">// running!</span>
+<span class="cmt">// after callback</span></code></pre>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">def</span> <span class="fn">make_multiplier</span>(factor: <span class="typ">Int</span>) <span class="op">-></span> (<span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> |x| x <span class="op">*</span> factor
+}
+
+<span class="kw">def</span> <span class="fn">apply</span>(f: (<span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span>, value: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> <span class="fn">f</span>(value)
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    double <span class="op">=</span> <span class="fn">make_multiplier</span>(<span class="num">2</span>)
+    triple <span class="op">=</span> <span class="fn">make_multiplier</span>(<span class="num">3</span>)
+
+    <span class="fn">println</span>(<span class="fn">apply</span>(double, <span class="num">5</span>))  <span class="cmt">// 10</span>
+    <span class="fn">println</span>(<span class="fn">apply</span>(triple, <span class="num">5</span>))  <span class="cmt">// 15</span>
+
+    <span class="cmt">// Inline lambda</span>
+    <span class="fn">println</span>(<span class="fn">apply</span>(|x| x <span class="op">+</span> <span class="num">100</span>, <span class="num">5</span>))  <span class="cmt">// 105</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="string-interpolation.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; String Interpolation</span>
+    </a>
+    <a href="async-await.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Async / Await &rarr;</span>
+    </a>
+  </div>
+
+</main>
+
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

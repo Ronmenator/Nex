@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.96</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -99,6 +99,73 @@
     <span class="fn">println</span>(<span class="str">"Hello!"</span>)
     <span class="kw">return</span>  <span class="cmt">// explicit return for Unit functions</span>
 }</code></pre>
+
+  <h2>Ternary Expression</h2>
+
+  <p>Nex uses Python-style ternary expressions where the <strong>value comes first</strong>, followed by the condition:</p>
+
+  <pre><code>result <span class="op">=</span> <span class="str">"yes"</span> <span class="kw">if</span> condition <span class="kw">else</span> <span class="str">"no"</span>
+
+<span class="cmt">// Use in assignments</span>
+max_val <span class="op">=</span> a <span class="kw">if</span> a <span class="op">&gt;</span> b <span class="kw">else</span> b
+
+<span class="cmt">// Chained (right-associative)</span>
+label <span class="op">=</span> <span class="str">"high"</span> <span class="kw">if</span> x <span class="op">&gt;</span> <span class="num">100</span> <span class="kw">else</span> <span class="str">"mid"</span> <span class="kw">if</span> x <span class="op">&gt;</span> <span class="num">50</span> <span class="kw">else</span> <span class="str">"low"</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p>The syntax is <code>then_value if condition else else_value</code> &mdash; this is an <strong>expression</strong> that produces a value and can be used in assignments, function arguments, and return statements.</p>
+  </div>
+
+  <h2>Pattern Matching (match)</h2>
+
+  <p>The <code>match</code> expression compares a value against a set of patterns:</p>
+
+  <pre><code><span class="kw">match</span> status {
+    <span class="num">1</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"active"</span>)
+    <span class="num">2</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"inactive"</span>)
+    _ <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"unknown"</span>)
+}</code></pre>
+
+  <h3>Pattern Types</h3>
+
+  <p><strong>Literal patterns</strong> &mdash; match exact values:</p>
+
+  <pre><code><span class="kw">match</span> x {
+    <span class="num">0</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"zero"</span>)
+    <span class="num">1</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"one"</span>)
+    _ <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"other"</span>)
+}</code></pre>
+
+  <p><strong>String patterns:</strong></p>
+
+  <pre><code><span class="kw">match</span> name {
+    <span class="str">"Alice"</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"hi Alice"</span>)
+    <span class="str">"Bob"</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"hi Bob"</span>)
+    _ <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"who?"</span>)
+}</code></pre>
+
+  <p><strong>Enum variant patterns:</strong></p>
+
+  <pre><code><span class="kw">match</span> color {
+    <span class="typ">Color</span>.Red <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"red"</span>)
+    <span class="typ">Color</span>.Green <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"green"</span>)
+    <span class="typ">Color</span>.Blue <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"blue"</span>)
+}</code></pre>
+
+  <p><strong>Guard clauses</strong> &mdash; add conditions with <code>if</code>:</p>
+
+  <pre><code><span class="kw">match</span> score {
+    s <span class="kw">if</span> s <span class="op">&gt;=</span> <span class="num">90</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"A"</span>)
+    s <span class="kw">if</span> s <span class="op">&gt;=</span> <span class="num">80</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"B"</span>)
+    s <span class="kw">if</span> s <span class="op">&gt;=</span> <span class="num">70</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"C"</span>)
+    _ <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"F"</span>)
+}</code></pre>
+
+  <div class="callout tip">
+    <div class="callout-title">Tip</div>
+    <p>Always include a wildcard <code>_</code> arm as the last pattern to handle all remaining cases.</p>
+  </div>
 
   <h2>Comments</h2>
 

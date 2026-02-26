@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.96</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -50,7 +50,7 @@ result <span class="op">=</span> <span class="fn">op</span>(<span class="num">3<
 
   <h2>Function References</h2>
 
-  <p>In v1, Nex supports <strong>function references only</strong> &mdash; closures and lambdas are deferred to v2. A function reference is created simply by naming the function:</p>
+  <p>A function reference is created simply by naming the function. Nex also supports <a href="closures.html">closures and lambdas</a> for anonymous functions.</p>
 
   <pre><code><span class="kw">def</span> <span class="fn">double</span>(x: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
     <span class="kw">return</span> x <span class="op">*</span> <span class="num">2</span>
@@ -67,9 +67,9 @@ transform <span class="op">=</span> double
 transform <span class="op">=</span> negate
 <span class="fn">println</span>(<span class="fn">transform</span>(<span class="num">5</span>))  <span class="cmt">// -5</span></code></pre>
 
-  <div class="callout info">
-    <div class="callout-title">v2 roadmap</div>
-    <p>Closures (anonymous functions that capture variables from the enclosing scope) and lambda syntax are planned for Nex v2.</p>
+  <div class="callout tip">
+    <div class="callout-title">Tip</div>
+    <p>In addition to named function references, Nex supports <a href="closures.html">closures and lambdas</a> &mdash; anonymous functions with variable capture using <code>|params| body</code> syntax.</p>
   </div>
 
   <h2>Passing Functions as Arguments</h2>
@@ -177,9 +177,9 @@ divider <span class="op">=</span> <span class="fn">get_divider</span>()
       <span class="nav-label">Previous</span>
       <span class="nav-title">&larr; Nullable Types</span>
     </a>
-    <a href="annotations.html">
+    <a href="closures.html">
       <span class="nav-label">Next</span>
-      <span class="nav-title">Annotations &rarr;</span>
+      <span class="nav-title">Closures &amp; Lambdas &rarr;</span>
     </a>
   </div>
 

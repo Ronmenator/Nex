@@ -20,6 +20,8 @@ const NAV_HTML = `
     <li><a href="classes.html">Classes &amp; Inheritance</a></li>
     <li><a href="structs.html">Structs</a></li>
     <li><a href="interfaces.html">Interfaces</a></li>
+    <li><a href="enums.html">Enums</a></li>
+    <li><a href="string-interpolation.html">String Interpolation</a></li>
     <li><a href="modules-imports.html">Modules &amp; Imports</a></li>
     <li><a href="error-handling.html">Error Handling</a></li>
     <li><a href="resource-management.html">Resource Management</a></li>
@@ -35,6 +37,8 @@ const NAV_HTML = `
     <li><a href="dynamic-var.html">Dynamic Typing (Var)</a></li>
     <li><a href="nullable-types.html">Nullable Types</a></li>
     <li><a href="function-types.html">Function Types</a></li>
+    <li><a href="closures.html">Closures &amp; Lambdas</a></li>
+    <li><a href="async-await.html">Async / Await</a></li>
     <li><a href="annotations.html">Annotations</a></li>
   </ul>
 </div>

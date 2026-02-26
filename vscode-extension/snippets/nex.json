@@ -207,5 +207,52 @@
       "}"
     ],
     "description": "Main entry point function"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Name} {",
+      "\t${2:Variant1},",
+      "\t${3:Variant2},",
+      "\t${4:Variant3}",
+      "}",
+      "$0"
+    ],
+    "description": "Enum definition"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": [
+      "match ${1:expr} {",
+      "\t${2:pattern1} -> ${3:body1}",
+      "\t${4:pattern2} -> ${5:body2}",
+      "\t_ -> ${6:default}",
+      "}",
+      "$0"
+    ],
+    "description": "Match expression"
+  },
+  "Async Function": {
+    "prefix": "adef",
+    "body": [
+      "async def ${1:name}(${2:params}) -> ${3:Unit} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Async function definition"
+  },
+  "Closure": {
+    "prefix": "closure",
+    "body": [
+      "|${1:params}| ${2:body}"
+    ],
+    "description": "Lambda/closure expression"
+  },
+  "String Interpolation": {
+    "prefix": "$\"",
+    "body": [
+      "$$\"${1:text} {${2:expr}}${3:more text}\""
+    ],
+    "description": "Interpolated string"
   }
 }

@@ -11,6 +11,7 @@
     { "include": "#keywords" },
     { "include": "#types" },
     { "include": "#function-calls" },
+    { "include": "#lambdas" },
     { "include": "#operators" }
   ],
   "repository": {
@@ -33,6 +34,27 @@
     },
     "strings": {
       "patterns": [
+        {
+          "name": "string.interpolated.nex",
+          "begin": "\\$\"",
+          "end": "\"",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.nex" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.nex" } },
+          "patterns": [
+            {
+              "name": "meta.interpolation.nex",
+              "begin": "\\{",
+              "end": "\\}",
+              "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.nex" } },
+              "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.nex" } },
+              "patterns": [{ "include": "$self" }]
+            },
+            {
+              "name": "constant.character.escape.nex",
+              "match": "\\\\."
+            }
+          ]
+        },
         {
           "name": "string.quoted.double.nex",
           "begin": "\"",
@@ -76,7 +98,7 @@
       "patterns": [
         {
           "name": "keyword.control.nex",
-          "match": "\\b(?:if|else|while|for|try|catch|finally|throw|return|break|continue|using)\\b"
+          "match": "\\b(?:if|else|while|for|try|catch|finally|throw|return|break|continue|using|match|async|await|enum)\\b"
         },
         {
           "name": "keyword.declaration.nex",
@@ -209,6 +231,25 @@
         {
           "name": "entity.name.function.call.nex",
           "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()"
+        }
+      ]
+    },
+    "lambdas": {
+      "patterns": [
+        {
+          "comment": "Lambda/closure parameter delimiters: |params| body",
+          "name": "meta.lambda.nex",
+          "begin": "(\\|)(?=[^|]*\\|)",
+          "end": "(\\|)",
+          "beginCaptures": { "0": { "name": "punctuation.definition.parameters.begin.nex" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.parameters.end.nex" } },
+          "patterns": [
+            { "include": "#types" },
+            {
+              "name": "variable.parameter.nex",
+              "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+            }
+          ]
         }
       ]
     },

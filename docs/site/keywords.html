@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.96</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -29,6 +29,7 @@
     <tr><td><code>class</code></td><td>Declare a class (reference type)</td><td><code>class Animal { }</code></td></tr>
     <tr><td><code>struct</code></td><td>Declare a struct (value type)</td><td><code>struct Vec2 { x: Float }</code></td></tr>
     <tr><td><code>interface</code></td><td>Declare an interface</td><td><code>interface Printable { }</code></td></tr>
+    <tr><td><code>enum</code></td><td>Declare an enumerated type</td><td><code>enum Color { Red, Green, Blue }</code></td></tr>
     <tr><td><code>public</code></td><td>Export declaration across modules</td><td><code>public def api() -> Unit</code></td></tr>
     <tr><td><code>virtual</code></td><td>Enable dynamic dispatch on method</td><td><code>virtual def area() -> Double</code></td></tr>
     <tr><td><code>override</code></td><td>Override a virtual method</td><td><code>override def area() -> Double</code></td></tr>
@@ -39,10 +40,13 @@
     <tr><td><code>from</code></td><td>Selective import</td><td><code>from std.io import read_line</code></td></tr>
     <tr><td><code>as</code></td><td>Import alias</td><td><code>import std.math as math</code></td></tr>
     <tr><td><code>var</code></td><td>Declare dynamic variable (Var type)</td><td><code>var x = 42</code></td></tr>
-    <tr><td><code>if</code></td><td>Conditional branch</td><td><code>if (x > 0) { }</code></td></tr>
+    <tr><td><code>async</code></td><td>Declare an async function</td><td><code>async def fetch() -> String</code></td></tr>
+    <tr><td><code>await</code></td><td>Await an async result</td><td><code>result = await fetch()</code></td></tr>
+    <tr><td><code>if</code></td><td>Conditional branch / ternary</td><td><code>if (x > 0) { }</code> or <code>a if cond else b</code></td></tr>
     <tr><td><code>else</code></td><td>Alternative branch</td><td><code>else { }</code></td></tr>
     <tr><td><code>while</code></td><td>While loop</td><td><code>while (i < 10) { }</code></td></tr>
-    <tr><td><code>for</code></td><td>C-style for loop</td><td><code>for (i = 0; i < 10; i += 1)</code></td></tr>
+    <tr><td><code>for</code></td><td>C-style for loop</td><td><code>for (i = 0; i &lt; 10; i += 1)</code></td></tr>
+    <tr><td><code>match</code></td><td>Pattern matching expression</td><td><code>match x { 1 -> "one", _ -> "other" }</code></td></tr>
     <tr><td><code>return</code></td><td>Return from function</td><td><code>return value</code></td></tr>
     <tr><td><code>break</code></td><td>Exit loop</td><td><code>break</code></td></tr>
     <tr><td><code>continue</code></td><td>Skip to next iteration</td><td><code>continue</code></td></tr>
@@ -134,7 +138,9 @@
     <tr><td><code>,</code></td><td>Separator in lists</td></tr>
     <tr><td><code>;</code></td><td>Optional statement terminator</td></tr>
     <tr><td><code>?</code></td><td>Nullable type suffix</td></tr>
-    <tr><td><code>@</code></td><td>Annotation prefix</td></tr>
+    <tr><td><code>[ ]</code></td><td>Attribute delimiters</td></tr>
+    <tr><td><code>|</code></td><td>Lambda parameter delimiters</td></tr>
+    <tr><td><code>$"..."</code></td><td>String interpolation</td></tr>
   </table>
 
   <div class="page-nav">

@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.96</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -21,7 +21,7 @@
   <h1>Grammar (EBNF)</h1>
   <p class="page-subtitle">Formal grammar specification for the Nex language.</p>
 
-  <p>This is the complete Extended Backus-Naur Form (EBNF) grammar for Nex v0.1.96. Terminal symbols are shown in double quotes. <code>{ X }</code> means zero or more repetitions of X, and <code>[ X ]</code> means X is optional.</p>
+  <p>This is the complete Extended Backus-Naur Form (EBNF) grammar for Nex v0.1.119. Terminal symbols are shown in double quotes. <code>{ X }</code> means zero or more repetitions of X, and <code>[ X ]</code> means X is optional.</p>
 
   <div class="callout info">
     <div class="callout-title">Notation</div>
@@ -36,8 +36,20 @@ Item              = ImportDecl
                   | ClassDecl
                   | InterfaceDecl
                   | StructDecl
+                  | EnumDecl
                   | FunctionDecl
                   | Statement ;</code></pre>
+
+  <h2>Enums</h2>
+
+  <pre><code>EnumDecl          = [ Attributes ] [ "public" ] "enum" Ident
+                    "{" EnumVariant { "," EnumVariant } [ "," ] "}" ;
+
+EnumVariant       = Ident ;
+
+Attributes        = { "[" Ident [ "(" AttrArgList ")" ] "]" } ;
+
+AttrArgList       = ( StringLiteral | Ident ) { "," ( StringLiteral | Ident ) } ;</code></pre>
 
   <h2>Imports</h2>
 
@@ -86,7 +98,8 @@ StructMember      = FieldDecl Terminator
 
   <h2>Functions</h2>
 
-  <pre><code>FunctionDecl      = [ "public" ] [ "virtual" ] [ "override" ] [ "static" ]
+  <pre><code>FunctionDecl      = [ Attributes ] [ "public" ] [ "virtual" ] [ "override" ]
+                    [ "static" ] [ "async" ]
                     "def" Ident [ TypeParams ] "(" [ Parameters ] ")"
                     [ "->" TypeRef ] Block ;
 
@@ -104,6 +117,7 @@ Statement         = Block
                   | IfStmt
                   | WhileStmt
                   | ForStmt
+                  | MatchExpr
                   | TryStmt
                   | UsingStmt
                   | ReturnStmt Terminator
@@ -149,7 +163,9 @@ ExprStmt          = Expr ;</code></pre>
 
   <pre><code>Expr              = Assignment ;
 
-Assignment        = LogicalOr [ ( "=" | "+=" | "-=" | "*=" | "/=" ) Assignment ] ;
+Assignment        = Ternary [ ( "=" | "+=" | "-=" | "*=" | "/=" ) Assignment ] ;
+
+Ternary           = LogicalOr [ "if" LogicalOr "else" Ternary ] ;
 
 LogicalOr         = LogicalAnd { "||" LogicalAnd } ;
 
@@ -181,16 +197,36 @@ ArgList           = Expr { "," Expr } ;</code></pre>
                   | Literal
                   | "self"
                   | "null"
+                  | MatchExpr
+                  | LambdaExpr
+                  | AwaitExpr
                   | "(" Expr ")"
                   | TypeRef "(" [ ArgList ] ")"
                   | TypeRef "[" TypeRef { "," TypeRef } "]" "(" [ ArgList ] ")" ;
 
+MatchExpr         = "match" Expr "{" { MatchArm } "}" ;
+
+MatchArm          = Pattern [ "if" Expr ] "-&gt;" Expr ;
+
+Pattern           = "_" | Literal | Ident "." Ident | Ident ;
+
+LambdaExpr        = "|" [ LambdaParams ] "|" [ "-&gt;" TypeRef ] ( Expr | Block ) ;
+
+LambdaParams      = LambdaParam { "," LambdaParam } ;
+
+LambdaParam       = Ident [ ":" TypeRef ] ;
+
+AwaitExpr         = "await" Expr ;
+
 Literal           = IntLiteral
                   | FloatLiteral
                   | StringLiteral
+                  | InterpolatedString
                   | CharLiteral
                   | "true"
                   | "false" ;
+
+InterpolatedString = "$\"" { StringChars | "{" Expr "}" } "\"" ;
 
 IntLiteral        = Digit { Digit } [ IntSuffix ] ;
 
@@ -275,14 +311,15 @@ Terminator        = ";" | &lt;ASI-inserted newline terminator&gt; ;</code></pre>
     <thead><tr><th>Precedence</th><th>Operators</th><th>Associativity</th></tr></thead>
     <tbody>
       <tr><td>1 (lowest)</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code></td><td>Right</td></tr>
-      <tr><td>2</td><td><code>||</code></td><td>Left</td></tr>
-      <tr><td>3</td><td><code>&amp;&amp;</code></td><td>Left</td></tr>
-      <tr><td>4</td><td><code>==</code> <code>!=</code></td><td>Left</td></tr>
-      <tr><td>5</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Left</td></tr>
-      <tr><td>6</td><td><code>+</code> <code>-</code></td><td>Left</td></tr>
-      <tr><td>7</td><td><code>*</code> <code>/</code> <code>%</code></td><td>Left</td></tr>
-      <tr><td>8</td><td><code>-</code> (unary) <code>!</code></td><td>Right</td></tr>
-      <tr><td>9 (highest)</td><td><code>.</code> <code>()</code> <code>[]</code> <code>::</code></td><td>Left</td></tr>
+      <tr><td>2</td><td><code>if ... else</code> (ternary)</td><td>Right</td></tr>
+      <tr><td>3</td><td><code>||</code></td><td>Left</td></tr>
+      <tr><td>4</td><td><code>&amp;&amp;</code></td><td>Left</td></tr>
+      <tr><td>5</td><td><code>==</code> <code>!=</code></td><td>Left</td></tr>
+      <tr><td>6</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Left</td></tr>
+      <tr><td>7</td><td><code>+</code> <code>-</code></td><td>Left</td></tr>
+      <tr><td>8</td><td><code>*</code> <code>/</code> <code>%</code></td><td>Left</td></tr>
+      <tr><td>9</td><td><code>-</code> (unary) <code>!</code></td><td>Right</td></tr>
+      <tr><td>10 (highest)</td><td><code>.</code> <code>()</code> <code>[]</code> <code>::</code></td><td>Left</td></tr>
     </tbody>
   </table>
 

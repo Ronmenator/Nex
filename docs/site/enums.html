@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enums - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+</header>
+
+<nav class="sidebar"></nav>
+
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>Enums</div>
+
+  <h1>Enums</h1>
+  <p class="page-subtitle">Define types with a fixed set of named variants.</p>
+
+  <h2>Declaring an Enum</h2>
+
+  <p>An enum declares a type that can be one of several named variants. Use the <code>enum</code> keyword followed by the name and a list of variants inside braces:</p>
+
+  <pre><code><span class="kw">enum</span> <span class="typ">Direction</span> {
+    North,
+    South,
+    East,
+    West
+}</code></pre>
+
+  <p>Each variant is a distinct value of the enum type. Variants are separated by commas:</p>
+
+  <pre><code><span class="kw">enum</span> <span class="typ">Color</span> {
+    Red,
+    Green,
+    Blue
+}</code></pre>
+
+  <h2>Public Enums</h2>
+
+  <p>By default, enums are private to the module they are defined in. To make an enum visible to other modules, use the <code>public</code> keyword:</p>
+
+  <pre><code><span class="kw">public</span> <span class="kw">enum</span> <span class="typ">Status</span> {
+    Active,
+    Inactive,
+    Pending
+}</code></pre>
+
+  <p>Other modules that import this module can then use <code>Status</code> and all of its variants.</p>
+
+  <h2>Using Enum Values</h2>
+
+  <p>Access a specific variant using dot notation: <code>EnumName.VariantName</code>.</p>
+
+  <pre><code>dir <span class="op">=</span> <span class="typ">Direction</span>.North
+color <span class="op">=</span> <span class="typ">Color</span>.Red
+
+<span class="fn">println</span>(dir)    <span class="cmt">// North</span>
+<span class="fn">println</span>(color)  <span class="cmt">// Red</span></code></pre>
+
+  <p>Enum values can be stored in variables, passed to functions, and returned from functions just like any other value:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">default_direction</span>() <span class="op">-></span> <span class="typ">Direction</span> {
+    <span class="kw">return</span> <span class="typ">Direction</span>.North
+}
+
+<span class="kw">def</span> <span class="fn">print_direction</span>(d: <span class="typ">Direction</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(d)
+    <span class="kw">return</span>
+}
+
+d <span class="op">=</span> <span class="fn">default_direction</span>()
+<span class="fn">print_direction</span>(d)  <span class="cmt">// North</span></code></pre>
+
+  <h2>Pattern Matching with Enums</h2>
+
+  <p>Enums work naturally with <code>match</code> expressions. Each arm matches a specific variant:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">describe</span>(dir: <span class="typ">Direction</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">match</span> dir {
+        <span class="typ">Direction</span>.North <span class="op">-></span> <span class="kw">return</span> <span class="str">"heading north"</span>
+        <span class="typ">Direction</span>.South <span class="op">-></span> <span class="kw">return</span> <span class="str">"heading south"</span>
+        <span class="typ">Direction</span>.East <span class="op">-></span> <span class="kw">return</span> <span class="str">"heading east"</span>
+        <span class="typ">Direction</span>.West <span class="op">-></span> <span class="kw">return</span> <span class="str">"heading west"</span>
+    }
+}</code></pre>
+
+  <p>You can also use the wildcard pattern <code>_</code> to match any remaining variants:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">is_vertical</span>(dir: <span class="typ">Direction</span>) <span class="op">-></span> <span class="typ">Bool</span> {
+    <span class="kw">match</span> dir {
+        <span class="typ">Direction</span>.North <span class="op">-></span> <span class="kw">return</span> true
+        <span class="typ">Direction</span>.South <span class="op">-></span> <span class="kw">return</span> true
+        _ <span class="op">-></span> <span class="kw">return</span> false
+    }
+}</code></pre>
+
+  <h2>Attributes on Enums</h2>
+
+  <p>Enums support attributes using bracket syntax. For example, the <code>[Reflectable]</code> attribute enables runtime reflection on the enum:</p>
+
+  <pre><code>[Reflectable]
+<span class="kw">enum</span> <span class="typ">Color</span> {
+    Red,
+    Green,
+    Blue
+}</code></pre>
+
+  <p>Attributes are placed on the line immediately before the <code>enum</code> declaration.</p>
+
+  <h2>Comparison</h2>
+
+  <p>Enum values can be compared using the <code>==</code> operator. Two enum values are equal if they are the same variant:</p>
+
+  <pre><code>a <span class="op">=</span> <span class="typ">Color</span>.Red
+b <span class="op">=</span> <span class="typ">Color</span>.Red
+c <span class="op">=</span> <span class="typ">Color</span>.Blue
+
+<span class="fn">println</span>(a <span class="op">==</span> b)  <span class="cmt">// true</span>
+<span class="fn">println</span>(a <span class="op">==</span> c)  <span class="cmt">// false</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Simple variants only</div>
+    <p>Nex v1 enums have simple named variants with no associated data. Each variant is a distinct constant value. Associated data on enum variants (such as <code>Some(value)</code>) is planned for a future release.</p>
+  </div>
+
+  <h2>Complete Example</h2>
+
+  <p>Here is a full example that declares two enums, uses pattern matching, and compares values:</p>
+
+  <pre><code><span class="kw">enum</span> <span class="typ">Direction</span> {
+    North,
+    South,
+    East,
+    West
+}
+
+<span class="kw">enum</span> <span class="typ">Color</span> {
+    Red,
+    Green,
+    Blue
+}
+
+<span class="kw">def</span> <span class="fn">direction_name</span>(d: <span class="typ">Direction</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">match</span> d {
+        <span class="typ">Direction</span>.North <span class="op">-></span> <span class="kw">return</span> <span class="str">"North"</span>
+        <span class="typ">Direction</span>.South <span class="op">-></span> <span class="kw">return</span> <span class="str">"South"</span>
+        <span class="typ">Direction</span>.East <span class="op">-></span> <span class="kw">return</span> <span class="str">"East"</span>
+        <span class="typ">Direction</span>.West <span class="op">-></span> <span class="kw">return</span> <span class="str">"West"</span>
+    }
+}
+
+<span class="kw">def</span> <span class="fn">color_code</span>(c: <span class="typ">Color</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">match</span> c {
+        <span class="typ">Color</span>.Red <span class="op">-></span> <span class="kw">return</span> <span class="num">0</span>
+        <span class="typ">Color</span>.Green <span class="op">-></span> <span class="kw">return</span> <span class="num">1</span>
+        <span class="typ">Color</span>.Blue <span class="op">-></span> <span class="kw">return</span> <span class="num">2</span>
+    }
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    dir <span class="op">=</span> <span class="typ">Direction</span>.East
+    <span class="fn">println</span>(<span class="fn">direction_name</span>(dir))  <span class="cmt">// East</span>
+
+    c1 <span class="op">=</span> <span class="typ">Color</span>.Green
+    c2 <span class="op">=</span> <span class="typ">Color</span>.Green
+    <span class="fn">println</span>(c1 <span class="op">==</span> c2)  <span class="cmt">// true</span>
+    <span class="fn">println</span>(<span class="fn">color_code</span>(c1))  <span class="cmt">// 1</span>
+}</code></pre>
+
+  <div class="page-nav">
+    <a href="operator-overloading.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Operator Overloading</span>
+    </a>
+    <a href="string-interpolation.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">String Interpolation &rarr;</span>
+    </a>
+  </div>
+
+</main>
+
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

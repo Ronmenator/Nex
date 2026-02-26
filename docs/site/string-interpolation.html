@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>String Interpolation - Nex Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <button class="menu-toggle">&#9776;</button>
+  <div class="logo">Nex <span>Documentation</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+</header>
+
+<nav class="sidebar"></nav>
+
+<main class="main-content">
+
+  <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span>Language Guide<span class="sep">/</span>String Interpolation</div>
+
+  <h1>String Interpolation</h1>
+  <p class="page-subtitle">Embed expressions directly inside string literals.</p>
+
+  <h2>Basic Syntax</h2>
+
+  <p>String interpolation lets you insert variable values into a string using the <code>$"..."</code> syntax. Place expressions inside <code>{}</code> braces:</p>
+
+  <pre><code>name <span class="op">=</span> <span class="str">"Alice"</span>
+greeting <span class="op">=</span> <span class="str">$"Hello, {name}!"</span>
+<span class="fn">println</span>(greeting)  <span class="cmt">// Hello, Alice!</span></code></pre>
+
+  <p>The <code>$</code> prefix before the opening quote signals that the string contains interpolation expressions. Any <code>{expression}</code> inside the string is evaluated and its result is inserted into the string at that position.</p>
+
+  <h2>Expressions in Interpolation</h2>
+
+  <p>Interpolation is not limited to simple variables. You can embed any expression inside the braces:</p>
+
+  <pre><code>x <span class="op">=</span> <span class="num">10</span>
+y <span class="op">=</span> <span class="num">20</span>
+result <span class="op">=</span> <span class="str">$"sum = {x + y}"</span>
+<span class="fn">println</span>(result)  <span class="cmt">// sum = 30</span></code></pre>
+
+  <p>Function calls work too:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">double</span>(n: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Int</span> {
+    <span class="kw">return</span> n <span class="op">*</span> <span class="num">2</span>
+}
+
+val <span class="op">=</span> <span class="num">5</span>
+msg <span class="op">=</span> <span class="str">$"double of {val} is {<span class="fn">double</span>(val)}"</span>
+<span class="fn">println</span>(msg)  <span class="cmt">// double of 5 is 10</span></code></pre>
+
+  <h2>Multiple Interpolations</h2>
+
+  <p>A single interpolated string can contain multiple <code>{...}</code> expressions:</p>
+
+  <pre><code>first <span class="op">=</span> <span class="str">"Jane"</span>
+last <span class="op">=</span> <span class="str">"Doe"</span>
+age <span class="op">=</span> <span class="num">30</span>
+
+info <span class="op">=</span> <span class="str">$"{first} {last} is {age} years old"</span>
+<span class="fn">println</span>(info)  <span class="cmt">// Jane Doe is 30 years old</span></code></pre>
+
+  <p>Each expression is evaluated independently and its string representation is inserted in order.</p>
+
+  <h2>Escape Sequences</h2>
+
+  <p>Standard escape sequences work inside interpolated strings, just as they do in regular strings:</p>
+
+  <table>
+    <tr><th>Escape</th><th>Character</th></tr>
+    <tr><td><code>\\</code></td><td>Backslash</td></tr>
+    <tr><td><code>\"</code></td><td>Double quote</td></tr>
+    <tr><td><code>\n</code></td><td>Newline</td></tr>
+    <tr><td><code>\t</code></td><td>Tab</td></tr>
+    <tr><td><code>\r</code></td><td>Carriage return</td></tr>
+  </table>
+
+  <pre><code>name <span class="op">=</span> <span class="str">"world"</span>
+msg <span class="op">=</span> <span class="str">$"Hello, {name}!\nWelcome to Nex."</span>
+<span class="fn">println</span>(msg)
+<span class="cmt">// Hello, world!</span>
+<span class="cmt">// Welcome to Nex.</span></code></pre>
+
+  <h2>Compared to Concatenation</h2>
+
+  <p>String interpolation is a more readable alternative to manual string concatenation with <code>+</code>:</p>
+
+  <pre><code>name <span class="op">=</span> <span class="str">"Alice"</span>
+age <span class="op">=</span> <span class="num">25</span>
+
+<span class="cmt">// With interpolation (cleaner)</span>
+msg1 <span class="op">=</span> <span class="str">$"Hello, {name}! You are {age} years old."</span>
+
+<span class="cmt">// With concatenation (verbose)</span>
+msg2 <span class="op">=</span> <span class="str">"Hello, "</span> <span class="op">+</span> name <span class="op">+</span> <span class="str">"! You are "</span> <span class="op">+</span> age <span class="op">+</span> <span class="str">" years old."</span></code></pre>
+
+  <p>Both produce exactly the same result. The interpolated form is generally preferred for readability, especially when embedding multiple values.</p>
+
+  <div class="callout tip">
+    <div class="callout-title">Under the hood</div>
+    <p>String interpolation is syntactic sugar for string concatenation. The compiler automatically converts <code>$"Hello, {name}!"</code> into a chain of <code>+</code> operations: <code>"Hello, " + name + "!"</code>. There is no runtime difference between the two forms.</p>
+  </div>
+
+  <h2>Complete Example</h2>
+
+  <pre><code><span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>, times: <span class="typ">Int</span>) <span class="op">-></span> <span class="typ">Unit</span> {
+    i <span class="op">=</span> <span class="num">0</span>
+    <span class="kw">while</span> (i <span class="op">&lt;</span> times) {
+        <span class="fn">println</span>(<span class="str">$"[{i}] Hello, {name}!"</span>)
+        i <span class="op">=</span> i <span class="op">+</span> <span class="num">1</span>
+    }
+    <span class="kw">return</span>
+}
+
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-></span> <span class="typ">Unit</span> {
+    user <span class="op">=</span> <span class="str">"Bob"</span>
+    count <span class="op">=</span> <span class="num">3</span>
+    <span class="fn">println</span>(<span class="str">$"Greeting {user} {count} times:"</span>)
+    <span class="fn">greet</span>(user, count)
+}
+
+<span class="cmt">// Output:</span>
+<span class="cmt">// Greeting Bob 3 times:</span>
+<span class="cmt">// [0] Hello, Bob!</span>
+<span class="cmt">// [1] Hello, Bob!</span>
+<span class="cmt">// [2] Hello, Bob!</span></code></pre>
+
+  <div class="page-nav">
+    <a href="enums.html">
+      <span class="nav-label">Previous</span>
+      <span class="nav-title">&larr; Enums</span>
+    </a>
+    <a href="closures.html">
+      <span class="nav-label">Next</span>
+      <span class="nav-title">Closures &amp; Lambdas &rarr;</span>
+    </a>
+  </div>
+
+</main>
+
+<script src="nav.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
