@@ -498,8 +498,21 @@ Minimum statements:
 * `break`, `continue`
 * `try { } catch (e: Type) { } finally { }`
 * `throw expr`
+* `match expr { pattern -> body }` — pattern matching with literal, enum variant, wildcard, binding, and guard patterns
+* `match expr { is Type as binding -> body }` — type-discriminating match using runtime type IDs and the reflection registry (`nex_reflect_instanceof`)
 
 Exceptions are heap objects derived from `Object`.
+
+### Type-Discriminating Match
+
+The `is` keyword in a match arm performs a runtime type check. Each object carries a type ID (the first 8 bytes of the object header). The check calls `nex_reflect_instanceof(object_type_id, "TypeName")` which walks the class hierarchy (base classes) and interface list. The `as` keyword binds the value with the narrowed compile-time type inside the arm body. The cast itself is zero-cost — same pointer, different static type.
+
+Rules:
+* Arms checked top to bottom, first match wins
+* Put more specific types before less specific (e.g., `is Dog` before `is Animal`)
+* Wildcard `_` arm recommended — compiler warns if omitted
+* Guards apply after the type check: `is SuccessResult as s if s.elapsed > 5000 -> ...`
+* Works as an expression: `msg = match result { is Ok as ok -> ok.value, _ -> "default" }`
 
 ---
 

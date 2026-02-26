@@ -15,7 +15,7 @@ This downloads the latest release, extracts it to `~/.nex/`, and adds it to your
 - **Static typing** with local type inference
 - **OOP** — classes, interfaces, multiple inheritance, virtual dispatch
 - **Enums** — named variants with pattern matching support
-- **Pattern matching** — `match` expressions with literal, enum, wildcard, binding, and guard patterns
+- **Pattern matching** — `match` expressions with literal, enum, wildcard, binding, guard, and type-discriminating (`is Type as binding`) patterns
 - **String interpolation** — `$"Hello {name}!"` syntax for embedding expressions in strings
 - **Bitwise operators** — `&`, `|`, `^`, `<<`, `>>`, `~` with compound assignment
 - **Closures & lambdas** — `|x| x + 1` anonymous functions with variable capture

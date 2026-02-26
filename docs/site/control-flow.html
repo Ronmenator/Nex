@@ -167,6 +167,73 @@ label <span class="op">=</span> <span class="str">"high"</span> <span class="kw"
     <p>Always include a wildcard <code>_</code> arm as the last pattern to handle all remaining cases.</p>
   </div>
 
+  <h2>Type-Discriminating Match (is / as)</h2>
+
+  <p>The <code>is</code> keyword in a match arm checks the <strong>runtime type</strong> of the scrutinee. The <code>as</code> keyword binds the value with the narrowed type inside the arm body:</p>
+
+  <pre><code><span class="kw">public class</span> <span class="typ">AgentResult</span> {
+    elapsed: <span class="typ">Float</span>
+}
+
+<span class="kw">public class</span> <span class="typ">SuccessResult</span> : <span class="typ">AgentResult</span> {
+    summary: <span class="typ">String</span>
+    <span class="kw">def</span> <span class="fn">summary</span>() <span class="op">-&gt;</span> <span class="typ">String</span> { <span class="kw">return</span> summary }
+}
+
+<span class="kw">public class</span> <span class="typ">ErrorResult</span> : <span class="typ">AgentResult</span> {
+    message: <span class="typ">String</span>
+    <span class="kw">def</span> <span class="fn">message</span>() <span class="op">-&gt;</span> <span class="typ">String</span> { <span class="kw">return</span> message }
+}
+
+result <span class="op">=</span> <span class="fn">getResult</span>()
+
+<span class="kw">match</span> result {
+    <span class="kw">is</span> <span class="typ">SuccessResult</span> <span class="kw">as</span> success <span class="op">-&gt;</span> {
+        <span class="fn">println</span>(<span class="str">$"Done: {success.summary()}"</span>)
+    }
+    <span class="kw">is</span> <span class="typ">ErrorResult</span> <span class="kw">as</span> err <span class="op">-&gt;</span> {
+        <span class="fn">println</span>(<span class="str">$"Failed: {err.message()}"</span>)
+    }
+    _ <span class="op">-&gt;</span> {
+        <span class="fn">println</span>(<span class="str">"Unknown result type"</span>)
+    }
+}</code></pre>
+
+  <p><strong>Works with interfaces:</strong></p>
+
+  <pre><code><span class="kw">match</span> obj {
+    <span class="kw">is</span> <span class="typ">Skill</span> <span class="kw">as</span> skill <span class="op">-&gt;</span> skill.<span class="fn">execute</span>(ctx)
+    <span class="kw">is</span> <span class="typ">Disposable</span> <span class="kw">as</span> d <span class="op">-&gt;</span> d.<span class="fn">dispose</span>()
+    _ <span class="op">-&gt;</span> {}
+}</code></pre>
+
+  <p><strong>Guards apply after the type check:</strong></p>
+
+  <pre><code><span class="kw">match</span> task {
+    <span class="kw">is</span> <span class="typ">SuccessResult</span> <span class="kw">as</span> s <span class="kw">if</span> s.elapsed <span class="op">&gt;</span> <span class="num">5000</span> <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"Slow!"</span>)
+    <span class="kw">is</span> <span class="typ">SuccessResult</span> <span class="kw">as</span> s <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"OK"</span>)
+    <span class="kw">is</span> <span class="typ">ErrorResult</span> <span class="kw">as</span> err <span class="op">-&gt;</span> <span class="fn">println</span>(err.<span class="fn">message</span>())
+}</code></pre>
+
+  <p><strong>Used as an expression:</strong></p>
+
+  <pre><code>message <span class="op">=</span> <span class="kw">match</span> result {
+    <span class="kw">is</span> <span class="typ">SuccessResult</span> <span class="kw">as</span> s <span class="op">-&gt;</span> s.<span class="fn">summary</span>()
+    <span class="kw">is</span> <span class="typ">ErrorResult</span> <span class="kw">as</span> e <span class="op">-&gt;</span> e.<span class="fn">message</span>()
+    _ <span class="op">-&gt;</span> <span class="str">"Unknown"</span>
+}</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Rules</div>
+    <ul>
+      <li>Arms are checked top to bottom &mdash; first match wins</li>
+      <li>Put more specific types before less specific (e.g., <code>is Dog</code> before <code>is Animal</code>)</li>
+      <li>Always include a <code>_</code> wildcard arm &mdash; the compiler warns if omitted</li>
+      <li>The binding (<code>as name</code>) has the narrowed type inside the arm body</li>
+      <li>The cast is zero-cost &mdash; same pointer, different compile-time type</li>
+    </ul>
+  </div>
+
   <h2>Comments</h2>
 
   <pre><code><span class="cmt">// This is a single-line comment</span>

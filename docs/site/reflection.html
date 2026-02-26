@@ -78,6 +78,7 @@
     <tr><td><code>Reflect.typeKind(typeId: Int)</code></td><td><code>Int</code></td><td>Kind: 0=Class, 1=Struct, 2=Enum, 3=Interface</td></tr>
     <tr><td><code>Reflect.isReflectable(typeId: Int)</code></td><td><code>Int</code></td><td>1 if [Reflectable], 0 otherwise</td></tr>
     <tr><td><code>Reflect.implements(typeId: Int, name: String)</code></td><td><code>Int</code></td><td>1 if type implements the interface/base class</td></tr>
+    <tr><td><code>Reflect.instanceof(typeId: Int, name: String)</code></td><td><code>Int</code></td><td>1 if type is or derives from the named type (used by <code>is</code> patterns)</td></tr>
     <tr><td><code>Reflect.interfaces(typeId: Int)</code></td><td><code>String</code></td><td>Comma-separated list of implemented interfaces</td></tr>
   </table>
 
@@ -206,6 +207,22 @@ Methods: 1
     <div class="callout-title">Tip</div>
     <p>Method function pointers are automatically patched after JIT compilation, so <code>Reflect.invoke</code> works with any method defined on a <code>[Reflectable]</code> type.</p>
   </div>
+
+  <h2>Type-Discriminating Match Integration</h2>
+
+  <p>The reflection registry powers the <code>is</code> type-check pattern in <code>match</code> expressions. Every heap-allocated object carries a type ID (the first 8 bytes of its header). When a match arm uses <code>is TypeName as binding</code>, the runtime loads the object's type ID and calls <code>Reflect.instanceof</code> to check exact type match, parent class chain, and implemented interfaces.</p>
+
+  <pre><code><span class="kw">public class</span> <span class="typ">AgentResult</span> { elapsed: <span class="typ">Float</span> }
+<span class="kw">public class</span> <span class="typ">SuccessResult</span> : <span class="typ">AgentResult</span> { summary: <span class="typ">String</span> }
+<span class="kw">public class</span> <span class="typ">ErrorResult</span> : <span class="typ">AgentResult</span> { message: <span class="typ">String</span> }
+
+<span class="kw">match</span> result {
+    <span class="kw">is</span> <span class="typ">SuccessResult</span> <span class="kw">as</span> s <span class="op">-&gt;</span> <span class="fn">println</span>(s.summary)
+    <span class="kw">is</span> <span class="typ">ErrorResult</span> <span class="kw">as</span> e <span class="op">-&gt;</span> <span class="fn">println</span>(e.message)
+    _ <span class="op">-&gt;</span> <span class="fn">println</span>(<span class="str">"Unknown"</span>)
+}</code></pre>
+
+  <p>See <a href="control-flow.html">Control Flow</a> for full syntax and rules.</p>
 
   <h2>Complete Example</h2>
 

@@ -202,10 +202,11 @@ snake_case
 as        async     await     break     catch
 class     continue  def       else      enum
 false     finally   for       from      if
-import    interface match     null      operator
-override  partial   public    return    self
-shared    static    struct    throw     true
-try       using     var       virtual   while
+import    interface is        match     null
+operator  override  partial   public    return
+self      shared    static    struct    throw
+true      try       using     var       virtual
+while
 ```
 
 ### 3.6 Built-in Type Keywords
@@ -617,6 +618,98 @@ match score {
     _ -> println("F")
 }
 ```
+
+### 7.9 Type-Discriminating Match (is / as)
+
+The `is` keyword in a match arm checks the runtime type of the scrutinee. The `as` keyword binds the value with the narrowed type:
+
+```nex
+public class AgentResult {
+    elapsed: Float
+}
+
+public class SuccessResult : AgentResult {
+    summary: String
+
+    def summary() -> String { return summary }
+}
+
+public class ErrorResult : AgentResult {
+    message: String
+
+    def message() -> String { return message }
+}
+
+result = getResult()   // returns AgentResult
+
+match result {
+    is SuccessResult as success -> {
+        println($"Done in {success.elapsed}ms: {success.summary()}")
+    }
+    is ErrorResult as err -> {
+        println($"Failed: {err.message()}")
+    }
+    _ -> {
+        println("Unknown result type")
+    }
+}
+```
+
+**Type check patterns work with interfaces too:**
+
+```nex
+interface Skill {
+    def execute(ctx: Context) -> Unit
+}
+
+interface Disposable {
+    def dispose() -> Unit
+}
+
+match obj {
+    is Skill as skill -> {
+        skill.execute(ctx)
+    }
+    is Disposable as d -> {
+        d.dispose()
+    }
+    _ -> {}
+}
+```
+
+**Guards apply after the type check passes:**
+
+```nex
+match task {
+    is SuccessResult as s if s.elapsed > 5000 -> {
+        println($"Slow task: {s.elapsed}ms")
+    }
+    is SuccessResult as s -> {
+        println("OK")
+    }
+    is ErrorResult as err -> {
+        println(err.message())
+    }
+}
+```
+
+**Used as an expression (returns a value):**
+
+```nex
+message = match result {
+    is SuccessResult as s -> s.summary()
+    is ErrorResult as e -> e.message()
+    _ -> "Unknown"
+}
+```
+
+**Rules for type-discriminating match:**
+- Arms are checked top to bottom; first match wins
+- If `Dog` extends `Animal`, put `is Dog` before `is Animal` or the `Dog` arm is unreachable
+- A wildcard `_` arm (or base-type `is` arm) should always be present — the compiler emits a warning if omitted, since new subclasses can be added at any time
+- The binding (`as name`) gives the value the narrowed type inside the arm body — field access and method calls resolve against the matched type
+- The cast itself has no runtime cost — it is the same pointer with a different compile-time type
+- Runtime type checking uses the reflection registry (`nex_reflect_instanceof`): each object carries a type ID, and the check walks the class hierarchy and interface list
 
 **Rules:**
 - Each arm is `pattern [if guard] -> body`
@@ -1556,6 +1649,7 @@ println(Reflect.typeName(ti))        // "Animal"
 | `Reflect.methodName(typeId, index)` | `String` | Name of method at index |
 | `Reflect.methodReturnType(typeId, index)` | `String` | Return type of method |
 | `Reflect.implements(typeId, name)` | `Int` | 1 if type implements the interface/base class |
+| `Reflect.instanceof(typeId, name)` | `Int` | 1 if type is or derives from the named type (used by `is` patterns) |
 | `Reflect.interfaces(typeId)` | `String` | Comma-separated list of interfaces |
 | `Reflect.typeCount()` | `Int` | Total number of registered types |
 | `Reflect.typeNameAt(index)` | `String` | Name of type at registry index |
@@ -3416,7 +3510,8 @@ InterpolatedString = "$\"" { StringChars | "{" Expr "}" } "\"" ;
 
 MatchExpr         = "match" Expr "{" { MatchArm } "}" ;
 MatchArm          = Pattern [ "if" Expr ] "->" Expr ;
-Pattern           = "_" | Literal | Ident "." Ident | Ident ;
+Pattern           = "_" | Literal | Ident "." Ident | TypeCheck | Ident ;
+TypeCheck         = "is" Ident "as" Ident ;
 
 LambdaExpr        = "|" [ LambdaParams ] "|" [ "->" TypeRef ] ( Expr | Block ) ;
 LambdaParams      = LambdaParam { "," LambdaParam } ;
@@ -3477,6 +3572,12 @@ Terminator        = ";" | ASI_NEWLINE ;
 ║                    Color.Red -> println("red")                   ║
 ║                    x if x > 10 -> println("big")                ║
 ║                    _ -> println("other")                         ║
+║                }                                                 ║
+║                                                                  ║
+║  TYPE MATCH    match obj {                                       ║
+║                    is Dog as d -> d.bark()                       ║
+║                    is Cat as c -> c.meow()                       ║
+║                    _ -> println("unknown")                       ║
 ║                }                                                 ║
 ║                                                                  ║
 ║  CLOSURES      |x| x + 1                                        ║

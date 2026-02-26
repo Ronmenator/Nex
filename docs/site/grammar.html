@@ -208,7 +208,9 @@ MatchExpr         = "match" Expr "{" { MatchArm } "}" ;
 
 MatchArm          = Pattern [ "if" Expr ] "-&gt;" Expr ;
 
-Pattern           = "_" | Literal | Ident "." Ident | Ident ;
+Pattern           = "_" | Literal | Ident "." Ident | TypeCheck | Ident ;
+
+TypeCheck         = "is" Ident "as" Ident ;
 
 LambdaExpr        = "|" [ LambdaParams ] "|" [ "-&gt;" TypeRef ] ( Expr | Block ) ;
 
