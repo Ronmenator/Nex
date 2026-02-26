@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -98,6 +98,27 @@
     <tr><td><code>Reflect.methodName(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Name of the method at index</td></tr>
     <tr><td><code>Reflect.methodReturnType(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Return type name of the method</td></tr>
   </table>
+
+  <h3>Field Value Access</h3>
+
+  <p>Read and write field values at runtime via reflection (requires <code>[Reflectable]</code>):</p>
+
+  <table>
+    <tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+    <tr><td><code>Reflect.getFieldString(typeId: Int, index: Int)</code></td><td><code>String</code></td><td>Read a String field value</td></tr>
+    <tr><td><code>Reflect.getFieldInt(typeId: Int, index: Int)</code></td><td><code>Int</code></td><td>Read an Int/Int64 field value</td></tr>
+    <tr><td><code>Reflect.getFieldFloat(typeId: Int, index: Int)</code></td><td><code>Double</code></td><td>Read a Float/Double field value</td></tr>
+    <tr><td><code>Reflect.getFieldBool(typeId: Int, index: Int)</code></td><td><code>Int</code></td><td>Read a Bool field value (1=true, 0=false)</td></tr>
+    <tr><td><code>Reflect.setFieldString(typeId: Int, index: Int, value: String)</code></td><td><code>Unit</code></td><td>Write a String field value</td></tr>
+    <tr><td><code>Reflect.setFieldInt(typeId: Int, index: Int, value: Int)</code></td><td><code>Unit</code></td><td>Write an Int/Int64 field value</td></tr>
+    <tr><td><code>Reflect.setFieldFloat(typeId: Int, index: Int, value: Double)</code></td><td><code>Unit</code></td><td>Write a Float/Double field value</td></tr>
+    <tr><td><code>Reflect.setFieldBool(typeId: Int, index: Int, value: Int)</code></td><td><code>Unit</code></td><td>Write a Bool field value (1=true, 0=false)</td></tr>
+  </table>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p>Field addresses are resolved lazily on first access after JIT compilation. The <code>json</code> library uses these APIs internally for type-safe serialization and deserialization.</p>
+  </div>
 
   <h3>Type Enumeration</h3>
 

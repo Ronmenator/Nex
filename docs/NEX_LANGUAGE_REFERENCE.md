@@ -1534,6 +1534,14 @@ println(Reflect.typeName(ti))        // "Animal"
 | `Reflect.interfaces(typeId)` | `String` | Comma-separated list of interfaces |
 | `Reflect.typeCount()` | `Int` | Total number of registered types |
 | `Reflect.typeNameAt(index)` | `String` | Name of type at registry index |
+| `Reflect.getFieldString(typeId, index)` | `String` | Read a String field value |
+| `Reflect.getFieldInt(typeId, index)` | `Int` | Read an Int/Int64 field value |
+| `Reflect.getFieldFloat(typeId, index)` | `Double` | Read a Float/Double field value |
+| `Reflect.getFieldBool(typeId, index)` | `Int` | Read a Bool field value (1=true, 0=false) |
+| `Reflect.setFieldString(typeId, index, value)` | `Unit` | Write a String field value |
+| `Reflect.setFieldInt(typeId, index, value)` | `Unit` | Write an Int/Int64 field value |
+| `Reflect.setFieldFloat(typeId, index, value)` | `Unit` | Write a Float/Double field value |
+| `Reflect.setFieldBool(typeId, index, value)` | `Unit` | Write a Bool field value (1=true, 0=false) |
 | `Reflect.invoke(typeId, methodName, args, argCount)` | `Int` | Call method dynamically (up to 8 args) |
 | `Reflect.createInstance(typeId, args, argCount)` | `Int` | Create instance via init method |
 | `Reflect.getFieldString(typeId, index)` | `String` | Read string field value by index |

@@ -174,7 +174,7 @@
         {
           "comment": "std.json",
           "name": "support.function.stdlib.nex",
-          "match": "\\b(json_parse|json_stringify|json_get_string|json_get_int|json_get_float|json_get_bool)\\b"
+          "match": "\\b(json_parse|json_stringify|json_stringify_pretty|json_get_string|json_get_int|json_get_float|json_get_bool|json_new_object|json_set_string|json_set_int|json_set_float|json_set_bool|json_set_null|json_free)\\b"
         },
         {
           "comment": "std.regex",

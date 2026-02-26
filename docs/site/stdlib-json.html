@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.119</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -19,11 +19,11 @@
   <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.json</div>
 
   <h1>std.json</h1>
-  <p class="page-subtitle">JSON parsing and serialization.</p>
+  <p class="page-subtitle">JSON parsing, building, and serialization.</p>
 
   <pre><code><span class="kw">import</span> std.json</code></pre>
 
-  <h2>Parsing &amp; Serialization</h2>
+  <h2>Parsing</h2>
 
   <h4>json_parse</h4>
   <div class="signature">
@@ -36,18 +36,6 @@
 <span class="kw">var</span> data <span class="op">=</span> <span class="fn">json_parse</span>(<span class="str">"{\"name\": \"Alice\", \"age\": 30}"</span>)
 name <span class="op">=</span> <span class="fn">json_get_string</span>(data, <span class="str">"name"</span>)
 <span class="fn">println</span>(name)   <span class="cmt">// Alice</span></code></pre>
-
-  <h4>json_stringify</h4>
-  <div class="signature">
-    <span class="kw">def</span> <span class="fn">json_stringify</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
-  </div>
-  <p>Converts a JSON handle back into a JSON string representation.</p>
-
-  <pre><code><span class="kw">import</span> std.json
-
-<span class="kw">var</span> data <span class="op">=</span> <span class="fn">json_parse</span>(<span class="str">"{\"x\": 1, \"y\": 2}"</span>)
-text <span class="op">=</span> <span class="fn">json_stringify</span>(data)
-<span class="fn">println</span>(text)   <span class="cmt">// {"x":1,"y":2}</span></code></pre>
 
   <h2>Accessors</h2>
 
@@ -85,57 +73,178 @@ port <span class="op">=</span> <span class="fn">json_get_int</span>(config, <spa
 ratio <span class="op">=</span> <span class="fn">json_get_float</span>(config, <span class="str">"ratio"</span>)
 debug <span class="op">=</span> <span class="fn">json_get_bool</span>(config, <span class="str">"debug"</span>)
 
-<span class="fn">print</span>(<span class="str">"Host: "</span>)
-<span class="fn">println</span>(host)       <span class="cmt">// localhost</span>
-<span class="fn">print</span>(<span class="str">"Port: "</span>)
-<span class="fn">println</span>(port)       <span class="cmt">// 8080</span>
-<span class="fn">print</span>(<span class="str">"Ratio: "</span>)
-<span class="fn">println</span>(ratio)      <span class="cmt">// 0.75</span>
-<span class="fn">print</span>(<span class="str">"Debug: "</span>)
-<span class="fn">println</span>(debug)      <span class="cmt">// true</span></code></pre>
+<span class="fn">println</span>(<span class="str">"Host:"</span>, host)       <span class="cmt">// localhost</span>
+<span class="fn">println</span>(<span class="str">"Port:"</span>, port)       <span class="cmt">// 8080</span>
+<span class="fn">println</span>(<span class="str">"Ratio:"</span>, ratio)     <span class="cmt">// 0.75</span>
+<span class="fn">println</span>(<span class="str">"Debug:"</span>, debug)     <span class="cmt">// true</span></code></pre>
 
-  <h2>Complete Example</h2>
+  <h2>Serialization</h2>
+
+  <h4>json_stringify</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_stringify</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Converts a JSON handle into a compact JSON string (single line, no indentation).</p>
+
+  <h4>json_stringify_pretty</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_stringify_pretty</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Converts a JSON handle into a pretty-printed JSON string with indentation.</p>
+
+  <h2>Object Builder</h2>
+
+  <p>Build JSON objects programmatically, then serialize to a string:</p>
+
+  <h4>json_new_object</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_new_object</span>() <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a new empty JSON object and returns a handle.</p>
+
+  <h4>json_set_string</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_set_string</span>(handle: <span class="typ">Var</span>, key: <span class="typ">String</span>, value: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets a string value for <code>key</code> on the JSON object.</p>
+
+  <h4>json_set_int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_set_int</span>(handle: <span class="typ">Var</span>, key: <span class="typ">String</span>, value: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets an integer value for <code>key</code> on the JSON object.</p>
+
+  <h4>json_set_float</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_set_float</span>(handle: <span class="typ">Var</span>, key: <span class="typ">String</span>, value: <span class="typ">Double</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets a floating-point value for <code>key</code> on the JSON object.</p>
+
+  <h4>json_set_bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_set_bool</span>(handle: <span class="typ">Var</span>, key: <span class="typ">String</span>, value: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets a boolean value for <code>key</code>. Pass <code>1</code> for true, <code>0</code> for false.</p>
+
+  <h4>json_set_null</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_set_null</span>(handle: <span class="typ">Var</span>, key: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sets a null value for <code>key</code> on the JSON object.</p>
+
+  <h4>json_free</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">json_free</span>(handle: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Frees the memory associated with a JSON handle. Call this when you are done with a JSON object created via <code>json_new_object</code>.</p>
 
   <pre><code><span class="kw">import</span> std.json
-<span class="kw">import</span> std.io
 
-<span class="cmt">// Parse a JSON configuration file</span>
-<span class="kw">def</span> <span class="fn">load_config</span>(path: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span> {
-    <span class="kw">if</span> (<span class="op">!</span><span class="fn">file_exists</span>(path)) {
-        <span class="fn">println</span>(<span class="str">"Config file not found"</span>)
+<span class="kw">var</span> obj <span class="op">=</span> <span class="fn">json_new_object</span>()
+<span class="fn">json_set_string</span>(obj, <span class="str">"name"</span>, <span class="str">"Alice"</span>)
+<span class="fn">json_set_int</span>(obj, <span class="str">"age"</span>, <span class="num">30</span>)
+<span class="fn">json_set_float</span>(obj, <span class="str">"score"</span>, <span class="num">95.5</span>)
+<span class="fn">json_set_bool</span>(obj, <span class="str">"active"</span>, <span class="num">1</span>)
+<span class="fn">json_set_null</span>(obj, <span class="str">"avatar"</span>)
+
+<span class="cmt">// Compact output</span>
+<span class="fn">println</span>(<span class="fn">json_stringify</span>(obj))
+<span class="cmt">// {"name":"Alice","age":30,"score":95.5,"active":true,"avatar":null}</span>
+
+<span class="cmt">// Pretty-printed output</span>
+<span class="fn">println</span>(<span class="fn">json_stringify_pretty</span>(obj))
+<span class="cmt">// {</span>
+<span class="cmt">//   "name": "Alice",</span>
+<span class="cmt">//   "age": 30,</span>
+<span class="cmt">//   "score": 95.5,</span>
+<span class="cmt">//   "active": true,</span>
+<span class="cmt">//   "avatar": null</span>
+<span class="cmt">// }</span>
+
+<span class="fn">json_free</span>(obj)</code></pre>
+
+  <h2>High-Level: Json Library</h2>
+
+  <p>The <code>json</code> library provides reflection-based serialization and deserialization for any <code>[Reflectable]</code> type. Add it to your <code>project.toml</code>:</p>
+
+  <pre><code>[libs]
+json = { path = "../libs/json" }</code></pre>
+
+  <pre><code><span class="kw">import</span> json.Json</code></pre>
+
+  <h4>Json.stringify</h4>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">stringify</span>(typeName: <span class="typ">String</span>, content: <span class="typ">Var</span>, indent: <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Serializes a <code>[Reflectable]</code> type to a JSON string. Reads field values via reflection. Pass <code>true</code> for <code>indent</code> to get pretty-printed output.</p>
+
+  <h4>Json.toJson / Json.toJsonCompact</h4>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">toJson</span>(typeName: <span class="typ">String</span>, content: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">toJsonCompact</span>(typeName: <span class="typ">String</span>, content: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Convenience methods: <code>toJson</code> returns pretty-printed, <code>toJsonCompact</code> returns compact.</p>
+
+  <h4>Json.parse / Json.fromJson</h4>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">parse</span>(typeName: <span class="typ">String</span>, content: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">fromJson</span>(typeName: <span class="typ">String</span>, content: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Deserializes a JSON string and populates the fields of a <code>[Reflectable]</code> type via reflection. <code>fromJson</code> is an alias for <code>parse</code>.</p>
+
+  <h4>Json.canSerialize / Json.fieldCount</h4>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">canSerialize</span>(typeName: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <div class="signature">
+    <span class="kw">public</span> <span class="kw">static</span> <span class="kw">def</span> <span class="fn">fieldCount</span>(typeName: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p><code>canSerialize</code> returns <code>true</code> if the type is registered and reflectable. <code>fieldCount</code> returns the number of serializable fields.</p>
+
+  <p>Supported field types: <code>String</code>, <code>Int</code>, <code>Int64</code>, <code>Float</code>, <code>Double</code>, <code>Bool</code>.</p>
+
+  <h3>Complete Example</h3>
+
+  <pre><code><span class="kw">import</span> json.Json
+
+[<span class="fn">Reflectable</span>]
+<span class="kw">class</span> <span class="typ">Person</span> {
+    name: <span class="typ">String</span>
+    age: <span class="typ">Int</span>
+    active: <span class="typ">Bool</span>
+
+    <span class="kw">def</span> <span class="fn">init</span>(name: <span class="typ">String</span>, age: <span class="typ">Int</span>, active: <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+        <span class="kw">self</span>.name <span class="op">=</span> name
+        <span class="kw">self</span>.age <span class="op">=</span> age
+        <span class="kw">self</span>.active <span class="op">=</span> active
         <span class="kw">return</span>
     }
-
-    <span class="kw">using</span> (f <span class="op">=</span> File.<span class="fn">open</span>(path)) {
-        content <span class="op">=</span> f.<span class="fn">read_all</span>()
-    }
-
-    <span class="kw">var</span> cfg <span class="op">=</span> <span class="fn">json_parse</span>(content)
-
-    app_name <span class="op">=</span> <span class="fn">json_get_string</span>(cfg, <span class="str">"name"</span>)
-    version <span class="op">=</span> <span class="fn">json_get_string</span>(cfg, <span class="str">"version"</span>)
-    max_conn <span class="op">=</span> <span class="fn">json_get_int</span>(cfg, <span class="str">"max_connections"</span>)
-    verbose <span class="op">=</span> <span class="fn">json_get_bool</span>(cfg, <span class="str">"verbose"</span>)
-
-    <span class="fn">print</span>(<span class="str">"App: "</span>)
-    <span class="fn">print</span>(app_name)
-    <span class="fn">print</span>(<span class="str">" v"</span>)
-    <span class="fn">println</span>(version)
-
-    <span class="fn">print</span>(<span class="str">"Max connections: "</span>)
-    <span class="fn">println</span>(max_conn)
-
-    <span class="kw">if</span> (verbose) {
-        <span class="fn">println</span>(<span class="str">"Verbose logging enabled"</span>)
-    }
-
-    <span class="cmt">// Round-trip: re-serialize</span>
-    output <span class="op">=</span> <span class="fn">json_stringify</span>(cfg)
-    <span class="fn">println</span>(<span class="str">"Serialized: "</span>)
-    <span class="fn">println</span>(output)
 }
 
-<span class="fn">load_config</span>(<span class="str">"config.json"</span>)</code></pre>
+<span class="kw">def</span> <span class="fn">main</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    <span class="cmt">// Serialize</span>
+    p <span class="op">=</span> <span class="typ">Person</span>(<span class="str">"Alice"</span>, <span class="num">30</span>, <span class="kw">true</span>)
+    json <span class="op">=</span> <span class="typ">Json</span>.<span class="fn">toJson</span>(<span class="str">"Person"</span>, p)
+    <span class="fn">println</span>(json)
+    <span class="cmt">// {</span>
+    <span class="cmt">//   "name": "Alice",</span>
+    <span class="cmt">//   "age": 30,</span>
+    <span class="cmt">//   "active": true</span>
+    <span class="cmt">// }</span>
+
+    <span class="cmt">// Deserialize</span>
+    <span class="typ">Json</span>.<span class="fn">parse</span>(<span class="str">"Person"</span>, <span class="str">"{\"name\":\"Bob\",\"age\":25,\"active\":false}"</span>)
+    <span class="cmt">// Person fields are now: name="Bob", age=25, active=false</span>
+
+    <span class="cmt">// Utilities</span>
+    <span class="fn">println</span>(<span class="typ">Json</span>.<span class="fn">canSerialize</span>(<span class="str">"Person"</span>))   <span class="cmt">// true</span>
+    <span class="fn">println</span>(<span class="typ">Json</span>.<span class="fn">fieldCount</span>(<span class="str">"Person"</span>))    <span class="cmt">// 3</span>
+    <span class="kw">return</span>
+}</code></pre>
 
   <div class="page-nav">
     <a href="stdlib-path.html">

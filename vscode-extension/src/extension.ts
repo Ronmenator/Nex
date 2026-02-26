@@ -365,6 +365,14 @@ const DOCS: Record<string, string> = {
   "json_get_int": "**json_get_int**(handle: Var, key: String) -> Int\n\n`std.json`",
   "json_get_float": "**json_get_float**(handle: Var, key: String) -> Double\n\n`std.json`",
   "json_get_bool": "**json_get_bool**(handle: Var, key: String) -> Bool\n\n`std.json`",
+  "json_new_object": "**json_new_object**() -> Var\n\n`std.json` — Create a new empty JSON object.",
+  "json_set_string": "**json_set_string**(handle: Var, key: String, value: String) -> Unit\n\n`std.json` — Set a string value on a JSON object.",
+  "json_set_int": "**json_set_int**(handle: Var, key: String, value: Int) -> Unit\n\n`std.json` — Set an integer value on a JSON object.",
+  "json_set_float": "**json_set_float**(handle: Var, key: String, value: Double) -> Unit\n\n`std.json` — Set a float value on a JSON object.",
+  "json_set_bool": "**json_set_bool**(handle: Var, key: String, value: Int) -> Unit\n\n`std.json` — Set a boolean value (1=true, 0=false) on a JSON object.",
+  "json_set_null": "**json_set_null**(handle: Var, key: String) -> Unit\n\n`std.json` — Set a null value on a JSON object.",
+  "json_stringify_pretty": "**json_stringify_pretty**(handle: Var) -> String\n\n`std.json` — Serialize a JSON handle to a pretty-printed string with indentation.",
+  "json_free": "**json_free**(handle: Var) -> Unit\n\n`std.json` — Free the memory associated with a JSON handle.",
 
   // std.regex
   "regex_new": "**regex_new**(pattern: String) -> Var\n\n`std.regex` — Compile a regular expression.",
