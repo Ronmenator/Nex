@@ -12,6 +12,11 @@ crate-type = ["cdylib"]
 libc = "0.2"
 rand = "0.8"
 sha2 = "0.10"
+sha1 = "0.10"
 md-5 = "0.10"
 hmac = "0.12"
 base64 = "0.22"
+aes-gcm = "0.10"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+pbkdf2 = { version = "0.12", features = ["simple"] }
+argon2 = "0.5"

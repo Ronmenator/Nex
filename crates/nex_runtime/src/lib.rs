@@ -20,6 +20,9 @@ pub mod closure_runtime;
 pub mod logging;
 pub mod testing;
 pub mod reflect;
+pub mod http_server;
+pub mod tls;
+pub mod websocket;
 
 pub use math::*;
 pub use string::*;
@@ -38,6 +41,9 @@ pub use closure_runtime::*;
 pub use logging::*;
 pub use testing::*;
 pub use reflect::*;
+pub use http_server::*;
+pub use tls::*;
+pub use websocket::*;
 
 #[repr(C)]
 pub struct NexType {

@@ -1,0 +1,22 @@
+// crypto.aes — AES-256-GCM authenticated encryption.
+
+// Generates a random 256-bit (32-byte) AES key as a 64-char hex string.
+public def keygen() -> String {
+    return crypto_aes_keygen()
+}
+
+// Encrypts plaintext using AES-256-GCM.
+// key_hex: 64-char hex string (32 bytes).
+// plaintext: the string to encrypt.
+// Returns: base64-encoded ciphertext (includes nonce + auth tag).
+public def encrypt(key_hex: String, plaintext: String) -> String {
+    return crypto_aes_encrypt(key_hex, plaintext)
+}
+
+// Decrypts AES-256-GCM ciphertext.
+// key_hex: 64-char hex string (32 bytes).
+// encrypted: base64-encoded ciphertext from encrypt().
+// Returns: decrypted plaintext, or "" on failure.
+public def decrypt(key_hex: String, encrypted: String) -> String {
+    return crypto_aes_decrypt(key_hex, encrypted)
+}

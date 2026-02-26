@@ -1,0 +1,52 @@
+// net.websocket — WebSocket server (RFC 6455).
+//
+// Usage:
+//   import net.websocket
+//
+//   def main() {
+//       let srv = websocket.listen(9001)
+//       println("WebSocket server on port 9001")
+//       let conn = websocket.accept(srv)
+//       println("Client connected")
+//       websocket.send(conn, "Hello from Nex!")
+//       let msg = websocket.recv(conn)
+//       println($"Received: {msg}")
+//       websocket.close(conn)
+//       websocket.close_server(srv)
+//   }
+
+// Create a WebSocket server listening on the given port.
+// Returns a server handle, or 0 on failure.
+public def listen(port: Int) -> Int {
+    return ws_server_new(port)
+}
+
+// Block until a client connects and completes the WebSocket handshake.
+// Returns a connection handle, or 0 on failure.
+public def accept(server: Int) -> Int {
+    return ws_accept(server)
+}
+
+// Send a text message over the WebSocket connection.
+// Returns the number of bytes sent, or -1 on failure.
+public def send(conn: Int, message: String) -> Int {
+    return ws_send(conn, message)
+}
+
+// Receive a text message from the WebSocket connection.
+// Blocks until a message is received. Returns "" on close or error.
+public def recv(conn: Int) -> String {
+    return ws_recv(conn)
+}
+
+// Close a WebSocket connection (sends close frame).
+public def close(conn: Int) {
+    ws_close(conn)
+    return
+}
+
+// Shut down the WebSocket server.
+public def close_server(server: Int) {
+    ws_server_close(server)
+    return
+}

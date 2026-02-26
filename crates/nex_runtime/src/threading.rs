@@ -64,3 +64,62 @@ pub unsafe extern "C" fn nex_mutex_free(handle: *mut Mutex<()>) {
         drop(Box::from_raw(handle));
     }
 }
+
+// ---------------------------------------------------------------------------
+// Thread Pool — channel-based fixed-size worker pool
+// ---------------------------------------------------------------------------
+
+use std::sync::Arc;
+
+pub struct NexThreadPool {
+    workers: Vec<std::thread::JoinHandle<()>>,
+    sender: Option<std::sync::mpsc::Sender<Box<dyn FnOnce() + Send>>>,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_threadpool_new(size: i64) -> *mut NexThreadPool {
+    let size = size.max(1) as usize;
+    let (sender, receiver) = std::sync::mpsc::channel::<Box<dyn FnOnce() + Send>>();
+    let receiver = Arc::new(Mutex::new(receiver));
+    let mut workers = Vec::with_capacity(size);
+    for _ in 0..size {
+        let rx = Arc::clone(&receiver);
+        let handle = std::thread::spawn(move || {
+            loop {
+                let task = {
+                    let lock = rx.lock().unwrap();
+                    lock.recv()
+                };
+                match task {
+                    Ok(job) => job(),
+                    Err(_) => break,
+                }
+            }
+        });
+        workers.push(handle);
+    }
+    Box::into_raw(Box::new(NexThreadPool {
+        workers,
+        sender: Some(sender),
+    }))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_threadpool_submit(pool: *mut NexThreadPool, func_ptr: i64) {
+    if pool.is_null() { return; }
+    let func: extern "C" fn() = std::mem::transmute(func_ptr);
+    if let Some(ref sender) = (*pool).sender {
+        let _ = sender.send(Box::new(move || func()));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_threadpool_shutdown(pool: *mut NexThreadPool) {
+    if pool.is_null() { return; }
+    let mut pool = Box::from_raw(pool);
+    // Drop sender to signal workers to stop
+    pool.sender.take();
+    for worker in pool.workers.drain(..) {
+        let _ = worker.join();
+    }
+}

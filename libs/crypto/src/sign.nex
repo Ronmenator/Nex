@@ -1,0 +1,24 @@
+// crypto.sign — Ed25519 digital signatures.
+
+// Generates an Ed25519 keypair.
+// Returns: "pubkey_hex:privkey_hex" (each 64-char hex = 32 bytes).
+public def ed25519_keygen() -> String {
+    return crypto_ed25519_keygen()
+}
+
+// Signs a message with an Ed25519 private key.
+// privkey_hex: 64-char hex string (32 bytes) from keygen().
+// message: the message string to sign.
+// Returns: 128-char hex string (64-byte signature).
+public def ed25519_sign(privkey_hex: String, message: String) -> String {
+    return crypto_ed25519_sign(privkey_hex, message)
+}
+
+// Verifies an Ed25519 signature.
+// pubkey_hex: 64-char hex string (32 bytes) from keygen().
+// message: the original message string.
+// sig_hex: 128-char hex string from ed25519_sign().
+// Returns: 1 if valid, 0 if invalid.
+public def ed25519_verify(pubkey_hex: String, message: String, sig_hex: String) -> Int {
+    return crypto_ed25519_verify(pubkey_hex, message, sig_hex)
+}

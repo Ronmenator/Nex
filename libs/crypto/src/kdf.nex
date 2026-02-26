@@ -1,0 +1,18 @@
+// crypto.kdf — Key derivation functions (PBKDF2, Argon2).
+
+// Derives a key using PBKDF2-HMAC-SHA256.
+// password: the password string.
+// salt: the salt string.
+// iterations: number of iterations (e.g. 100000).
+// Returns: 64-char hex string (32-byte derived key).
+public def pbkdf2(password: String, salt: String, iterations: Int) -> String {
+    return crypto_pbkdf2(password, salt, iterations)
+}
+
+// Derives a key using Argon2id with default parameters.
+// password: the password string.
+// salt: the salt string (must be at least 8 bytes).
+// Returns: 64-char hex string (32-byte derived key).
+public def argon2(password: String, salt: String) -> String {
+    return crypto_argon2(password, salt)
+}

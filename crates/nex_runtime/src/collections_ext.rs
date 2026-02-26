@@ -232,3 +232,54 @@ pub unsafe extern "C" fn nex_list_contains_str(handle: *mut Vec<i64>, value: *co
     }
     0
 }
+
+// ---------------------------------------------------------------------------
+// Queue — FIFO queue backed by VecDeque<i64>
+// ---------------------------------------------------------------------------
+
+use std::collections::VecDeque;
+
+pub struct NexQueue {
+    pub inner: VecDeque<i64>,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_new() -> *mut NexQueue {
+    Box::into_raw(Box::new(NexQueue { inner: VecDeque::new() }))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_push(handle: *mut NexQueue, value: i64) {
+    if handle.is_null() { return; }
+    (*handle).inner.push_back(value);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_pop(handle: *mut NexQueue) -> i64 {
+    if handle.is_null() { return 0; }
+    (*handle).inner.pop_front().unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_peek(handle: *mut NexQueue) -> i64 {
+    if handle.is_null() { return 0; }
+    (*handle).inner.front().copied().unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_is_empty(handle: *mut NexQueue) -> i64 {
+    if handle.is_null() { return 1; }
+    if (*handle).inner.is_empty() { 1 } else { 0 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_size(handle: *mut NexQueue) -> i64 {
+    if handle.is_null() { return 0; }
+    (*handle).inner.len() as i64
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_queue_free(handle: *mut NexQueue) {
+    if handle.is_null() { return; }
+    drop(Box::from_raw(handle));
+}

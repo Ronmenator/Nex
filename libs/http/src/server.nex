@@ -1,0 +1,86 @@
+// http.server — Minimal HTTP/1.1 server.
+//
+// Usage:
+//   import http.server
+//
+//   def main() {
+//       let srv = server.listen(8080)
+//       println($"Listening on port 8080")
+//       while true {
+//           let conn = server.accept(srv)
+//           let method = server.method(conn)
+//           let path   = server.path(conn)
+//           println($"{method} {path}")
+//           server.respond(conn, 200, "Hello!", "text/plain")
+//           server.close_conn(conn)
+//       }
+//   }
+
+// Create a new HTTP server listening on the given port.
+// Returns a server handle, or 0 on failure.
+public def listen(port: Int) -> Int {
+    return http_server_new(port)
+}
+
+// Block until a client connects and sends a request.
+// Returns a connection handle with the parsed request.
+public def accept(server: Int) -> Int {
+    return http_server_accept(server)
+}
+
+// Get the HTTP method of the request (GET, POST, PUT, DELETE, etc.).
+public def method(conn: Int) -> String {
+    return http_conn_method(conn)
+}
+
+// Get the request path (e.g. "/api/users").
+public def path(conn: Int) -> String {
+    return http_conn_path(conn)
+}
+
+// Get a request header value by name (case-insensitive).
+// Returns "" if the header is not present.
+public def header(conn: Int, name: String) -> String {
+    return http_conn_header(conn, name)
+}
+
+// Get the request body as a string.
+public def body(conn: Int) -> String {
+    return http_conn_body(conn)
+}
+
+// Send an HTTP response with status code, body, and content type.
+public def respond(conn: Int, status: Int, body: String, content_type: String) {
+    http_conn_respond(conn, status, body, content_type)
+    return
+}
+
+// Send a JSON response (sets Content-Type to application/json).
+public def respond_json(conn: Int, status: Int, json_body: String) {
+    http_conn_respond(conn, status, json_body, "application/json")
+    return
+}
+
+// Send a plain text response.
+public def respond_text(conn: Int, status: Int, text: String) {
+    http_conn_respond(conn, status, text, "text/plain")
+    return
+}
+
+// Send an HTML response.
+public def respond_html(conn: Int, status: Int, html: String) {
+    http_conn_respond(conn, status, html, "text/html")
+    return
+}
+
+// Close a connection and free resources.
+public def close_conn(conn: Int) {
+    http_conn_close(conn)
+    return
+}
+
+// Shut down the server and free resources.
+public def close(server: Int) {
+    http_server_close(server)
+    return
+}

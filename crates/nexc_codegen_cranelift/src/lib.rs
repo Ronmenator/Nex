@@ -334,6 +334,47 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_mutex_unlock);
     sym!(nex_mutex_free);
 
+    // std.queue
+    sym!(nex_queue_new);
+    sym!(nex_queue_push);
+    sym!(nex_queue_pop);
+    sym!(nex_queue_peek);
+    sym!(nex_queue_is_empty);
+    sym!(nex_queue_size);
+    sym!(nex_queue_free);
+
+    // std.threadpool
+    sym!(nex_threadpool_new);
+    sym!(nex_threadpool_submit);
+    sym!(nex_threadpool_shutdown);
+
+    // std.http_server
+    sym!(nex_http_server_new);
+    sym!(nex_http_server_accept);
+    sym!(nex_http_conn_method);
+    sym!(nex_http_conn_path);
+    sym!(nex_http_conn_header);
+    sym!(nex_http_conn_body);
+    sym!(nex_http_conn_respond);
+    sym!(nex_http_conn_close);
+    sym!(nex_http_server_close);
+
+    // std.tls
+    sym!(nex_tls_connect);
+    sym!(nex_tls_send);
+    sym!(nex_tls_send_bytes);
+    sym!(nex_tls_recv);
+    sym!(nex_tls_recv_bytes);
+    sym!(nex_tls_close);
+
+    // std.websocket
+    sym!(nex_ws_server_new);
+    sym!(nex_ws_accept);
+    sym!(nex_ws_send);
+    sym!(nex_ws_recv);
+    sym!(nex_ws_close);
+    sym!(nex_ws_server_close);
+
     // std.async
     sym!(nex_task_spawn);
     sym!(nex_task_await);
@@ -780,10 +821,19 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_crypto_sha256",
     "nex_crypto_sha512",
     "nex_crypto_md5",
+    "nex_crypto_sha1",
     "nex_crypto_random_bytes",
     "nex_crypto_base64_encode",
     "nex_crypto_base64_decode",
     "nex_crypto_hmac_sha256",
+    "nex_crypto_aes_encrypt",
+    "nex_crypto_aes_decrypt",
+    "nex_crypto_aes_keygen",
+    "nex_crypto_ed25519_keygen",
+    "nex_crypto_ed25519_sign",
+    "nex_crypto_ed25519_verify",
+    "nex_crypto_pbkdf2",
+    "nex_crypto_argon2",
     // http
     "nex_http_get",
     "nex_http_post",
@@ -911,6 +961,23 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
     // Map functions
     match name {
         "nex_map_get" => return Some(RegType::String),
+        _ => {}
+    }
+    // Crypto functions that return strings
+    match name {
+        "nex_crypto_sha1" | "nex_crypto_sha256" | "nex_crypto_sha512" | "nex_crypto_md5"
+        | "nex_crypto_base64_encode" | "nex_crypto_base64_decode"
+        | "nex_crypto_hmac_sha256"
+        | "nex_crypto_aes_encrypt" | "nex_crypto_aes_decrypt" | "nex_crypto_aes_keygen"
+        | "nex_crypto_ed25519_keygen" | "nex_crypto_ed25519_sign"
+        | "nex_crypto_pbkdf2" | "nex_crypto_argon2" => return Some(RegType::String),
+        _ => {}
+    }
+    // HTTP server functions that return strings
+    match name {
+        "nex_http_conn_method" | "nex_http_conn_path"
+        | "nex_http_conn_header" | "nex_http_conn_body"
+        | "nex_tls_recv" | "nex_ws_recv" => return Some(RegType::String),
         _ => {}
     }
     // JSON functions
@@ -2079,14 +2146,59 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "mutex_lock" => Some("nex_mutex_lock"),
         "mutex_unlock" => Some("nex_mutex_unlock"),
         "mutex_free" => Some("nex_mutex_free"),
+        // std.queue
+        "queue_new" => Some("nex_queue_new"),
+        "queue_push" => Some("nex_queue_push"),
+        "queue_pop" => Some("nex_queue_pop"),
+        "queue_peek" => Some("nex_queue_peek"),
+        "queue_is_empty" => Some("nex_queue_is_empty"),
+        "queue_size" => Some("nex_queue_size"),
+        "queue_free" => Some("nex_queue_free"),
+        // std.threadpool
+        "threadpool_new" => Some("nex_threadpool_new"),
+        "threadpool_submit" => Some("nex_threadpool_submit"),
+        "threadpool_shutdown" => Some("nex_threadpool_shutdown"),
+        // std.http_server
+        "http_server_new" => Some("nex_http_server_new"),
+        "http_server_accept" => Some("nex_http_server_accept"),
+        "http_conn_method" => Some("nex_http_conn_method"),
+        "http_conn_path" => Some("nex_http_conn_path"),
+        "http_conn_header" => Some("nex_http_conn_header"),
+        "http_conn_body" => Some("nex_http_conn_body"),
+        "http_conn_respond" => Some("nex_http_conn_respond"),
+        "http_conn_close" => Some("nex_http_conn_close"),
+        "http_server_close" => Some("nex_http_server_close"),
+        // std.tls
+        "tls_connect" => Some("nex_tls_connect"),
+        "tls_send" => Some("nex_tls_send"),
+        "tls_send_bytes" => Some("nex_tls_send_bytes"),
+        "tls_recv" => Some("nex_tls_recv"),
+        "tls_recv_bytes" => Some("nex_tls_recv_bytes"),
+        "tls_close" => Some("nex_tls_close"),
+        // std.websocket
+        "ws_server_new" => Some("nex_ws_server_new"),
+        "ws_accept" => Some("nex_ws_accept"),
+        "ws_send" => Some("nex_ws_send"),
+        "ws_recv" => Some("nex_ws_recv"),
+        "ws_close" => Some("nex_ws_close"),
+        "ws_server_close" => Some("nex_ws_server_close"),
         // std.crypto
         "sha256" => Some("nex_crypto_sha256"),
         "sha512" => Some("nex_crypto_sha512"),
         "md5" => Some("nex_crypto_md5"),
+        "sha1" => Some("nex_crypto_sha1"),
         "random_bytes" => Some("nex_crypto_random_bytes"),
         "base64_encode" => Some("nex_crypto_base64_encode"),
         "base64_decode" => Some("nex_crypto_base64_decode"),
         "hmac_sha256" => Some("nex_crypto_hmac_sha256"),
+        "aes_encrypt" => Some("nex_crypto_aes_encrypt"),
+        "aes_decrypt" => Some("nex_crypto_aes_decrypt"),
+        "aes_keygen" => Some("nex_crypto_aes_keygen"),
+        "ed25519_keygen" => Some("nex_crypto_ed25519_keygen"),
+        "ed25519_sign" => Some("nex_crypto_ed25519_sign"),
+        "ed25519_verify" => Some("nex_crypto_ed25519_verify"),
+        "pbkdf2" => Some("nex_crypto_pbkdf2"),
+        "argon2" => Some("nex_crypto_argon2"),
         // std.logging
         "log_debug" => Some("nex_log_debug"),
         "log_info" => Some("nex_log_info"),
@@ -2463,10 +2575,19 @@ fn crypto_function_name(name: &str) -> Option<&'static str> {
         "crypto_sha256" => Some("nex_crypto_sha256"),
         "crypto_sha512" => Some("nex_crypto_sha512"),
         "crypto_md5" => Some("nex_crypto_md5"),
+        "crypto_sha1" => Some("nex_crypto_sha1"),
         "crypto_random_bytes" => Some("nex_crypto_random_bytes"),
         "crypto_base64_encode" => Some("nex_crypto_base64_encode"),
         "crypto_base64_decode" => Some("nex_crypto_base64_decode"),
         "crypto_hmac_sha256" => Some("nex_crypto_hmac_sha256"),
+        "crypto_aes_encrypt" => Some("nex_crypto_aes_encrypt"),
+        "crypto_aes_decrypt" => Some("nex_crypto_aes_decrypt"),
+        "crypto_aes_keygen" => Some("nex_crypto_aes_keygen"),
+        "crypto_ed25519_keygen" => Some("nex_crypto_ed25519_keygen"),
+        "crypto_ed25519_sign" => Some("nex_crypto_ed25519_sign"),
+        "crypto_ed25519_verify" => Some("nex_crypto_ed25519_verify"),
+        "crypto_pbkdf2" => Some("nex_crypto_pbkdf2"),
+        "crypto_argon2" => Some("nex_crypto_argon2"),
         _ => None,
     }
 }
@@ -3029,6 +3150,18 @@ fn declare_runtime_imports<M: Module>(
         ("nex_mutex_lock", &sig_void_ptr),
         ("nex_mutex_unlock", &sig_void_ptr),
         ("nex_mutex_free", &sig_void_ptr),
+        // std.queue
+        ("nex_queue_new", &sig_ret_ptr),
+        ("nex_queue_push", &sig_void_ptr2),
+        ("nex_queue_pop", &sig_ptr_ptr),
+        ("nex_queue_peek", &sig_ptr_ptr),
+        ("nex_queue_is_empty", &sig_ptr_ptr),
+        ("nex_queue_size", &sig_ptr_ptr),
+        ("nex_queue_free", &sig_void_ptr),
+        // std.threadpool
+        ("nex_threadpool_new", &sig_ptr_ptr),
+        ("nex_threadpool_submit", &sig_void_ptr2),
+        ("nex_threadpool_shutdown", &sig_void_ptr),
         // std.async
         ("nex_task_spawn", &sig_ptr_ptr),
         ("nex_task_await", &sig_ptr_ptr),
@@ -3042,10 +3175,19 @@ fn declare_runtime_imports<M: Module>(
         ("nex_crypto_sha256", &sig_ptr_ptr),
         ("nex_crypto_sha512", &sig_ptr_ptr),
         ("nex_crypto_md5", &sig_ptr_ptr),
+        ("nex_crypto_sha1", &sig_ptr_ptr),
         ("nex_crypto_random_bytes", &sig_void_ptr2),
         ("nex_crypto_base64_encode", &sig_ptr_ptr),
         ("nex_crypto_base64_decode", &sig_ptr_ptr),
         ("nex_crypto_hmac_sha256", &sig_ptr_ptr2),
+        ("nex_crypto_aes_encrypt", &sig_ptr_ptr2),
+        ("nex_crypto_aes_decrypt", &sig_ptr_ptr2),
+        ("nex_crypto_aes_keygen", &sig_ret_ptr),
+        ("nex_crypto_ed25519_keygen", &sig_ret_ptr),
+        ("nex_crypto_ed25519_sign", &sig_ptr_ptr2),
+        ("nex_crypto_ed25519_verify", &sig_ptr_ptr3),
+        ("nex_crypto_pbkdf2", &sig_ptr_ptr3),
+        ("nex_crypto_argon2", &sig_ptr_ptr2),
         // std.logging
         ("nex_log_debug", &sig_void_ptr),
         ("nex_log_info", &sig_void_ptr),
@@ -3496,10 +3638,19 @@ fn declare_runtime_imports<M: Module>(
         ("nex_crypto_sha256", &sig_ptr_ptr),
         ("nex_crypto_sha512", &sig_ptr_ptr),
         ("nex_crypto_md5", &sig_ptr_ptr),
+        ("nex_crypto_sha1", &sig_ptr_ptr),
         ("nex_crypto_random_bytes", &sig_void_ptr2),
         ("nex_crypto_base64_encode", &sig_ptr_ptr),
         ("nex_crypto_base64_decode", &sig_ptr_ptr),
         ("nex_crypto_hmac_sha256", &sig_ptr_ptr2),
+        ("nex_crypto_aes_encrypt", &sig_ptr_ptr2),
+        ("nex_crypto_aes_decrypt", &sig_ptr_ptr2),
+        ("nex_crypto_aes_keygen", &sig_ret_ptr),
+        ("nex_crypto_ed25519_keygen", &sig_ret_ptr),
+        ("nex_crypto_ed25519_sign", &sig_ptr_ptr2),
+        ("nex_crypto_ed25519_verify", &sig_ptr_ptr3),
+        ("nex_crypto_pbkdf2", &sig_ptr_ptr3),
+        ("nex_crypto_argon2", &sig_ptr_ptr2),
     ];
 
     let http_imports: Vec<(&str, &Signature)> = vec![
@@ -3519,7 +3670,33 @@ fn declare_runtime_imports<M: Module>(
         ("nex_regex_free", &sig_void_ptr),
     ];
 
-    for imports_list in [crypto_imports, http_imports, regex_imports] {
+    let http_server_imports: Vec<(&str, &Signature)> = vec![
+        ("nex_http_server_new", &sig_ptr_ptr),
+        ("nex_http_server_accept", &sig_ptr_ptr),
+        ("nex_http_conn_method", &sig_ptr_ptr),
+        ("nex_http_conn_path", &sig_ptr_ptr),
+        ("nex_http_conn_header", &sig_ptr_ptr2),
+        ("nex_http_conn_body", &sig_ptr_ptr),
+        ("nex_http_conn_respond", &sig_void_ptr4),
+        ("nex_http_conn_close", &sig_void_ptr),
+        ("nex_http_server_close", &sig_void_ptr),
+        // std.tls
+        ("nex_tls_connect", &sig_ptr_ptr2),
+        ("nex_tls_send", &sig_ptr_ptr2),
+        ("nex_tls_send_bytes", &sig_ptr_ptr3),
+        ("nex_tls_recv", &sig_ptr_ptr2),
+        ("nex_tls_recv_bytes", &sig_ptr_ptr3),
+        ("nex_tls_close", &sig_void_ptr),
+        // std.websocket
+        ("nex_ws_server_new", &sig_ptr_ptr),
+        ("nex_ws_accept", &sig_ptr_ptr),
+        ("nex_ws_send", &sig_ptr_ptr2),
+        ("nex_ws_recv", &sig_ptr_ptr),
+        ("nex_ws_close", &sig_void_ptr),
+        ("nex_ws_server_close", &sig_void_ptr),
+    ];
+
+    for imports_list in [crypto_imports, http_imports, regex_imports, http_server_imports] {
         for (name, sig) in imports_list {
             declare(name, sig)?;
         }

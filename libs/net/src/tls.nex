@@ -1,0 +1,35 @@
+// net.tls — TLS/SSL client connections using rustls.
+//
+// Usage:
+//   import net.tls
+//
+//   def main() {
+//       let conn = tls.connect("example.com", 443)
+//       tls.send(conn, "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+//       let response = tls.recv(conn, 4096)
+//       println(response)
+//       tls.close(conn)
+//   }
+
+// Connect to a TLS server. Returns a TLS stream handle, or 0 on failure.
+public def connect(host: String, port: Int) -> Int {
+    return tls_connect(host, port)
+}
+
+// Send a string over the TLS connection.
+// Returns the number of bytes sent, or -1 on failure.
+public def send(conn: Int, data: String) -> Int {
+    return tls_send(conn, data)
+}
+
+// Receive data from the TLS connection as a string.
+// max_len is the maximum number of bytes to read.
+public def recv(conn: Int, max_len: Int) -> String {
+    return tls_recv(conn, max_len)
+}
+
+// Close the TLS connection and free resources.
+public def close(conn: Int) {
+    tls_close(conn)
+    return
+}
