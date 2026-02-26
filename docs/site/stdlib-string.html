@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -175,6 +175,20 @@ invalid <span class="op">=</span> <span class="fn">char_at</span>(<span class="s
 
 <span class="fn">println</span>(<span class="fn">str_reverse</span>(<span class="str">"Nex"</span>))  <span class="cmt">// "xeN"</span>
 <span class="fn">println</span>(<span class="fn">str_reverse</span>(<span class="str">"racecar"</span>))  <span class="cmt">// "racecar" (palindrome)</span></code></pre>
+
+  <h2>Truncation</h2>
+
+  <h4>str_truncate</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">str_truncate</span>(s: <span class="typ">String</span>, max_len: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Returns the first <code>max_len</code> characters of <code>s</code>. If <code>s</code> is shorter than <code>max_len</code>, it is returned unchanged. UTF-8 aware.</p>
+
+  <pre><code><span class="kw">import</span> std.string
+
+msg <span class="op">=</span> <span class="str">"Hello World, this is a long message"</span>
+<span class="fn">println</span>(<span class="fn">str_truncate</span>(msg, <span class="num">11</span>))  <span class="cmt">// "Hello World"</span>
+<span class="fn">println</span>(<span class="fn">str_truncate</span>(<span class="str">"Hi"</span>, <span class="num">10</span>))  <span class="cmt">// "Hi"</span></code></pre>
 
   <h2>Splitting</h2>
 

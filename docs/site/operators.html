@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -27,15 +27,20 @@
 
   <table>
     <tr><th>Precedence</th><th>Operators</th><th>Associativity</th><th>Description</th></tr>
-    <tr><td>1</td><td><code>= += -= *= /=</code></td><td>Right</td><td>Assignment</td></tr>
-    <tr><td>2</td><td><code>||</code></td><td>Left</td><td>Logical OR</td></tr>
-    <tr><td>3</td><td><code>&amp;&amp;</code></td><td>Left</td><td>Logical AND</td></tr>
-    <tr><td>4</td><td><code>== !=</code></td><td>Left</td><td>Equality</td></tr>
-    <tr><td>5</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Left</td><td>Comparison</td></tr>
-    <tr><td>6</td><td><code>+ -</code></td><td>Left</td><td>Addition, Subtraction</td></tr>
-    <tr><td>7</td><td><code>* / %</code></td><td>Left</td><td>Multiplication, Division, Modulo</td></tr>
-    <tr><td>8</td><td><code>! - +</code> (unary)</td><td>Right</td><td>Negation, Not</td></tr>
-    <tr><td>9</td><td><code>. :: ()</code></td><td>Left</td><td>Member access, Qualified access, Call</td></tr>
+    <tr><td>1</td><td><code>= += -= *= /= &amp;= |= ^= &lt;&lt;= &gt;&gt;=</code></td><td>Right</td><td>Assignment</td></tr>
+    <tr><td>2</td><td><code>expr if cond else expr</code></td><td>Right</td><td>Ternary</td></tr>
+    <tr><td>3</td><td><code>||</code></td><td>Left</td><td>Logical OR</td></tr>
+    <tr><td>4</td><td><code>&amp;&amp;</code></td><td>Left</td><td>Logical AND</td></tr>
+    <tr><td>5</td><td><code>|</code></td><td>Left</td><td>Bitwise OR</td></tr>
+    <tr><td>6</td><td><code>^</code></td><td>Left</td><td>Bitwise XOR</td></tr>
+    <tr><td>7</td><td><code>&amp;</code></td><td>Left</td><td>Bitwise AND</td></tr>
+    <tr><td>8</td><td><code>== !=</code></td><td>Left</td><td>Equality</td></tr>
+    <tr><td>9</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Left</td><td>Comparison</td></tr>
+    <tr><td>10</td><td><code>&lt;&lt; &gt;&gt;</code></td><td>Left</td><td>Shift</td></tr>
+    <tr><td>11</td><td><code>+ -</code></td><td>Left</td><td>Addition, Subtraction</td></tr>
+    <tr><td>12</td><td><code>* / %</code></td><td>Left</td><td>Multiplication, Division, Modulo</td></tr>
+    <tr><td>13</td><td><code>! - + ~</code> (unary)</td><td>Right</td><td>Negation, Not, Bitwise NOT</td></tr>
+    <tr><td>14</td><td><code>. :: ()</code></td><td>Left</td><td>Member access, Qualified access, Call</td></tr>
   </table>
 
   <h2>Arithmetic Operators</h2>
@@ -74,13 +79,27 @@ a <span class="op">&gt;=</span> b    <span class="cmt">// greater than or equal<
     <span class="fn">println</span>(<span class="str">"flag is false"</span>)
 }</code></pre>
 
+  <h2>Bitwise Operators</h2>
+
+  <pre><code>a <span class="op">=</span> <span class="num">0xFF</span> <span class="op">&amp;</span> <span class="num">0x0F</span>    <span class="cmt">// AND: 15</span>
+b <span class="op">=</span> <span class="num">0x0F</span> <span class="op">|</span> <span class="num">0xF0</span>    <span class="cmt">// OR: 255</span>
+c <span class="op">=</span> <span class="num">0xFF</span> <span class="op">^</span> <span class="num">0xAA</span>    <span class="cmt">// XOR: 85</span>
+d <span class="op">=</span> <span class="num">1</span> <span class="op">&lt;&lt;</span> <span class="num">3</span>          <span class="cmt">// left shift: 8</span>
+e <span class="op">=</span> <span class="num">16</span> <span class="op">&gt;&gt;</span> <span class="num">2</span>        <span class="cmt">// right shift: 4</span>
+f <span class="op">=</span> <span class="op">~</span><span class="num">0</span>              <span class="cmt">// bitwise NOT: -1</span></code></pre>
+
   <h2>Assignment Operators</h2>
 
   <pre><code>x <span class="op">=</span> <span class="num">10</span>      <span class="cmt">// simple assignment</span>
 x <span class="op">+=</span> <span class="num">5</span>     <span class="cmt">// x = x + 5</span>
 x <span class="op">-=</span> <span class="num">3</span>     <span class="cmt">// x = x - 3</span>
 x <span class="op">*=</span> <span class="num">2</span>     <span class="cmt">// x = x * 2</span>
-x <span class="op">/=</span> <span class="num">4</span>     <span class="cmt">// x = x / 4</span></code></pre>
+x <span class="op">/=</span> <span class="num">4</span>     <span class="cmt">// x = x / 4</span>
+x <span class="op">&amp;=</span> <span class="num">0xFF</span>  <span class="cmt">// x = x &amp; 0xFF</span>
+x <span class="op">|=</span> <span class="num">0x01</span>  <span class="cmt">// x = x | 0x01</span>
+x <span class="op">^=</span> <span class="num">0xAA</span>  <span class="cmt">// x = x ^ 0xAA</span>
+x <span class="op">&lt;&lt;=</span> <span class="num">2</span>    <span class="cmt">// x = x &lt;&lt; 2</span>
+x <span class="op">&gt;&gt;=</span> <span class="num">1</span>    <span class="cmt">// x = x &gt;&gt; 1</span></code></pre>
 
   <h2>String Concatenation</h2>
 

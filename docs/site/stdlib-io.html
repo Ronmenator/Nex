@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -80,6 +80,18 @@ name <span class="op">=</span> <span class="fn">read_line</span>()
     <span class="kw">def</span> <span class="fn">file_copy</span>(from: <span class="typ">String</span>, to: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
   </div>
   <p>Copies a file from one path to another. Returns <code>true</code> on success.</p>
+
+  <h4>file_append</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">file_append</span>(path: <span class="typ">String</span>, data: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Appends <code>data</code> to the end of the file at <code>path</code>. Creates the file if it doesn't exist. Returns <code>true</code> on success. Efficient for log files and incremental writes.</p>
+
+  <pre><code><span class="kw">import</span> std.io
+
+<span class="cmt">// Append to a log file</span>
+<span class="fn">file_append</span>(<span class="str">"app.log"</span>, <span class="str">"[INFO] Server started\n"</span>)
+<span class="fn">file_append</span>(<span class="str">"app.log"</span>, <span class="str">"[INFO] Listening on port 8080\n"</span>)</code></pre>
 
   <pre><code><span class="kw">import</span> std.io
 

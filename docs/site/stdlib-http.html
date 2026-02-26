@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -19,14 +19,15 @@
   <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="lib-overview.html">Standard Libraries</a><span class="sep">/</span>http</div>
 
   <h1>http</h1>
-  <p class="page-subtitle">HTTP client for GET and POST requests.</p>
+  <p class="page-subtitle">HTTP client and server for building web applications.</p>
 
   <h2>Setup</h2>
   <p>Add to your <code>project.toml</code>:</p>
   <pre><code>[libs]
 http = { path = "../libs/http" }</code></pre>
 
-  <pre><code><span class="kw">import</span> http.client</code></pre>
+  <pre><code><span class="kw">import</span> http.client
+<span class="kw">import</span> http.server</code></pre>
 
   <h2>Making Requests</h2>
 
@@ -107,6 +108,67 @@ server <span class="op">=</span> <span class="fn">response_header</span>(resp, <
     <span class="kw">def</span> <span class="fn">response_free</span>(response: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
   </div>
   <p>Frees the response handle and releases associated resources. Always call this when you are done reading the response to avoid memory leaks.</p>
+
+  <h2>HTTP Server</h2>
+
+  <pre><code><span class="kw">import</span> http.server</code></pre>
+
+  <h4>server.listen</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">listen</span>(port: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Creates an HTTP server listening on the given port. Returns a server handle.</p>
+
+  <h4>server.accept</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">accept</span>(srv: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Blocks until an HTTP request arrives. Returns a connection handle with the parsed request.</p>
+
+  <h4>server.method / path / header / body</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">method</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span><br>
+    <span class="kw">def</span> <span class="fn">path</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span><br>
+    <span class="kw">def</span> <span class="fn">header</span>(conn: <span class="typ">Int</span>, name: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span><br>
+    <span class="kw">def</span> <span class="fn">body</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Access the HTTP method, path, headers, and body of the incoming request.</p>
+
+  <h4>server.respond</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">respond</span>(conn: <span class="typ">Int</span>, status: <span class="typ">Int</span>, body: <span class="typ">String</span>, content_type: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Sends an HTTP response with the given status code, body, and content type.</p>
+
+  <h4>Convenience Response Methods</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">respond_json</span>(conn: <span class="typ">Int</span>, status: <span class="typ">Int</span>, json: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span><br>
+    <span class="kw">def</span> <span class="fn">respond_text</span>(conn: <span class="typ">Int</span>, status: <span class="typ">Int</span>, text: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span><br>
+    <span class="kw">def</span> <span class="fn">respond_html</span>(conn: <span class="typ">Int</span>, status: <span class="typ">Int</span>, html: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Shorthand for responding with JSON (<code>application/json</code>), plain text (<code>text/plain</code>), or HTML (<code>text/html</code>).</p>
+
+  <h4>server.close_conn / close</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">close_conn</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span><br>
+    <span class="kw">def</span> <span class="fn">close</span>(srv: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Close a connection or shut down the server.</p>
+
+  <pre><code><span class="kw">import</span> http.server
+
+srv <span class="op">=</span> <span class="fn">server.listen</span>(<span class="num">8080</span>)
+<span class="fn">println</span>(<span class="str">"HTTP server on port 8080"</span>)
+
+<span class="kw">while</span> (<span class="kw">true</span>) {
+    conn <span class="op">=</span> <span class="fn">server.accept</span>(srv)
+    m <span class="op">=</span> <span class="fn">server.method</span>(conn)
+    p <span class="op">=</span> <span class="fn">server.path</span>(conn)
+    <span class="fn">println</span>(m <span class="op">+</span> <span class="str">" "</span> <span class="op">+</span> p)
+
+    <span class="fn">server.respond_json</span>(conn, <span class="num">200</span>, <span class="str">"{\"status\": \"ok\"}"</span>)
+    <span class="fn">server.close_conn</span>(conn)
+}</code></pre>
 
   <h2>Complete Example</h2>
 

@@ -4,7 +4,7 @@ Supports `.nex` files with:
 - Syntax highlighting
 - Nex LSP integration (`nex-lsp`)
 - Commands: Build/Run/Test/Format
-- Hover documentation for all 21 standard library modules including `std.ui` and `std.torch`, and libraries such as `nex3d`
+- Hover documentation for all 22 standard library modules including `std.ui` and `std.torch`, and libraries such as `crypto`, `http`, `net`, and `nex3d`
 
 ## Development
 1. `cd vscode-extension`

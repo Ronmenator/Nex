@@ -464,7 +464,16 @@ impl IrLowering {
                 if name == "self" {
                     return self.current_class.clone();
                 }
-                self.var_types.get(name).cloned()
+                if let Some(ty) = self.var_types.get(name) {
+                    return Some(ty.clone());
+                }
+                // Check class fields when inside a class method
+                if let Some(class_name) = &self.current_class {
+                    if let Some(field_type) = self.class_fields.get(&(class_name.clone(), name.clone())) {
+                        return Some(field_type.clone());
+                    }
+                }
+                None
             }
             nexc_ast::Expr::Call { callee, .. } => match callee.as_ref() {
                 nexc_ast::Expr::Identifier { name, .. } => {
@@ -856,7 +865,28 @@ impl IrLowering {
                 nexc_ast::Literal::Char(c) => IrValue::IntConst(*c as i64),
                 nexc_ast::Literal::Null => IrValue::NullConst,
             },
-            Expr::Identifier { name, .. } => IrValue::Register(format!("%{name}")),
+            Expr::Identifier { name, .. } => {
+                // If inside a class method and the identifier is a class field
+                // (not shadowed by a local), emit a Load from the class global.
+                if !self.current_scope_vars.contains(name) {
+                    let is_class_field = self.current_class.as_ref().and_then(|cn| {
+                        if self.class_fields.contains_key(&(cn.clone(), name.clone())) {
+                            Some(cn.clone())
+                        } else {
+                            None
+                        }
+                    });
+                    if let Some(class_name) = is_class_field {
+                        let dst = self.fresh_temp();
+                        self.emit(IrInstruction::Load {
+                            dst: dst.clone(),
+                            src: format!("%{class_name}.{name}"),
+                        });
+                        return IrValue::Register(dst);
+                    }
+                }
+                IrValue::Register(format!("%{name}"))
+            }
             Expr::Binary { op, lhs, rhs, .. } => {
                 // Check for operator overloading on class/struct types
                 let op_symbol = match op {
@@ -961,8 +991,23 @@ impl IrLowering {
                 let val = self.lower_expr(value);
                 match target.as_ref() {
                     Expr::Identifier { name, .. } => {
+                        // If inside a class method and assigning to a class field,
+                        // store to the class global instead of a local register.
+                        let dst = if !self.current_scope_vars.contains(name) {
+                            if let Some(class_name) = &self.current_class {
+                                if self.class_fields.contains_key(&(class_name.clone(), name.clone())) {
+                                    format!("%{class_name}.{name}")
+                                } else {
+                                    format!("%{name}")
+                                }
+                            } else {
+                                format!("%{name}")
+                            }
+                        } else {
+                            format!("%{name}")
+                        };
                         self.emit(IrInstruction::Store {
-                            dst: format!("%{name}"),
+                            dst,
                             src: val.clone(),
                         });
                     }

@@ -17,13 +17,14 @@ This downloads the latest release, extracts it to `~/.nex/`, and adds it to your
 - **Enums** — named variants with pattern matching support
 - **Pattern matching** — `match` expressions with literal, enum, wildcard, binding, and guard patterns
 - **String interpolation** — `$"Hello {name}!"` syntax for embedding expressions in strings
+- **Bitwise operators** — `&`, `|`, `^`, `<<`, `>>`, `~` with compound assignment
 - **Closures & lambdas** — `|x| x + 1` anonymous functions with variable capture
 - **Async/await** — concurrent programming with async functions
 - **Ternary expressions** — `value if condition else other` Python-style conditionals
 - **Reflection** — runtime type introspection with `[Reflectable]` attribute and `Reflect` API
 - **Native performance** — compiles to machine code via Cranelift (AOT and JIT)
 - **Garbage collected** with deterministic cleanup via `using` blocks
-- **Rich standard library** — collections, I/O, networking, JSON, crypto, threading, and more
+- **Rich standard library** — collections, I/O, networking, TLS, WebSocket, HTTP server, JSON, crypto, threading, thread pools, queues, and more
 - **3D game engine** — `nex3d` with sprites, 3D models, animation, audio, lighting, fonts, gamepad input, and more
 - **Machine learning** — `torch` library with tensors, neural networks, CUDA, and training utilities
 - **Declarative UI** — `.nexui` markup for desktop GUI applications
@@ -80,8 +81,9 @@ Opt-in libraries that ship with Nex. Add them to your `project.toml` under `[lib
 
 | Library | Description |
 |---------|-------------|
-| **crypto** | SHA-256, SHA-512, MD5, HMAC, Base64, secure random bytes |
-| **http** | HTTP client for GET/POST with response status, body, and headers |
+| **crypto** | SHA-1, SHA-256, SHA-512, MD5, HMAC, Base64, AES-256-GCM, Ed25519 signatures, PBKDF2, Argon2 |
+| **http** | HTTP client (GET/POST) and HTTP/1.1 server with request parsing and response helpers |
+| **net** | TLS/SSL client (rustls) and WebSocket server (RFC 6455) |
 | **regex** | Regular expression compilation, matching, searching, and replacement |
 | **torch** | PyTorch tensors, neural networks, loss functions, optimizers, CUDA, training utilities |
 | **nex_ui** | Desktop GUI (WGPU) and terminal TUI with flexbox layout, canvas, and dialogs |

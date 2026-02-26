@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -19,7 +19,7 @@
   <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.threading</div>
 
   <h1>std.threading</h1>
-  <p class="page-subtitle">Thread creation, synchronization, and mutex operations.</p>
+  <p class="page-subtitle">Thread creation, synchronization, mutex operations, and thread pools.</p>
 
   <pre><code><span class="kw">import</span> std.threading</code></pre>
 
@@ -112,6 +112,38 @@ t2 <span class="op">=</span> <span class="fn">thread_spawn</span>(increment_work
 tid <span class="op">=</span> <span class="fn">thread_current_id</span>()
 <span class="fn">print</span>(<span class="str">"Main thread ID: "</span>)
 <span class="fn">println</span>(tid)</code></pre>
+
+  <h2>Thread Pool</h2>
+
+  <h4>threadpool_new</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">threadpool_new</span>(size: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Var</span>
+  </div>
+  <p>Creates a thread pool with <code>size</code> worker threads. Returns a pool handle.</p>
+
+  <h4>threadpool_submit</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">threadpool_submit</span>(pool: <span class="typ">Var</span>, func: <span class="typ">Function</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Submits a function to the pool for execution by one of the worker threads.</p>
+
+  <h4>threadpool_shutdown</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">threadpool_shutdown</span>(pool: <span class="typ">Var</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Shuts down the thread pool, waiting for all submitted tasks to complete.</p>
+
+  <pre><code><span class="kw">import</span> std.threading
+
+<span class="kw">def</span> <span class="fn">task</span>() <span class="op">-&gt;</span> <span class="typ">Unit</span> {
+    <span class="fn">println</span>(<span class="str">"Running task on worker thread"</span>)
+}
+
+pool <span class="op">=</span> <span class="fn">threadpool_new</span>(<span class="num">4</span>)
+<span class="fn">threadpool_submit</span>(pool, task)
+<span class="fn">threadpool_submit</span>(pool, task)
+<span class="fn">threadpool_submit</span>(pool, task)
+<span class="fn">threadpool_shutdown</span>(pool)</code></pre>
 
   <div class="page-nav">
     <a href="stdlib-net.html">

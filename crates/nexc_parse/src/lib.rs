@@ -1413,7 +1413,8 @@ impl Parser {
         match self.peek_kind() {
             Some(TokenKind::Bang) => {
                 let op = self.advance();
-                let value = self.parse_expression_bp(22);
+                // bp 19: lower than `.` (20) so `!a.b()` parses as `!(a.b())`
+                let value = self.parse_expression_bp(19);
                 let value_span = expr_span(&value);
                 Expr::Unary {
                     op: UnaryOp::Not,

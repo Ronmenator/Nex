@@ -563,7 +563,7 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
             }
             val_ty
         }
-        Expr::Call { callee, args, .. } => {
+        Expr::Call { callee, args, type_args, .. } => {
             for arg in args {
                 infer_expr(arg, scope, sink);
             }
@@ -572,6 +572,10 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
                     return sig.return_type.clone();
                 }
                 if scope.global_types.contains_key(name) {
+                    if !type_args.is_empty() {
+                        let resolved_args: Vec<Type> = type_args.iter().map(|t| resolve_type_expr(t)).collect();
+                        return Type::Generic(name.clone(), resolved_args);
+                    }
                     return Type::Named(name.clone());
                 }
             }
@@ -676,6 +680,13 @@ fn types_compatible(source: &Type, target: &Type) -> bool {
     }
     if source.is_float() && target.is_float() {
         return true;
+    }
+    // Generic type erasure: Named("List") is compatible with Generic("List", [...])
+    match (source, target) {
+        (Type::Named(a), Type::Generic(b, _)) | (Type::Generic(a, _), Type::Named(b)) if a == b => {
+            return true;
+        }
+        _ => {}
     }
     false
 }

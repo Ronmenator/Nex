@@ -72,6 +72,7 @@ const NAV_HTML = `
     <li><a href="lib-overview.html">Overview</a></li>
     <li><a href="stdlib-crypto.html">crypto</a></li>
     <li><a href="stdlib-http.html">http</a></li>
+    <li><a href="stdlib-net-lib.html">net</a></li>
     <li><a href="stdlib-regex.html">regex</a></li>
     <li><a href="stdlib-torch.html">torch</a></li>
     <li><a href="stdlib-ui.html">nex_ui</a></li>

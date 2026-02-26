@@ -443,6 +443,18 @@ pub fn resolve_lib_auto(name: &str, search_root: Option<&Path>) -> Option<LibDep
                 git: None,
             });
         }
+        // Flat layout: project.toml directly in ~/.nex/libs/<name>/
+        // (no version subdirectory).
+        if cache_root.join("project.toml").exists() {
+            let native_lib = resolve_native_lib(&cache_root);
+            return Some(LibDependency {
+                name: name.to_string(),
+                root: cache_root,
+                native_lib,
+                version: None,
+                git: None,
+            });
+        }
     }
 
     // 2. Walk up from search_root looking for libs/<name>/ in each ancestor.

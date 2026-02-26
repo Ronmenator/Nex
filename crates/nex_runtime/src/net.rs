@@ -25,19 +25,26 @@ pub unsafe extern "C" fn nex_net_tcp_close(handle: *mut TcpStream) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_net_tcp_send(handle: *mut TcpStream, data: *const u8, len: i32) -> i32 {
+pub unsafe extern "C" fn nex_net_tcp_send(handle: *mut TcpStream, data: *const c_char) -> i64 {
     if handle.is_null() || data.is_null() { return -1; }
     let stream = &mut *handle;
-    let slice = std::slice::from_raw_parts(data, len as usize);
-    stream.write(slice).map(|n| n as i32).unwrap_or(-1)
+    let bytes = std::ffi::CStr::from_ptr(data).to_bytes();
+    stream.write(bytes).map(|n| n as i64).unwrap_or(-1)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_net_tcp_recv(handle: *mut TcpStream, buf: *mut u8, max_len: i32) -> i32 {
-    if handle.is_null() || buf.is_null() { return -1; }
+pub unsafe extern "C" fn nex_net_tcp_recv(handle: *mut TcpStream, max_len: i64) -> *const c_char {
+    if handle.is_null() || max_len <= 0 { return std::ptr::null(); }
     let stream = &mut *handle;
-    let slice = std::slice::from_raw_parts_mut(buf, max_len as usize);
-    stream.read(slice).map(|n| n as i32).unwrap_or(-1)
+    let mut buf = vec![0u8; max_len as usize];
+    match stream.read(&mut buf) {
+        Ok(0) | Err(_) => std::ptr::null(),
+        Ok(n) => {
+            buf.truncate(n);
+            let c_string = std::ffi::CString::new(buf).unwrap_or_default();
+            c_string.into_raw() as *const c_char
+        }
+    }
 }
 
 #[no_mangle]

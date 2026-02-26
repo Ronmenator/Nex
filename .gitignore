@@ -1,3 +1,6 @@
+# Nex distribution (binaries, configs, archived versions)
+/nex/
+
 # Rust / Cargo
 target/
 **/*.rs.bk

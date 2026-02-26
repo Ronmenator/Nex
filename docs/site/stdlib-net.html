@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -19,7 +19,7 @@
   <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.net</div>
 
   <h1>std.net</h1>
-  <p class="page-subtitle">TCP and UDP networking.</p>
+  <p class="page-subtitle">TCP/UDP networking, TLS/SSL, and WebSocket support.</p>
 
   <pre><code><span class="kw">import</span> std.net</code></pre>
 
@@ -171,6 +171,111 @@ data <span class="op">=</span> <span class="fn">tcp_recv</span>(client, <span cl
 }
 
 <span class="fn">echo_server</span>(<span class="str">"127.0.0.1"</span>, <span class="num">7000</span>)</code></pre>
+
+  <h2>TLS/SSL Client</h2>
+
+  <p>Secure TLS connections using the <code>net.tls</code> library module. Requires adding the <code>net</code> library to your <code>project.toml</code>.</p>
+
+  <div class="callout info">
+    <div class="callout-title">Library Module</div>
+    <p>TLS is provided by the <code>net</code> standard library, not the built-in <code>std.net</code>. Add it to your <code>project.toml</code>:</p>
+  </div>
+
+  <pre><code>[libs]
+net = { path = "../libs/net" }</code></pre>
+
+  <pre><code><span class="kw">import</span> net.tls</code></pre>
+
+  <h4>tls.connect</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">connect</span>(host: <span class="typ">String</span>, port: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Establishes a TLS connection to the given host and port. Returns a TLS stream handle, or <code>0</code> on failure.</p>
+
+  <h4>tls.send</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">send</span>(conn: <span class="typ">Int</span>, data: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Sends data over the TLS connection. Returns the number of bytes sent, or <code>-1</code> on failure.</p>
+
+  <h4>tls.recv</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">recv</span>(conn: <span class="typ">Int</span>, max_len: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Receives up to <code>max_len</code> bytes from the TLS connection. Returns the data as a string.</p>
+
+  <h4>tls.close</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">close</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Closes the TLS connection and frees resources.</p>
+
+  <pre><code><span class="kw">import</span> net.tls
+
+<span class="cmt">// HTTPS request via TLS</span>
+conn <span class="op">=</span> <span class="fn">tls.connect</span>(<span class="str">"example.com"</span>, <span class="num">443</span>)
+<span class="fn">tls.send</span>(conn, <span class="str">"GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"</span>)
+response <span class="op">=</span> <span class="fn">tls.recv</span>(conn, <span class="num">4096</span>)
+<span class="fn">println</span>(response)
+<span class="fn">tls.close</span>(conn)</code></pre>
+
+  <h2>WebSocket Server</h2>
+
+  <p>RFC 6455 WebSocket server provided by the <code>net.websocket</code> library module.</p>
+
+  <pre><code><span class="kw">import</span> net.websocket</code></pre>
+
+  <h4>websocket.listen</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">listen</span>(port: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Creates a WebSocket server listening on the given port. Returns a server handle, or <code>0</code> on failure.</p>
+
+  <h4>websocket.accept</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">accept</span>(server: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Blocks until a client connects and completes the WebSocket handshake. Returns a connection handle.</p>
+
+  <h4>websocket.send</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">send</span>(conn: <span class="typ">Int</span>, message: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Sends a text message over the WebSocket connection. Returns bytes sent, or <code>-1</code> on failure.</p>
+
+  <h4>websocket.recv</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">recv</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
+  </div>
+  <p>Receives a text message. Blocks until a message arrives. Returns <code>""</code> on close or error.</p>
+
+  <h4>websocket.close</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">close</span>(conn: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Closes a WebSocket connection (sends close frame).</p>
+
+  <h4>websocket.close_server</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">close_server</span>(server: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Shuts down the WebSocket server.</p>
+
+  <pre><code><span class="kw">import</span> net.websocket
+
+<span class="cmt">// Simple WebSocket echo server</span>
+srv <span class="op">=</span> <span class="fn">websocket.listen</span>(<span class="num">9001</span>)
+<span class="fn">println</span>(<span class="str">"WebSocket server on port 9001"</span>)
+
+conn <span class="op">=</span> <span class="fn">websocket.accept</span>(srv)
+<span class="fn">println</span>(<span class="str">"Client connected"</span>)
+
+<span class="fn">websocket.send</span>(conn, <span class="str">"Hello from Nex!"</span>)
+msg <span class="op">=</span> <span class="fn">websocket.recv</span>(conn)
+<span class="fn">println</span>(<span class="str">"Received: "</span> <span class="op">+</span> msg)
+
+<span class="fn">websocket.close</span>(conn)
+<span class="fn">websocket.close_server</span>(srv)</code></pre>
 
   <div class="page-nav">
     <a href="stdlib-process.html">

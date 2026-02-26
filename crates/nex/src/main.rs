@@ -825,13 +825,79 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
         .unwrap_or_default();
 
     // Collect native library paths from project dependencies.
-    let native_libs: Vec<PathBuf> = project_root.as_ref()
+    let mut native_libs: Vec<PathBuf> = project_root.as_ref()
         .map(|root| discover_native_libs(root, &mut sink))
         .unwrap_or_default();
 
     for d in sink.diagnostics() {
         if matches!(d.severity, Severity::Error) {
             eprintln!("{d:?}");
+        }
+    }
+
+    // Step 1.5: Auto-resolve library imports from source files.
+    // Scan the main source and sibling sources for `import` statements and
+    // auto-resolve any libraries not already declared in project.toml.
+    // This handles `import std.crypto` → resolve "crypto" from the global
+    // cache (~/.nex/libs/crypto/) or local libs/ directory.
+    {
+        let mut lib_names_mut = lib_names.clone();
+        let mut import_candidates: HashSet<String> = HashSet::new();
+
+        // Helper: extract import prefixes from source text.
+        let extract_imports = |text: &str, candidates: &mut HashSet<String>| {
+            for line in text.lines() {
+                let trimmed = line.trim();
+                if let Some(rest) = trimmed.strip_prefix("import ") {
+                    let parts: Vec<&str> = rest.trim().split('.').collect();
+                    if !parts.is_empty() {
+                        candidates.insert(parts[0].to_string());
+                    }
+                    // For `import std.X`, also try resolving `X` directly.
+                    if parts.len() >= 2 && parts[0] == "std" {
+                        candidates.insert(parts[1].to_string());
+                    }
+                }
+            }
+        };
+
+        extract_imports(&source_text, &mut import_candidates);
+
+        // Also scan sibling source files for imports.
+        let sibling_base = source_path.parent()
+            .map(|p| if p.as_os_str().is_empty() { Path::new(".") } else { p })
+            .unwrap_or(Path::new("."));
+        let sibling_canonical = fs::canonicalize(sibling_base)
+            .unwrap_or_else(|_| sibling_base.to_path_buf());
+        {
+            let mut pre_sink = nexc_diag::DiagnosticSink::new();
+            let pre_siblings = discover_sibling_modules(
+                &sibling_canonical,
+                Some(source_path),
+                &mut pre_sink,
+            );
+            for (_, path) in &pre_siblings {
+                if let Ok(text) = fs::read_to_string(path) {
+                    extract_imports(&text, &mut import_candidates);
+                }
+            }
+        }
+
+        let search_root = project_root.as_deref()
+            .or_else(|| source_path.parent());
+
+        for candidate in &import_candidates {
+            if lib_names_mut.contains(candidate) {
+                continue;
+            }
+            if let Some(dep) = resolve_lib_auto(candidate, search_root) {
+                lib_names_mut.insert(dep.name.clone());
+                if let Some(ref native) = dep.native_lib {
+                    if native.exists() && !native_libs.contains(native) {
+                        native_libs.push(native.clone());
+                    }
+                }
+            }
         }
     }
 

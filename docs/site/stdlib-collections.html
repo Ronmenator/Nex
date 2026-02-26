@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.129</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -19,7 +19,7 @@
   <div class="breadcrumbs"><a href="index.html">Docs</a><span class="sep">/</span><a href="stdlib-overview.html">Standard Library</a><span class="sep">/</span>std.collections</div>
 
   <h1>std.collections</h1>
-  <p class="page-subtitle">Generic collection types: List, Map, and Set.</p>
+  <p class="page-subtitle">Generic collection types: List, Map, Set, and Queue.</p>
 
   <pre><code><span class="kw">import</span> std.collections</code></pre>
 
@@ -93,7 +93,42 @@ nums <span class="op">=</span> <span class="typ">List</span>[<span class="typ">I
   <div class="signature">
     <span class="kw">def</span> <span class="fn">contains</span>(value: T) <span class="op">-&gt;</span> <span class="typ">Bool</span>
   </div>
-  <p>Returns <code>true</code> if the list contains <code>value</code>. Available for <code>List[Int]</code>.</p>
+  <p>Returns <code>true</code> if the list contains <code>value</code>. Works for both <code>List[Int]</code> and <code>List[String]</code>.</p>
+
+  <h4>filter(predicate: (T) &rarr; Bool) &rarr; List[T]</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">filter</span>(predicate: (T) <span class="op">-&gt;</span> <span class="typ">Bool</span>) <span class="op">-&gt;</span> <span class="typ">List</span>[T]
+  </div>
+  <p>Returns a new list containing only elements for which <code>predicate</code> returns <code>true</code>.</p>
+
+  <pre><code>nums <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+<span class="fn">nums.add</span>(<span class="num">1</span>); <span class="fn">nums.add</span>(<span class="num">2</span>); <span class="fn">nums.add</span>(<span class="num">3</span>); <span class="fn">nums.add</span>(<span class="num">4</span>); <span class="fn">nums.add</span>(<span class="num">5</span>)
+
+evens <span class="op">=</span> <span class="fn">nums.filter</span>(<span class="op">|</span>x<span class="op">|</span> <span class="op">-&gt;</span> x <span class="op">%</span> <span class="num">2</span> <span class="op">==</span> <span class="num">0</span>)
+<span class="fn">println</span>(<span class="fn">evens.length</span>())  <span class="cmt">// 2</span></code></pre>
+
+  <h4>map(transform: (T) &rarr; U) &rarr; List[U]</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">map</span>(transform: (T) <span class="op">-&gt;</span> U) <span class="op">-&gt;</span> <span class="typ">List</span>[U]
+  </div>
+  <p>Returns a new list with <code>transform</code> applied to each element.</p>
+
+  <pre><code>nums <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
+<span class="fn">nums.add</span>(<span class="num">1</span>); <span class="fn">nums.add</span>(<span class="num">2</span>); <span class="fn">nums.add</span>(<span class="num">3</span>)
+
+doubled <span class="op">=</span> <span class="fn">nums.map</span>(<span class="op">|</span>x<span class="op">|</span> <span class="op">-&gt;</span> x <span class="op">*</span> <span class="num">2</span>)
+<span class="fn">println</span>(<span class="fn">doubled.get</span>(<span class="num">0</span>))  <span class="cmt">// 2</span></code></pre>
+
+  <h4>forEach(action: (T) &rarr; Unit)</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">forEach</span>(action: (T) <span class="op">-&gt;</span> <span class="typ">Unit</span>)
+  </div>
+  <p>Calls <code>action</code> on each element in the list.</p>
+
+  <pre><code>names <span class="op">=</span> <span class="typ">List</span>[<span class="typ">String</span>]()
+<span class="fn">names.add</span>(<span class="str">"Alice"</span>); <span class="fn">names.add</span>(<span class="str">"Bob"</span>)
+
+<span class="fn">names.forEach</span>(<span class="op">|</span>name<span class="op">|</span> <span class="op">-&gt;</span> <span class="fn">println</span>(name))</code></pre>
 
   <h4>index_of(value: T) &rarr; Int</h4>
   <div class="signature">
@@ -185,6 +220,25 @@ ages <span class="op">=</span> <span class="typ">Map</span>[<span class="typ">St
   </div>
   <p>Returns the number of key-value pairs in the map.</p>
 
+  <h4>keys() &rarr; List[K]</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">keys</span>() <span class="op">-&gt;</span> <span class="typ">List</span>[K]
+  </div>
+  <p>Returns a <code>List</code> of all keys in the map.</p>
+
+  <h4>values() &rarr; List[V]</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">values</span>() <span class="op">-&gt;</span> <span class="typ">List</span>[V]
+  </div>
+  <p>Returns a <code>List</code> of all values in the map.</p>
+
+  <pre><code>config <span class="op">=</span> <span class="typ">Map</span>[<span class="typ">String</span>, <span class="typ">String</span>]()
+<span class="fn">config.put</span>(<span class="str">"host"</span>, <span class="str">"localhost"</span>)
+<span class="fn">config.put</span>(<span class="str">"port"</span>, <span class="str">"8080"</span>)
+
+all_keys <span class="op">=</span> <span class="fn">config.keys</span>()
+<span class="fn">println</span>(<span class="fn">all_keys.length</span>())  <span class="cmt">// 2</span></code></pre>
+
   <h3>Map Example</h3>
 
   <pre><code><span class="kw">import</span> std.collections
@@ -255,6 +309,66 @@ visitors <span class="op">=</span> <span class="fn">set_new</span>()
 
 <span class="fn">set_remove</span>(visitors, <span class="num">205</span>)
 <span class="fn">println</span>(<span class="fn">set_size</span>(visitors))            <span class="cmt">// 2</span></code></pre>
+
+  <h2>Queue</h2>
+
+  <p>A first-in, first-out (FIFO) data structure. Queues are implemented as free functions operating on an opaque handle.</p>
+
+  <h3>Functions</h3>
+
+  <h4>queue_new() &rarr; Queue</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">queue_new</span>() <span class="op">-&gt;</span> Queue
+  </div>
+  <p>Creates a new empty queue.</p>
+
+  <h4>queue_push(q: Queue, value: Int)</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">queue_push</span>(q: Queue, value: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Unit</span>
+  </div>
+  <p>Adds <code>value</code> to the back of the queue.</p>
+
+  <h4>queue_pop(q: Queue) &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">queue_pop</span>(q: Queue) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Removes and returns the front element. Returns <code>0</code> if the queue is empty.</p>
+
+  <h4>queue_peek(q: Queue) &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">queue_peek</span>(q: Queue) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the front element without removing it. Returns <code>0</code> if the queue is empty.</p>
+
+  <h4>queue_is_empty(q: Queue) &rarr; Bool</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">queue_is_empty</span>(q: Queue) <span class="op">-&gt;</span> <span class="typ">Bool</span>
+  </div>
+  <p>Returns <code>true</code> if the queue contains no elements.</p>
+
+  <h4>queue_size(q: Queue) &rarr; Int</h4>
+  <div class="signature">
+    <span class="kw">def</span> <span class="fn">queue_size</span>(q: Queue) <span class="op">-&gt;</span> <span class="typ">Int</span>
+  </div>
+  <p>Returns the number of elements in the queue.</p>
+
+  <h3>Queue Example</h3>
+
+  <pre><code><span class="kw">import</span> std.collections
+
+<span class="cmt">// Task queue</span>
+q <span class="op">=</span> <span class="fn">queue_new</span>()
+<span class="fn">queue_push</span>(q, <span class="num">1</span>)
+<span class="fn">queue_push</span>(q, <span class="num">2</span>)
+<span class="fn">queue_push</span>(q, <span class="num">3</span>)
+
+<span class="fn">println</span>(<span class="fn">queue_size</span>(q))     <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">queue_peek</span>(q))     <span class="cmt">// 1 (front element)</span>
+<span class="fn">println</span>(<span class="fn">queue_pop</span>(q))      <span class="cmt">// 1 (removed)</span>
+<span class="fn">println</span>(<span class="fn">queue_pop</span>(q))      <span class="cmt">// 2</span>
+<span class="fn">println</span>(<span class="fn">queue_is_empty</span>(q)) <span class="cmt">// false</span>
+<span class="fn">println</span>(<span class="fn">queue_pop</span>(q))      <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">queue_is_empty</span>(q)) <span class="cmt">// true</span></code></pre>
 
   <h2>Complete Example</h2>
 

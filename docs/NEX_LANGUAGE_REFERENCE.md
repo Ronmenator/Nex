@@ -30,14 +30,15 @@
 18d. [Async / Await](#18d-async--await)
 18e. [Reflection](#18e-reflection)
 19. [Standard Library Reference](#19-standard-library-reference)
-20. [Collections (List, Map, Set)](#20-collections-list-map-set)
+20. [Collections (List, Map, Set, Queue)](#20-collections-list-map-set-queue)
 21. [File I/O](#21-file-io)
-22. [Networking](#22-networking)
-23. [Threading](#23-threading)
+22. [Networking (TCP, UDP, TLS, HTTP Server, WebSocket)](#22-networking)
+23. [Threading & Thread Pools](#23-threading)
 24. [JSON](#24-json)
 25. [Cryptography Library](#25-cryptography-library)
 26. [HTTP Library](#26-http-library)
 27. [Regex Library](#27-regex-library)
+27a. [Net Library (TLS & WebSocket)](#27a-net-library)
 28. [Torch Library (Machine Learning)](#28-torch-library-machine-learning)
 29. [nex3d Library (3D Game Engine)](#29-nex3d-library-3d-game-engine)
 30. [nex_ui Library (Desktop GUI)](#30-nex_ui-library-desktop-gui)
@@ -396,15 +397,29 @@ x /= 4               // x = x / 4
 | `\|\|` | Logical OR (short-circuit) |
 | `!` | Logical NOT (unary) |
 
-### 6.4 Unary Operators
+### 6.4 Bitwise Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `&` | Bitwise AND | `0xFF & 0x0F` → `15` |
+| `\|` | Bitwise OR | `0x0F \| 0xF0` → `255` |
+| `^` | Bitwise XOR | `0xFF ^ 0xAA` → `85` |
+| `<<` | Left shift | `1 << 3` → `8` |
+| `>>` | Right shift (arithmetic) | `16 >> 2` → `4` |
+| `~` | Bitwise NOT (unary) | `~0` → `-1` |
+
+Compound assignment variants: `&=`, `|=`, `^=`, `<<=`, `>>=`.
+
+### 6.5 Unary Operators
 
 | Operator | Description |
 |----------|-------------|
 | `-` | Numeric negation |
 | `!` | Logical NOT |
 | `+` | Unary plus (no-op) |
+| `~` | Bitwise NOT |
 
-### 6.5 String Concatenation
+### 6.6 String Concatenation
 
 The `+` operator concatenates strings. Non-string values are automatically converted:
 
@@ -414,23 +429,27 @@ The `+` operator concatenates strings. Non-string values are automatically conve
 "Value: " + 3.14              // String + Double → String
 ```
 
-### 6.6 Operator Precedence (highest to lowest)
+### 6.7 Operator Precedence (highest to lowest)
 
 | Precedence | Operators | Associativity |
 |------------|-----------|---------------|
-| 18 | Unary prefix: `!`, `-`, `+` | Right |
-| 17 | Member access: `.`, `::` | Left |
-| 16 | Function call: `f()` | Left |
-| 12 | `*`, `/`, `%` | Left |
-| 10 | `+`, `-` | Left |
-| 8 | `<`, `<=`, `>`, `>=` | Left |
-| 6 | `==`, `!=` | Left |
-| 4 | `&&` | Left |
-| 3 | `\|\|` | Left |
+| 20 | Unary prefix: `!`, `-`, `+`, `~` | Right |
+| 19 | Member access: `.`, `::` | Left |
+| 18 | Function call: `f()`, index `[]` | Left |
+| 16 | `*`, `/`, `%` | Left |
+| 14 | `+`, `-` | Left |
+| 12 | `<<`, `>>` | Left |
+| 10 | `<`, `<=`, `>`, `>=` | Left |
+| 8 | `==`, `!=` | Left |
+| 7 | `&` (bitwise AND) | Left |
+| 6 | `^` (bitwise XOR) | Left |
+| 5 | `\|` (bitwise OR) | Left |
+| 4 | `&&` (logical AND) | Left |
+| 3 | `\|\|` (logical OR) | Left |
 | 2 | Ternary: `expr if cond else expr` | Right |
-| 1 | `=`, `+=`, `-=`, `*=`, `/=` | Right |
+| 1 | `=`, `+=`, `-=`, `*=`, `/=`, `&=`, `\|=`, `^=`, `<<=`, `>>=` | Right |
 
-### 6.7 Member Access
+### 6.8 Member Access
 
 ```nex
 object.field           // Dot access
@@ -1671,6 +1690,7 @@ str_to_lower(s)                     // To lowercase
 str_repeat(s, count)                // Repeat N times
 str_char_at(s, index)               // Character at index
 str_reverse(s)                      // Reverse string
+str_truncate(s, max_len)            // Truncate to max_len characters (UTF-8 aware)
 ```
 
 ### 19.4 std.convert
@@ -1792,11 +1812,16 @@ for (item in items) {
 }
 
 // Extended operations (import std.collections)
-list_sort(items)           // Sort in place
+list_sort(items)           // Sort in place (List[Int])
 list_reverse(items)        // Reverse in place
 list_clear(items)          // Remove all elements
-list_contains(items, val)  // Check if value exists
+list_contains(items, val)  // Check if value exists (Int or String)
 list_index_of(items, val)  // Find index (-1 if not found)
+
+// Functional operations (closure-based)
+filtered = list_filter(items, |x| -> x > 3)      // Filter elements by predicate
+mapped = list_map(items, |x| -> x * 2)            // Transform each element
+list_foreach(items, |x| -> println(x))             // Iterate with side effects
 ```
 
 ### 20.2 Map
@@ -1814,6 +1839,8 @@ data.get("name")           // "Alice"
 data.contains("name")      // true
 data.remove("name")        // Remove entry
 data.size()                // Number of entries
+data.keys()                // List[String] of all keys
+data.values()              // List[String] of all values
 ```
 
 ### 20.3 Set
@@ -1827,6 +1854,31 @@ tags.add("nex")
 tags.add("language")
 tags.contains("nex")       // true
 tags.remove("nex")
+```
+
+### 20.4 Queue
+
+```nex
+// Create a FIFO queue
+q = queue_new()
+
+// Add to back
+queue_push(q, 10)
+queue_push(q, 20)
+queue_push(q, 30)
+
+// Inspect front without removing
+queue_peek(q)              // 10
+
+// Remove from front
+queue_pop(q)               // 10
+
+// Size and empty check
+queue_size(q)              // 2
+queue_is_empty(q)          // false (returns 1 if empty, 0 otherwise)
+
+// Free resources
+queue_free(q)
 ```
 
 ---
@@ -1849,6 +1901,7 @@ file_delete("temp.txt")              // Delete file
 file_rename("old.txt", "new.txt")    // Rename file
 file_copy("src.txt", "dst.txt")      // Copy file
 file_size("data.txt")                // File size in bytes
+file_append("log.txt", "new line\n") // Append to file (creates if missing)
 
 // Directory operations
 mkdir("new_dir")                      // Create directory
@@ -1892,6 +1945,86 @@ data = udp_recv(sock, 1024)
 udp_close(sock)
 ```
 
+### 22.2 TLS/SSL
+
+Secure connections using rustls (pure Rust, no OpenSSL dependency).
+
+```nex
+// TLS Client
+conn = tls_connect("example.com", 443)
+tls_send(conn, "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+response = tls_recv(conn, 4096)
+println(response)
+tls_close(conn)
+```
+
+### 22.3 HTTP Server
+
+Built-in HTTP/1.1 server with automatic request parsing.
+
+```nex
+// Create and run a simple HTTP server
+srv = http_server_new(8080)
+println("Listening on port 8080")
+
+while (true) {
+    conn = http_server_accept(srv)
+    method = http_conn_method(conn)
+    path = http_conn_path(conn)
+    body = http_conn_body(conn)
+    content_type = http_conn_header(conn, "Content-Type")
+
+    println($"{method} {path}")
+
+    http_conn_respond(conn, 200, "Hello from Nex!", "text/plain")
+    http_conn_close(conn)
+}
+
+http_server_close(srv)
+```
+
+Or use the `http.server` stdlib wrapper:
+
+```nex
+import http.server
+
+srv = server.listen(8080)
+conn = server.accept(srv)
+server.respond_json(conn, 200, "{\"status\": \"ok\"}")
+server.close_conn(conn)
+server.close(srv)
+```
+
+### 22.4 WebSocket
+
+RFC 6455 WebSocket server with frame encoding/decoding.
+
+```nex
+// WebSocket Server
+srv = ws_server_new(9001)
+conn = ws_accept(srv)
+
+ws_send(conn, "Hello from Nex!")
+msg = ws_recv(conn)
+println($"Received: {msg}")
+
+ws_close(conn)
+ws_server_close(srv)
+```
+
+Or use the `net.websocket` stdlib wrapper:
+
+```nex
+import net.websocket
+
+srv = websocket.listen(9001)
+conn = websocket.accept(srv)
+websocket.send(conn, "Hello!")
+msg = websocket.recv(conn)
+websocket.close(conn)
+websocket.close_server(srv)
+```
+
 ---
 
 ## 23. Threading
@@ -1917,6 +2050,12 @@ mutex_lock(mtx)
 // ... critical section ...
 mutex_unlock(mtx)
 mutex_free(mtx)            // Release mutex resources
+
+// Thread Pool
+pool = threadpool_new(4)              // Create pool with 4 workers
+threadpool_submit(pool, my_function)  // Submit work to the pool
+threadpool_submit(pool, other_work)
+threadpool_shutdown(pool)             // Wait for all work to finish, then shut down
 ```
 
 ---
@@ -2034,12 +2173,16 @@ import crypto.hash
 import crypto.encode
 import crypto.hmac
 import crypto.random
+import crypto.aes
+import crypto.sign
+import crypto.kdf
 
 // Hashing
-hash = sha256("hello")                  // HashResult { hex, algorithm }
-println(hash.hex)
-sha256_verify("hello", hash.hex)        // Bool
+hash = sha256("hello")                  // hex-encoded SHA-256
+println(hash)
+sha256_verify("hello", hash)            // Bool
 
+hash1 = sha1("hello")                   // hex-encoded SHA-1
 hash512 = sha512("hello")
 md5hash = md5("hello")
 
@@ -2048,10 +2191,24 @@ encoded = base64_encode("hello")        // "aGVsbG8="
 decoded = base64_decode(encoded)        // "hello"
 
 // HMAC
-mac = crypto_hmac_sha256("secret-key", "message")
+mac = hmac_sha256("secret-key", "message")
 
 // Secure random
-buf = random_bytes(32)                  // 32 random bytes
+buf = random_bytes(32)                  // 32 random bytes (hex-encoded)
+
+// AES-256-GCM encryption
+key = aes.keygen()                      // Generate random 256-bit key (hex)
+encrypted = aes.encrypt(key, "secret")  // Base64(nonce || ciphertext)
+decrypted = aes.decrypt(key, encrypted) // "secret"
+
+// Ed25519 digital signatures
+keypair = sign.ed25519_keygen()         // "pubkey_hex:privkey_hex"
+sig = sign.ed25519_sign(privkey, "message")
+valid = sign.ed25519_verify(pubkey, "message", sig)  // 1 or 0
+
+// Key derivation
+derived = kdf.pbkdf2("password", "salt", 100000)  // PBKDF2-HMAC-SHA256
+hash_a = kdf.argon2("password", "salt")            // Argon2id
 ```
 
 ---
@@ -2064,6 +2221,8 @@ Add to `project.toml`:
 [libs]
 http = { path = "../libs/http" }
 ```
+
+### 26.1 HTTP Client
 
 ```nex
 import http.client
@@ -2105,6 +2264,32 @@ CONTENT_JSON()         // "application/json"
 CONTENT_FORM()         // "application/x-www-form-urlencoded"
 ```
 
+### 26.2 HTTP Server
+
+```nex
+import http.server
+
+// Create a server
+srv = server.listen(8080)
+
+// Accept and handle requests
+conn = server.accept(srv)
+method = server.method(conn)     // "GET", "POST", etc.
+path = server.path(conn)         // "/api/users"
+body = server.body(conn)         // Request body
+ct = server.header(conn, "Content-Type")
+
+// Send responses
+server.respond(conn, 200, "OK", "text/plain")
+server.respond_json(conn, 200, "{\"status\": \"ok\"}")
+server.respond_text(conn, 200, "Hello!")
+server.respond_html(conn, 200, "<h1>Hello</h1>")
+
+// Clean up
+server.close_conn(conn)
+server.close(srv)
+```
+
 ---
 
 ## 27. Regex Library
@@ -2142,6 +2327,48 @@ PATTERN_EMAIL()
 PATTERN_URL()
 PATTERN_IPV4()
 PATTERN_DIGITS()
+```
+
+---
+
+## 27a. Net Library
+
+The `net` library provides TLS and WebSocket wrappers.
+
+```toml
+[libs]
+net = { path = "../libs/net" }
+```
+
+### TLS Client
+
+```nex
+import net.tls
+
+conn = tls.connect("example.com", 443)
+tls.send(conn, "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+response = tls.recv(conn, 8192)
+println(response)
+tls.close(conn)
+```
+
+### WebSocket Server
+
+```nex
+import net.websocket
+
+srv = websocket.listen(9001)
+println("WebSocket server on port 9001")
+
+conn = websocket.accept(srv)
+println("Client connected")
+
+websocket.send(conn, "Hello from Nex!")
+msg = websocket.recv(conn)
+println($"Received: {msg}")
+
+websocket.close(conn)
+websocket.close_server(srv)
 ```
 
 ---
@@ -3164,15 +3391,19 @@ VarStmt           = "var" Ident [ ":" TypeRef ] "=" Expr Terminator ;
 ExprStmt          = Expr Terminator ;
 
 Expr              = Assignment ;
-Assignment        = Ternary [ ( "=" | "+=" | "-=" | "*=" | "/=" ) Assignment ] ;
+Assignment        = Ternary [ ( "=" | "+=" | "-=" | "*=" | "/=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) Assignment ] ;
 Ternary           = LogicalOr [ "if" LogicalOr "else" Ternary ] ;
 LogicalOr         = LogicalAnd { "||" LogicalAnd } ;
-LogicalAnd        = Equality { "&&" Equality } ;
+LogicalAnd        = BitwiseOr { "&&" BitwiseOr } ;
+BitwiseOr         = BitwiseXor { "|" BitwiseXor } ;
+BitwiseXor        = BitwiseAnd { "^" BitwiseAnd } ;
+BitwiseAnd        = Equality { "&" Equality } ;
 Equality          = Relational { ( "==" | "!=" ) Relational } ;
-Relational        = Additive { ( "<" | ">" | "<=" | ">=" ) Additive } ;
+Relational        = Shift { ( "<" | ">" | "<=" | ">=" ) Shift } ;
+Shift             = Additive { ( "<<" | ">>" ) Additive } ;
 Additive          = Multiplicative { ( "+" | "-" ) Multiplicative } ;
 Multiplicative    = Unary { ( "*" | "/" | "%" ) Unary } ;
-Unary             = ( "!" | "-" | "+" ) Unary | Postfix ;
+Unary             = ( "!" | "-" | "+" | "~" ) Unary | Postfix ;
 Postfix           = Primary { "(" [ ArgList ] ")" | "." Ident | "::" Ident } ;
 ArgList           = Expr { "," Expr } ;
 
@@ -3293,4 +3524,4 @@ Terminator        = ";" | ASI_NEWLINE ;
 
 ---
 
-*Document generated for Nex v0.1.129. This is a complete reference for AI-assisted code generation in the Nex programming language.*
+*Document generated for Nex v0.1.143. This is a complete reference for AI-assisted code generation in the Nex programming language.*

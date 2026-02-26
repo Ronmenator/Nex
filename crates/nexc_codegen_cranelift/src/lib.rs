@@ -1928,11 +1928,16 @@ fn coerce_call_args(
     args.iter()
         .enumerate()
         .map(|(i, &v)| {
-            if i < param_types.len()
-                && param_types[i] == types::F64
-                && builder.func.dfg.value_type(v) == types::I64
-            {
-                builder.ins().bitcast(types::F64, MemFlags::new(), v)
+            if i < param_types.len() {
+                let expected = param_types[i];
+                let actual = builder.func.dfg.value_type(v);
+                if expected == types::F64 && actual == types::I64 {
+                    builder.ins().bitcast(types::F64, MemFlags::new(), v)
+                } else if expected == types::I32 && actual == types::I64 {
+                    builder.ins().ireduce(types::I32, v)
+                } else {
+                    v
+                }
             } else {
                 v
             }
@@ -1940,7 +1945,7 @@ fn coerce_call_args(
         .collect()
 }
 
-/// If a call returns F64, bitcast the result back to I64 for the Nex IR.
+/// If a call returns F64 or I32, coerce the result back to I64 for the Nex IR.
 fn coerce_return_value(
     builder: &mut FunctionBuilder,
     call_inst: cranelift_codegen::ir::Inst,
@@ -1950,8 +1955,11 @@ fn coerce_return_value(
         return builder.ins().iconst(types::I64, 0);
     }
     let ret = results[0];
-    if builder.func.dfg.value_type(ret) == types::F64 {
+    let ret_ty = builder.func.dfg.value_type(ret);
+    if ret_ty == types::F64 {
         builder.ins().bitcast(types::I64, MemFlags::new(), ret)
+    } else if ret_ty == types::I32 {
+        builder.ins().sextend(types::I64, ret)
     } else {
         ret
     }
@@ -3126,8 +3134,8 @@ fn declare_runtime_imports<M: Module>(
         // std.net
         ("nex_net_tcp_connect", &sig_ptr_ptr2),
         ("nex_net_tcp_close", &sig_void_ptr),
-        ("nex_net_tcp_send", &sig_ptr_ptr3),
-        ("nex_net_tcp_recv", &sig_ptr_ptr3),
+        ("nex_net_tcp_send", &sig_ptr_ptr2),
+        ("nex_net_tcp_recv", &sig_ptr_ptr2),
         ("nex_net_tcp_listen", &sig_ptr_ptr2),
         ("nex_net_tcp_accept", &sig_ptr_ptr),
         ("nex_net_udp_bind", &sig_ptr_ptr2),
