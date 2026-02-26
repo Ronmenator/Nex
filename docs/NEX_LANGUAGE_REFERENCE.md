@@ -198,9 +198,10 @@ snake_case
 ### 3.5 Reserved Keywords
 
 ```
-as        break     catch     class     continue
-def       else      false     finally   for
-from      if        import    interface null
+as        async     await     break     catch
+class     continue  def       else      enum
+false     finally   for       from      if
+import    interface match     null      operator
 override  partial   public    return    self
 shared    static    struct    throw     true
 try       using     var       virtual   while
@@ -298,15 +299,14 @@ Double > Float > Int64 > Int > Byte
 ```nex
 "\\"     // Backslash
 "\""     // Double quote
+"\'"     // Single quote
 "\n"     // Newline
 "\r"     // Carriage return
 "\t"     // Tab
 "\0"     // Null character
-"\b"     // Backspace
-"\xHH"   // Hex byte (e.g., "\x41" = 'A')
 ```
 
-For `Char` literals: `'\uFFFF'` for Unicode code points.
+For `Char` literals, Unicode escapes are also available: `'\uFFFF'` for Unicode code points.
 
 ---
 
@@ -360,6 +360,8 @@ x -= 3               // x = x - 3
 x *= 2               // x = x * 2
 x /= 4               // x = x / 4
 ```
+
+**Note**: There is no `%=` operator. Use `x = x % n` instead.
 
 ---
 
@@ -416,12 +418,16 @@ The `+` operator concatenates strings. Non-string values are automatically conve
 
 | Precedence | Operators | Associativity |
 |------------|-----------|---------------|
+| 18 | Unary prefix: `!`, `-`, `+` | Right |
+| 17 | Member access: `.`, `::` | Left |
+| 16 | Function call: `f()` | Left |
 | 12 | `*`, `/`, `%` | Left |
 | 10 | `+`, `-` | Left |
 | 8 | `<`, `<=`, `>`, `>=` | Left |
 | 6 | `==`, `!=` | Left |
 | 4 | `&&` | Left |
-| 2 | `\|\|` | Left |
+| 3 | `\|\|` | Left |
+| 2 | Ternary: `expr if cond else expr` | Right |
 | 1 | `=`, `+=`, `-=`, `*=`, `/=` | Right |
 
 ### 6.7 Member Access
@@ -1305,7 +1311,7 @@ var msg = s + t      // Runtime dispatch → "hello world"
 Using `Var` in public APIs generates a warning. Suppress with:
 
 ```nex
-@allow_var_api
+[allow_var_api]
 public def dynamic_handler(input: Var) -> Var {
     // ...
 }
@@ -1544,14 +1550,6 @@ println(Reflect.typeName(ti))        // "Animal"
 | `Reflect.setFieldBool(typeId, index, value)` | `Unit` | Write a Bool field value (1=true, 0=false) |
 | `Reflect.invoke(typeId, methodName, args, argCount)` | `Int` | Call method dynamically (up to 8 args) |
 | `Reflect.createInstance(typeId, args, argCount)` | `Int` | Create instance via init method |
-| `Reflect.getFieldString(typeId, index)` | `String` | Read string field value by index |
-| `Reflect.getFieldInt(typeId, index)` | `Int` | Read int field value by index |
-| `Reflect.getFieldFloat(typeId, index)` | `Double` | Read float/double field value by index |
-| `Reflect.getFieldBool(typeId, index)` | `Int` | Read bool field value (0 or 1) by index |
-| `Reflect.setFieldString(typeId, index, value)` | `Unit` | Write string field value by index |
-| `Reflect.setFieldInt(typeId, index, value)` | `Unit` | Write int field value by index |
-| `Reflect.setFieldFloat(typeId, index, value)` | `Unit` | Write float/double field value by index |
-| `Reflect.setFieldBool(typeId, index, value)` | `Unit` | Write bool field value by index |
 
 ### Complete Example
 
@@ -1648,6 +1646,8 @@ sin(x)                 // Sine (radians)
 cos(x)                 // Cosine (radians)
 tan(x)                 // Tangent (radians)
 log(x)                 // Natural logarithm
+log2(x)                // Base-2 logarithm
+log10(x)               // Base-10 logarithm
 exp(x)                 // e^x
 random()               // Random Double in [0.0, 1.0)
 ```
@@ -1759,7 +1759,9 @@ assert(condition)                    // Assert condition is true
 assert_eq_int(actual, expected)      // Assert two ints are equal
 assert_eq_str(actual, expected)      // Assert two strings are equal
 assert_eq_float(actual, expected)    // Assert two floats are equal
+assert_eq_bool(actual, expected)     // Assert two booleans are equal
 assert_ne_int(actual, expected)      // Assert two ints differ
+assert_ne_str(actual, expected)      // Assert two strings differ
 assert_true(condition)               // Assert true
 ```
 
@@ -1914,6 +1916,7 @@ mtx = mutex_new()
 mutex_lock(mtx)
 // ... critical section ...
 mutex_unlock(mtx)
+mutex_free(mtx)            // Release mutex resources
 ```
 
 ---
@@ -3154,6 +3157,8 @@ ForStmt           = "for" "(" ( VarInit ";" [ Expr ] ";" [ Expr ] | Ident "in" E
 TryStmt           = "try" Block { "catch" "(" Ident ":" TypeRef ")" Block } [ "finally" Block ] ;
 UsingStmt         = "using" "(" Ident "=" Expr { "," Ident "=" Expr } ")" Block ;
 ReturnStmt        = "return" [ Expr ] Terminator ;
+BreakStmt         = "break" Terminator ;
+ContinueStmt      = "continue" Terminator ;
 ThrowStmt         = "throw" Expr Terminator ;
 VarStmt           = "var" Ident [ ":" TypeRef ] "=" Expr Terminator ;
 ExprStmt          = Expr Terminator ;
@@ -3225,12 +3230,32 @@ Terminator        = ";" | ASI_NEWLINE ;
 ║                                                                  ║
 ║  INTERFACE     interface Name { def method(p: T) -> R }         ║
 ║                                                                  ║
+║  ENUM          enum Color { Red, Green, Blue }                   ║
+║                                                                  ║
 ║  GENERICS      class Box[T] { value: T }                        ║
 ║                                                                  ║
 ║  CONTROL       if (cond) { } else { }                           ║
 ║                while (cond) { }                                  ║
 ║                for (i = 0; i < n; i = i + 1) { }               ║
 ║                for (item in list) { }                            ║
+║                                                                  ║
+║  TERNARY       val = x if (cond) else y                         ║
+║                                                                  ║
+║  MATCH         match expr {                                      ║
+║                    1 -> println("one")                           ║
+║                    Color.Red -> println("red")                   ║
+║                    x if x > 10 -> println("big")                ║
+║                    _ -> println("other")                         ║
+║                }                                                 ║
+║                                                                  ║
+║  CLOSURES      |x| x + 1                                        ║
+║                |a, b| { return a + b }                           ║
+║                                                                  ║
+║  ASYNC         async def fetch() -> String { ... }              ║
+║                result = await fetch()                            ║
+║                                                                  ║
+║  STRINGS       $"Hello {name}!"  // interpolation               ║
+║                "str" + val       // auto-converts                ║
 ║                                                                  ║
 ║  ERRORS        try { } catch (e: Error) { } finally { }        ║
 ║                throw Error("message")                            ║
@@ -3241,13 +3266,25 @@ Terminator        = ";" | ASI_NEWLINE ;
 ║                from mod.path import Name                         ║
 ║                                                                  ║
 ║  PRINT         print(a, b, c)   println(a, b, c)                ║
-║                "str" + val   // auto-converts                    ║
 ║                                                                  ║
 ║  OPERATORS     + - * / %  == != < <= > >=  && || !              ║
 ║                = += -= *= /=                                     ║
 ║                                                                  ║
 ║  NULL          x: String? = null                                ║
 ║                if (x != null) { /* x narrowed */ }              ║
+║                                                                  ║
+║  ATTRIBUTES    [Reflectable]                                     ║
+║                class Animal { name: String }                     ║
+║                                                                  ║
+║  REFLECTION    ti = Reflect.findType("Animal")                   ║
+║                Reflect.fieldCount(ti)                             ║
+║                Reflect.getFieldString(ti, 0)                     ║
+║                                                                  ║
+║  JSON          obj = json_new_object()                           ║
+║                json_set_string(obj, "key", "val")                ║
+║                json_stringify_pretty(obj)                         ║
+║                Json.toJson("TypeName", instance)                 ║
+║                Json.parse("TypeName", jsonStr)                   ║
 ║                                                                  ║
 ║  ENTRY POINT   def main() -> Unit { return }                    ║
 ║                                                                  ║
@@ -3256,4 +3293,4 @@ Terminator        = ";" | ASI_NEWLINE ;
 
 ---
 
-*Document generated for Nex v0.1.90. This is a complete reference for AI-assisted code generation in the Nex programming language.*
+*Document generated for Nex v0.1.129. This is a complete reference for AI-assisted code generation in the Nex programming language.*
