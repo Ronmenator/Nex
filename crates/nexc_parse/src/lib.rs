@@ -37,6 +37,51 @@ impl Parser {
             }
 
             match self.peek_kind() {
+                Some(TokenKind::LBracket) => {
+                    let attrs = self.parse_attributes();
+                    if attrs.is_empty() {
+                        // Not a valid attribute — fall through to expression parsing
+                        let statement = self.parse_statement();
+                        file.items.push(Item::Statement(statement));
+                    } else {
+                        // Skip newlines between attribute and declaration
+                        self.skip_terminators();
+                        // Consume optional `public` / `partial` before the declaration
+                        let mut is_public = false;
+                        let mut is_partial = false;
+                        if self.peek_kind() == Some(TokenKind::Public) {
+                            is_public = true;
+                            self.advance();
+                        }
+                        if self.is_contextual_keyword("partial") && self.peek_nth_kind(1) == Some(TokenKind::Class) {
+                            is_partial = true;
+                            self.advance();
+                        }
+                        match self.peek_kind() {
+                            Some(TokenKind::Class) => {
+                                file.items.push(Item::Class(self.parse_class_with_attrs(is_public, is_partial, attrs)));
+                            }
+                            Some(TokenKind::Struct) => {
+                                file.items.push(Item::Struct(self.parse_struct_with_attrs(is_public, attrs)));
+                            }
+                            Some(TokenKind::Enum) => {
+                                file.items.push(Item::Enum(self.parse_enum_with_attrs(is_public, attrs)));
+                            }
+                            Some(TokenKind::Interface) => {
+                                file.items.push(Item::Interface(self.parse_interface_with_attrs(is_public, attrs)));
+                            }
+                            Some(TokenKind::Def) | Some(TokenKind::Virtual) | Some(TokenKind::Override) | Some(TokenKind::Static) => {
+                                let mut func = self.parse_function(is_public, false);
+                                func.attributes = attrs;
+                                file.items.push(Item::Function(func));
+                            }
+                            _ => {
+                                self.push_error("expected declaration after attribute");
+                                self.recover_to_item_boundary();
+                            }
+                        }
+                    }
+                }
                 Some(TokenKind::Import) => {
                     file.items.push(Item::Import(self.parse_import(false, false)));
                 }
@@ -204,7 +249,50 @@ impl Parser {
         }
     }
 
+    fn parse_attributes(&mut self) -> Vec<Attribute> {
+        let mut attrs = Vec::new();
+        while self.peek_kind() == Some(TokenKind::LBracket) {
+            let span = self.current_span();
+            self.advance(); // consume '['
+            if let Some(name) = self.consume_identifier() {
+                let mut args = Vec::new();
+                if self.consume_if(&TokenKind::LParen) {
+                    while !self.is_eof() && self.peek_kind() != Some(TokenKind::RParen) {
+                        if let Some(TokenKind::StringLiteral) = self.peek_kind() {
+                            let text = self.tokens[self.pos].lexeme.clone();
+                            // Strip surrounding quotes
+                            let unquoted = text.trim_matches('"').to_string();
+                            args.push(unquoted);
+                            self.advance();
+                        } else if let Some(id) = self.consume_identifier() {
+                            args.push(id);
+                        } else {
+                            break;
+                        }
+                        if !self.consume_if(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    self.consume_if(&TokenKind::RParen);
+                }
+                if !self.consume_if(&TokenKind::RBracket) {
+                    self.push_error("expected ']' after attribute");
+                }
+                attrs.push(Attribute { name, args, span });
+            } else {
+                // Not an attribute — rewind (put back '[')
+                self.pos -= 1;
+                break;
+            }
+        }
+        attrs
+    }
+
     fn parse_class(&mut self, is_public: bool, is_partial: bool) -> ClassDecl {
+        self.parse_class_with_attrs(is_public, is_partial, Vec::new())
+    }
+
+    fn parse_class_with_attrs(&mut self, is_public: bool, is_partial: bool, attributes: Vec<Attribute>) -> ClassDecl {
         let span = self.current_span();
         self.advance(); // consume `class` keyword
         let name = self.consume_identifier().unwrap_or_else(|| {
@@ -229,6 +317,7 @@ impl Parser {
                 base_specs,
                 fields: Vec::new(),
                 methods: Vec::new(),
+                attributes,
                 span,
             };
         }
@@ -284,11 +373,16 @@ impl Parser {
             base_specs,
             fields,
             methods,
+            attributes,
             span,
         }
     }
 
     fn parse_interface(&mut self, is_public: bool) -> InterfaceDecl {
+        self.parse_interface_with_attrs(is_public, Vec::new())
+    }
+
+    fn parse_interface_with_attrs(&mut self, is_public: bool, attributes: Vec<Attribute>) -> InterfaceDecl {
         let span = self.current_span();
         self.advance();
         let name = self.consume_identifier().unwrap_or_else(|| {
@@ -309,6 +403,7 @@ impl Parser {
                 },
                 type_params,
                 methods: Vec::new(),
+                attributes,
                 span,
             };
         }
@@ -350,11 +445,16 @@ impl Parser {
             },
             type_params,
             methods,
+            attributes,
             span,
         }
     }
 
     fn parse_struct(&mut self, is_public: bool) -> StructDecl {
+        self.parse_struct_with_attrs(is_public, Vec::new())
+    }
+
+    fn parse_struct_with_attrs(&mut self, is_public: bool, attributes: Vec<Attribute>) -> StructDecl {
         let span = self.current_span();
         self.advance();
         let name = self.consume_identifier().unwrap_or_else(|| {
@@ -378,6 +478,7 @@ impl Parser {
                 interfaces,
                 fields: Vec::new(),
                 methods: Vec::new(),
+                attributes,
                 span,
             };
         }
@@ -432,11 +533,16 @@ impl Parser {
             interfaces,
             fields,
             methods,
+            attributes,
             span,
         }
     }
 
     fn parse_enum(&mut self, is_public: bool) -> EnumDecl {
+        self.parse_enum_with_attrs(is_public, Vec::new())
+    }
+
+    fn parse_enum_with_attrs(&mut self, is_public: bool, attributes: Vec<Attribute>) -> EnumDecl {
         let span = self.current_span();
         self.advance(); // consume `enum`
         let name = self.consume_identifier().unwrap_or_else(|| {
@@ -455,6 +561,7 @@ impl Parser {
                     Visibility::Internal
                 },
                 variants: Vec::new(),
+                attributes,
                 span,
             };
         }
@@ -489,6 +596,7 @@ impl Parser {
                 Visibility::Internal
             },
             variants,
+            attributes,
             span,
         }
     }

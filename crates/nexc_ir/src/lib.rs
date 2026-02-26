@@ -265,6 +265,180 @@ impl IrLowering {
         }
     }
 
+    fn lower_reflect_call(
+        &mut self,
+        method_name: &str,
+        args: &[nexc_ast::Expr],
+    ) -> IrValue {
+        let dst = self.fresh_temp();
+        match method_name {
+            "typeOf" => {
+                // Compile-time: resolve the type of the argument expression
+                if let Some(arg) = args.first() {
+                    let type_name = self.resolve_expr_type(arg)
+                        .unwrap_or_else(|| "Unknown".into());
+                    self.emit(IrInstruction::Call {
+                        dst: Some(dst.clone()),
+                        target: "nex_reflect_find_type".into(),
+                        args: vec![IrValue::StringConst(type_name)],
+                    });
+                    // Still evaluate the arg for side effects
+                    let _ = self.lower_expr(arg);
+                } else {
+                    self.emit(IrInstruction::Store {
+                        dst: dst.clone(),
+                        src: IrValue::IntConst(-1),
+                    });
+                }
+            }
+            "findType" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_find_type".into(),
+                    args: ir_args,
+                });
+            }
+            "typeName" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_name".into(),
+                    args: ir_args,
+                });
+            }
+            "typeModule" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_module".into(),
+                    args: ir_args,
+                });
+            }
+            "typeKind" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_kind".into(),
+                    args: ir_args,
+                });
+            }
+            "fieldCount" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_field_count".into(),
+                    args: ir_args,
+                });
+            }
+            "fieldName" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_field_name".into(),
+                    args: ir_args,
+                });
+            }
+            "fieldType" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_field_type".into(),
+                    args: ir_args,
+                });
+            }
+            "methodCount" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_method_count".into(),
+                    args: ir_args,
+                });
+            }
+            "methodName" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_method_name".into(),
+                    args: ir_args,
+                });
+            }
+            "methodReturnType" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_method_return_type".into(),
+                    args: ir_args,
+                });
+            }
+            "implements" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_implements".into(),
+                    args: ir_args,
+                });
+            }
+            "isReflectable" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_is_reflectable".into(),
+                    args: ir_args,
+                });
+            }
+            "typeCount" => {
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_count".into(),
+                    args: vec![],
+                });
+            }
+            "typeNameAt" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_name_at".into(),
+                    args: ir_args,
+                });
+            }
+            "interfaces" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_type_interfaces".into(),
+                    args: ir_args,
+                });
+            }
+            "invoke" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_invoke".into(),
+                    args: ir_args,
+                });
+            }
+            "createInstance" => {
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_reflect_create_instance".into(),
+                    args: ir_args,
+                });
+            }
+            _ => {
+                // Unknown Reflect method — emit as regular call for extensibility
+                let ir_args: Vec<IrValue> = args.iter().map(|a| self.lower_expr(a)).collect();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: format!("nex_reflect_{}", method_name),
+                    args: ir_args,
+                });
+            }
+        }
+        IrValue::Register(dst)
+    }
+
     /// Resolve an unqualified method name to a class-qualified IR function name.
     /// If `qualifier` is given (e.g. from `Base::method` or `self.method` inside
     /// a class), use it directly.  Otherwise search known classes for a match.
@@ -839,6 +1013,20 @@ impl IrLowering {
                             args: vec![IrValue::Register(addr_reg)],
                         });
                         return IrValue::Register(dst);
+                    }
+                }
+
+                // Check for Reflect.* built-in calls
+                if let Expr::MemberAccess {
+                    receiver,
+                    name: method_name,
+                    ..
+                } = callee.as_ref()
+                {
+                    if let Expr::Identifier { name: recv_name, .. } = receiver.as_ref() {
+                        if recv_name == "Reflect" {
+                            return self.lower_reflect_call(method_name, args);
+                        }
                     }
                 }
 
@@ -1824,6 +2012,17 @@ fn collect_free_vars_stmt(
     }
 }
 
+fn type_expr_display(te: &nexc_ast::TypeExpr) -> String {
+    match &te.kind {
+        nexc_ast::TypeExprKind::Named(n) => n.clone(),
+        nexc_ast::TypeExprKind::Generic(base, _) => base.clone(),
+        nexc_ast::TypeExprKind::Var => "Var".into(),
+        nexc_ast::TypeExprKind::Unit => "Unit".into(),
+        nexc_ast::TypeExprKind::Nullable(inner) => format!("{}?", type_expr_display(inner)),
+        nexc_ast::TypeExprKind::Function(_, ret) => format!("Function -> {}", type_expr_display(ret)),
+    }
+}
+
 fn type_expr_to_type(te: &nexc_ast::TypeExpr) -> Type {
     match &te.kind {
         nexc_ast::TypeExprKind::Named(n) => match n.as_str() {
@@ -2077,6 +2276,188 @@ pub fn lower_typed_module_with_prefix(
         }
     }
 
+    // ---- Reflection metadata registration ----
+    // Emit Call instructions that register type metadata with the runtime
+    // reflection registry.  These run at module-init time (before user code).
+    let module_name_str = typed.file.path.clone();
+    for item in &typed.file.items {
+        match item {
+            nexc_ast::Item::Class(c) => {
+                let is_reflectable = c.attributes.iter().any(|a| a.name == "Reflectable");
+                let tid = lowering.fresh_temp();
+                init_instructions.push(IrInstruction::Call {
+                    dst: Some(tid.clone()),
+                    target: "nex_reflect_register_type".into(),
+                    args: vec![
+                        IrValue::StringConst(c.name.clone()),
+                        IrValue::StringConst(module_name_str.clone()),
+                        IrValue::IntConst(0), // Class
+                        IrValue::IntConst(if is_reflectable { 1 } else { 0 }),
+                    ],
+                });
+                for base in &c.base_specs {
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_base".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(base.name.clone()),
+                        ],
+                    });
+                }
+                for field in &c.fields {
+                    let type_name = field.ty.as_ref()
+                        .map(|t| type_expr_display(t))
+                        .unwrap_or_else(|| "Unknown".into());
+                    let is_pub = matches!(field.visibility, nexc_ast::Visibility::Public);
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_field".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(field.name.clone()),
+                            IrValue::StringConst(type_name),
+                            IrValue::IntConst(if is_pub { 1 } else { 0 }),
+                        ],
+                    });
+                }
+                for method in &c.methods {
+                    if method.name == "init" { continue; }
+                    let ret = method.return_type.as_ref()
+                        .map(|t| type_expr_display(t))
+                        .unwrap_or_else(|| "Unit".into());
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_method".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(method.name.clone()),
+                            IrValue::StringConst(ret),
+                            IrValue::IntConst(method.params.len() as i64),
+                            IrValue::IntConst(if method.is_static { 1 } else { 0 }),
+                            IrValue::IntConst(if method.is_virtual { 1 } else { 0 }),
+                        ],
+                    });
+                }
+            }
+            nexc_ast::Item::Struct(s) => {
+                let is_reflectable = s.attributes.iter().any(|a| a.name == "Reflectable");
+                let tid = lowering.fresh_temp();
+                init_instructions.push(IrInstruction::Call {
+                    dst: Some(tid.clone()),
+                    target: "nex_reflect_register_type".into(),
+                    args: vec![
+                        IrValue::StringConst(s.name.clone()),
+                        IrValue::StringConst(module_name_str.clone()),
+                        IrValue::IntConst(1), // Struct
+                        IrValue::IntConst(if is_reflectable { 1 } else { 0 }),
+                    ],
+                });
+                for iface in &s.interfaces {
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_interface".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(iface.clone()),
+                        ],
+                    });
+                }
+                for field in &s.fields {
+                    let type_name = field.ty.as_ref()
+                        .map(|t| type_expr_display(t))
+                        .unwrap_or_else(|| "Unknown".into());
+                    let is_pub = matches!(field.visibility, nexc_ast::Visibility::Public);
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_field".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(field.name.clone()),
+                            IrValue::StringConst(type_name),
+                            IrValue::IntConst(if is_pub { 1 } else { 0 }),
+                        ],
+                    });
+                }
+                for method in &s.methods {
+                    if method.name == "init" { continue; }
+                    let ret = method.return_type.as_ref()
+                        .map(|t| type_expr_display(t))
+                        .unwrap_or_else(|| "Unit".into());
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_method".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(method.name.clone()),
+                            IrValue::StringConst(ret),
+                            IrValue::IntConst(method.params.len() as i64),
+                            IrValue::IntConst(if method.is_static { 1 } else { 0 }),
+                            IrValue::IntConst(if method.is_virtual { 1 } else { 0 }),
+                        ],
+                    });
+                }
+            }
+            nexc_ast::Item::Enum(e) => {
+                let is_reflectable = e.attributes.iter().any(|a| a.name == "Reflectable");
+                let tid = lowering.fresh_temp();
+                init_instructions.push(IrInstruction::Call {
+                    dst: Some(tid.clone()),
+                    target: "nex_reflect_register_type".into(),
+                    args: vec![
+                        IrValue::StringConst(e.name.clone()),
+                        IrValue::StringConst(module_name_str.clone()),
+                        IrValue::IntConst(2), // Enum
+                        IrValue::IntConst(if is_reflectable { 1 } else { 0 }),
+                    ],
+                });
+                for (i, variant) in e.variants.iter().enumerate() {
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_variant".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(variant.name.clone()),
+                            IrValue::IntConst(i as i64),
+                        ],
+                    });
+                }
+            }
+            nexc_ast::Item::Interface(iface) => {
+                let is_reflectable = iface.attributes.iter().any(|a| a.name == "Reflectable");
+                let tid = lowering.fresh_temp();
+                init_instructions.push(IrInstruction::Call {
+                    dst: Some(tid.clone()),
+                    target: "nex_reflect_register_type".into(),
+                    args: vec![
+                        IrValue::StringConst(iface.name.clone()),
+                        IrValue::StringConst(module_name_str.clone()),
+                        IrValue::IntConst(3), // Interface
+                        IrValue::IntConst(if is_reflectable { 1 } else { 0 }),
+                    ],
+                });
+                for method in &iface.methods {
+                    let ret = method.return_type.as_ref()
+                        .map(|t| type_expr_display(t))
+                        .unwrap_or_else(|| "Unit".into());
+                    init_instructions.push(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_reflect_add_method".into(),
+                        args: vec![
+                            IrValue::Register(tid.clone()),
+                            IrValue::StringConst(method.name.clone()),
+                            IrValue::StringConst(ret),
+                            IrValue::IntConst(method.params.len() as i64),
+                            IrValue::IntConst(if method.is_static { 1 } else { 0 }),
+                            IrValue::IntConst(if method.is_virtual { 1 } else { 0 }),
+                        ],
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
     // Helper: apply module prefix to a function/method name when provided.
     // The entry point `main` is never prefixed.
     let prefix_name = |name: String| -> String {
@@ -2299,6 +2680,7 @@ mod tests {
             is_virtual: false,
             is_override: false,
             is_static: false,
+            is_async: false,
             operator: None,
             body: Some(Expr::Block(Block {
                 statements: vec![

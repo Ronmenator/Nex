@@ -19,6 +19,7 @@ pub mod async_runtime;
 pub mod closure_runtime;
 pub mod logging;
 pub mod testing;
+pub mod reflect;
 
 pub use math::*;
 pub use string::*;
@@ -36,6 +37,7 @@ pub use async_runtime::*;
 pub use closure_runtime::*;
 pub use logging::*;
 pub use testing::*;
+pub use reflect::*;
 
 #[repr(C)]
 pub struct NexType {

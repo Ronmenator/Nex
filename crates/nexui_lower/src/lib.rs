@@ -103,6 +103,7 @@ pub fn lower_document(doc: &UIDocument, sink: &mut DiagnosticSink) -> ClassDecl 
         base_specs,
         fields: ctx.fields,
         methods,
+        attributes: Vec::new(),
         span: S,
     }
 }

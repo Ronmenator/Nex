@@ -78,6 +78,7 @@ mod tests {
             base_specs: bases,
             fields: Vec::new(),
             methods: Vec::new(),
+            attributes: Vec::new(),
             span: span(),
         }
     }

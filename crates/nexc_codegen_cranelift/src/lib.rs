@@ -80,6 +80,13 @@ pub fn jit_execute(
 
     module.finalize_definitions().map_err(|e| format!("JIT finalize: {e}"))?;
 
+    // Patch reflection method pointers now that JIT code is finalized
+    nex_runtime::reflect::patch_method_pointers(&|name| {
+        func_ids
+            .get(name)
+            .map(|id| module.get_finalized_function(*id))
+    });
+
     let main_name = if func_ids.contains_key("main") {
         "main"
     } else if func_ids.contains_key("nex_main") {
@@ -321,6 +328,33 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_assert_ne_int);
     sym!(nex_assert_ne_str);
     sym!(nex_assert_true);
+
+    // std.reflect
+    sym!(nex_reflect_register_type);
+    sym!(nex_reflect_add_base);
+    sym!(nex_reflect_add_interface);
+    sym!(nex_reflect_add_field);
+    sym!(nex_reflect_add_method);
+    sym!(nex_reflect_add_variant);
+    sym!(nex_reflect_find_type);
+    sym!(nex_reflect_type_name);
+    sym!(nex_reflect_type_module);
+    sym!(nex_reflect_type_kind);
+    sym!(nex_reflect_type_field_count);
+    sym!(nex_reflect_type_field_name);
+    sym!(nex_reflect_type_field_type);
+    sym!(nex_reflect_type_method_count);
+    sym!(nex_reflect_type_method_name);
+    sym!(nex_reflect_type_method_return_type);
+    sym!(nex_reflect_type_implements);
+    sym!(nex_reflect_type_is_reflectable);
+    sym!(nex_reflect_type_count);
+    sym!(nex_reflect_type_name_at);
+    sym!(nex_reflect_type_interfaces);
+    sym!(nex_reflect_set_method_ptr);
+    sym!(nex_reflect_invoke);
+    sym!(nex_reflect_create_instance);
+    sym!(nex_reflect_reset);
 
     // NOTE: torch, crypto, http, regex symbols are loaded dynamically via
     // register_native_libs() from their respective native DLLs.
@@ -830,6 +864,23 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
         | "math_random"
         | "parse_float"
         | "tensor_item_float" | "tensor_get_float" => return Some(RegType::Float),
+        _ => {}
+    }
+    // Reflection query functions
+    match name {
+        "nex_reflect_type_name" | "nex_reflect_type_module"
+        | "nex_reflect_type_field_name" | "nex_reflect_type_field_type"
+        | "nex_reflect_type_method_name" | "nex_reflect_type_method_return_type"
+        | "nex_reflect_type_name_at" | "nex_reflect_type_interfaces" => {
+            return Some(RegType::String);
+        }
+        "nex_reflect_register_type" | "nex_reflect_find_type"
+        | "nex_reflect_type_kind" | "nex_reflect_type_field_count"
+        | "nex_reflect_type_method_count" | "nex_reflect_type_implements"
+        | "nex_reflect_type_is_reflectable" | "nex_reflect_type_count"
+        | "nex_reflect_invoke" | "nex_reflect_create_instance" => {
+            return Some(RegType::Int);
+        }
         _ => {}
     }
     None
@@ -2906,6 +2957,39 @@ fn declare_runtime_imports<M: Module>(
     for _ in 0..4 { sig_ptr_ptr4.params.push(AbiParam::new(types::I64)); }
     sig_ptr_ptr4.returns.push(AbiParam::new(types::I64));
 
+    let reflect_imports: Vec<(&str, &Signature)> = vec![
+        // Registration
+        ("nex_reflect_register_type", &sig_ptr_ptr4),    // (name, module, kind, is_reflectable) -> type_id
+        ("nex_reflect_add_base", &sig_void_ptr2),         // (type_id, base_name)
+        ("nex_reflect_add_interface", &sig_void_ptr2),    // (type_id, iface_name)
+        ("nex_reflect_add_field", &sig_void_ptr4),        // (type_id, name, type_name, is_public)
+        ("nex_reflect_add_method", &sig_void_ptr6),       // (type_id, name, ret_type, param_count, is_static, is_virtual)
+        ("nex_reflect_add_variant", &sig_void_ptr3),      // (type_id, name, ordinal)
+        // Query — single arg returning i64/ptr
+        ("nex_reflect_find_type", &sig_ptr_ptr),          // (name) -> type_id
+        ("nex_reflect_type_name", &sig_ptr_ptr),          // (type_id) -> *c_char
+        ("nex_reflect_type_module", &sig_ptr_ptr),        // (type_id) -> *c_char
+        ("nex_reflect_type_kind", &sig_ptr_ptr),          // (type_id) -> i64
+        ("nex_reflect_type_field_count", &sig_ptr_ptr),   // (type_id) -> i64
+        ("nex_reflect_type_method_count", &sig_ptr_ptr),  // (type_id) -> i64
+        ("nex_reflect_type_is_reflectable", &sig_ptr_ptr),// (type_id) -> i64
+        ("nex_reflect_type_interfaces", &sig_ptr_ptr),    // (type_id) -> *c_char
+        // Query — two args returning i64/ptr
+        ("nex_reflect_type_field_name", &sig_ptr_ptr2),   // (type_id, index) -> *c_char
+        ("nex_reflect_type_field_type", &sig_ptr_ptr2),   // (type_id, index) -> *c_char
+        ("nex_reflect_type_method_name", &sig_ptr_ptr2),  // (type_id, index) -> *c_char
+        ("nex_reflect_type_method_return_type", &sig_ptr_ptr2), // (type_id, index) -> *c_char
+        ("nex_reflect_type_implements", &sig_ptr_ptr2),   // (type_id, iface_name) -> i64
+        // Enumeration
+        ("nex_reflect_type_count", &sig_ret_ptr),         // () -> i64
+        ("nex_reflect_type_name_at", &sig_ptr_ptr),       // (index) -> *c_char
+        // Dynamic invocation
+        ("nex_reflect_set_method_ptr", &sig_void_ptr3),   // (type_id, method_index, func_ptr)
+        ("nex_reflect_invoke", &sig_ptr_ptr4),            // (type_id, method_name, args_ptr, arg_count) -> i64
+        ("nex_reflect_create_instance", &sig_ptr_ptr3),   // (type_id, args_ptr, arg_count) -> i64
+        ("nex_reflect_reset", &sig_void),                 // ()
+    ];
+
     let ui_imports: Vec<(&str, &Signature)> = vec![
         // Application
         ("nex_ui_app_create", &sig_ptr_ptr3),
@@ -3247,6 +3331,9 @@ fn declare_runtime_imports<M: Module>(
     };
 
     for (name, sig) in imports {
+        declare(name, sig)?;
+    }
+    for (name, sig) in reflect_imports {
         declare(name, sig)?;
     }
     for (name, sig) in ui_imports {

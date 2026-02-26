@@ -1,0 +1,51 @@
+[Reflectable]
+class Animal {
+    name: String
+    age: Int
+
+    def speak() -> String {
+        return "Hello"
+    }
+}
+
+interface Skill {
+    def execute() -> Unit
+}
+
+[Reflectable]
+struct CalendarSkill : Skill {
+    def execute() -> Unit {
+        println("Running calendar")
+    }
+}
+
+[Reflectable]
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+def main() {
+    var ti = Reflect.findType("Animal")
+    println(Reflect.typeName(ti))
+    println(Reflect.fieldCount(ti))
+    println(Reflect.fieldName(ti, 0))
+    println(Reflect.fieldType(ti, 0))
+    println(Reflect.fieldName(ti, 1))
+    println(Reflect.fieldType(ti, 1))
+    println(Reflect.methodCount(ti))
+    println(Reflect.methodName(ti, 0))
+
+    var si = Reflect.findType("CalendarSkill")
+    println(Reflect.typeName(si))
+    println(Reflect.implements(si, "Skill"))
+
+    var count = Reflect.typeCount()
+    println(count)
+    var i = 0
+    while (i < count) {
+        println(Reflect.typeNameAt(i))
+        i = i + 1
+    }
+}

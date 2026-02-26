@@ -44,6 +44,7 @@ pub struct ImportDecl {
 #[derive(Debug, Clone)]
 pub struct Attribute {
     pub name: String,
+    pub args: Vec<String>,
     pub span: Span,
 }
 
@@ -135,6 +136,7 @@ pub struct ClassDecl {
     pub base_specs: Vec<BaseSpec>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<FunctionDecl>,
+    pub attributes: Vec<Attribute>,
     pub span: Span,
 }
 
@@ -144,6 +146,7 @@ pub struct InterfaceDecl {
     pub visibility: Visibility,
     pub type_params: Vec<Name>,
     pub methods: Vec<FunctionDecl>,
+    pub attributes: Vec<Attribute>,
     pub span: Span,
 }
 
@@ -155,6 +158,7 @@ pub struct StructDecl {
     pub interfaces: Vec<Name>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<FunctionDecl>,
+    pub attributes: Vec<Attribute>,
     pub span: Span,
 }
 
@@ -169,6 +173,7 @@ pub struct EnumDecl {
     pub name: Name,
     pub visibility: Visibility,
     pub variants: Vec<EnumVariant>,
+    pub attributes: Vec<Attribute>,
     pub span: Span,
 }
 
