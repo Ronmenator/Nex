@@ -68,6 +68,19 @@ pub unsafe extern "C" fn nex_io_file_write_bytes(path: *const c_char, buf: *cons
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn nex_io_file_append(path: *const c_char, data: *const c_char) -> i32 {
+    use std::io::Write;
+    let Ok(mut f) = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(cstr_to_str(path))
+    else {
+        return 0;
+    };
+    f.write_all(cstr_to_str(data).as_bytes()).is_ok() as i32
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn nex_io_mkdir(path: *const c_char) -> i32 {
     std::fs::create_dir_all(cstr_to_str(path)).is_ok() as i32
 }

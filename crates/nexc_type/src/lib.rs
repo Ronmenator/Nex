@@ -505,6 +505,8 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
                 | BinaryOp::Gt
                 | BinaryOp::GtEq => Type::Bool,
                 BinaryOp::And | BinaryOp::Or => Type::Bool,
+                BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor
+                | BinaryOp::Shl | BinaryOp::Shr => Type::Int,
             }
         }
         Expr::Unary {
@@ -520,6 +522,7 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
                         Type::Unknown
                     }
                 }
+                UnaryOp::BitNot => Type::Int,
             }
         }
         Expr::Assign {

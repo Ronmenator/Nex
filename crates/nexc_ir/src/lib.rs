@@ -468,7 +468,7 @@ impl IrLowering {
             }
             nexc_ast::Expr::Call { callee, .. } => match callee.as_ref() {
                 nexc_ast::Expr::Identifier { name, .. } => {
-                    if self.known_classes.contains(name) || name == "List" {
+                    if self.known_classes.contains(name) || name == "List" || name == "Map" {
                         return Some(name.clone());
                     }
                     // Infer return types for well-known free functions.
@@ -487,11 +487,19 @@ impl IrLowering {
                     ..
                 } => {
                     if let Some(recv_type) = self.resolve_expr_type(receiver) {
+                        // Check user-defined class method returns
                         if let Some(ret_type) = self
                             .class_method_returns
-                            .get(&(recv_type, method.clone()))
+                            .get(&(recv_type.clone(), method.clone()))
                         {
                             return Some(ret_type.clone());
+                        }
+                        // Built-in collection method return types
+                        if recv_type == "List" && (method == "filter" || method == "map") {
+                            return Some("List".into());
+                        }
+                        if recv_type == "Map" && (method == "keys" || method == "values") {
+                            return Some("List".into());
                         }
                     }
                     None
@@ -912,6 +920,11 @@ impl IrLowering {
                     nexc_ast::BinaryOp::GtEq => "ge",
                     nexc_ast::BinaryOp::And => "and",
                     nexc_ast::BinaryOp::Or => "or",
+                    nexc_ast::BinaryOp::BitAnd => "bitand",
+                    nexc_ast::BinaryOp::BitOr => "bitor",
+                    nexc_ast::BinaryOp::BitXor => "bitxor",
+                    nexc_ast::BinaryOp::Shl => "shl",
+                    nexc_ast::BinaryOp::Shr => "shr",
                 };
                 self.emit(IrInstruction::BinOp {
                     dst: dst.clone(),
@@ -929,6 +942,7 @@ impl IrLowering {
                 let op_str = match op {
                     nexc_ast::UnaryOp::Not => "not",
                     nexc_ast::UnaryOp::Neg => "neg",
+                    nexc_ast::UnaryOp::BitNot => "bitnot",
                 };
                 self.emit(IrInstruction::UnaryOp {
                     dst: dst.clone(),
@@ -979,6 +993,20 @@ impl IrLowering {
                             target: "nex_list_new".into(),
                             args: vec![],
                         });
+                        return IrValue::Register(dst);
+                    }
+                }
+
+                // Check for Map constructor: Map() or Map<K,V>()
+                if let Expr::Identifier { name, .. } = callee.as_ref() {
+                    if name == "Map" {
+                        let dst = self.fresh_temp();
+                        self.emit(IrInstruction::Call {
+                            dst: Some(dst.clone()),
+                            target: "nex_map_new".into(),
+                            args: vec![],
+                        });
+                        self.var_types.insert(dst.clone(), "Map".into());
                         return IrValue::Register(dst);
                     }
                 }
@@ -1075,7 +1103,7 @@ impl IrLowering {
                                 let dst = self.fresh_temp();
                                 let returns_value = matches!(
                                     method_name.as_str(),
-                                    "get" | "length" | "remove"
+                                    "get" | "length" | "remove" | "filter" | "map" | "contains"
                                 );
                                 if returns_value {
                                     self.emit(IrInstruction::Call {
@@ -1083,6 +1111,42 @@ impl IrLowering {
                                         target: ffi.into(),
                                         args: ir_args,
                                     });
+                                    // Track return types for method chaining
+                                    if method_name == "filter" || method_name == "map" {
+                                        self.var_types.insert(dst.clone(), "List".into());
+                                    }
+                                    return IrValue::Register(dst);
+                                } else {
+                                    self.emit(IrInstruction::Call {
+                                        dst: None,
+                                        target: ffi.into(),
+                                        args: ir_args,
+                                    });
+                                    return IrValue::NullConst;
+                                }
+                            }
+                        }
+                        // Fallback: check Map FFI methods
+                        if recv_type == "Map" {
+                            if let Some(ffi) = map_method_to_ffi(method_name) {
+                                let recv_val = self.lower_expr(receiver);
+                                let mut ir_args = vec![recv_val];
+                                ir_args.extend(args.iter().map(|a| self.lower_expr(a)));
+                                let dst = self.fresh_temp();
+                                let returns_value = matches!(
+                                    method_name.as_str(),
+                                    "get" | "contains" | "size" | "keys" | "values"
+                                );
+                                if returns_value {
+                                    self.emit(IrInstruction::Call {
+                                        dst: Some(dst.clone()),
+                                        target: ffi.into(),
+                                        args: ir_args,
+                                    });
+                                    // Track return types for method chaining
+                                    if method_name == "keys" || method_name == "values" {
+                                        self.var_types.insert(dst.clone(), "List".into());
+                                    }
                                     return IrValue::Register(dst);
                                 } else {
                                     self.emit(IrInstruction::Call {
@@ -1839,6 +1903,24 @@ fn list_method_to_ffi(method: &str) -> Option<&str> {
         "length" => Some("nex_list_length"),
         "remove" => Some("nex_list_remove"),
         "free" => Some("nex_list_free"),
+        "filter" => Some("nex_list_filter"),
+        "map" => Some("nex_list_map"),
+        "forEach" => Some("nex_list_foreach"),
+        "contains" => Some("nex_list_contains_str"),
+        _ => None,
+    }
+}
+
+fn map_method_to_ffi(method: &str) -> Option<&str> {
+    match method {
+        "put" => Some("nex_map_put"),
+        "get" => Some("nex_map_get"),
+        "contains" => Some("nex_map_contains"),
+        "remove" => Some("nex_map_remove"),
+        "size" => Some("nex_map_size"),
+        "keys" => Some("nex_map_keys"),
+        "values" => Some("nex_map_values"),
+        "free" => Some("nex_map_free"),
         _ => None,
     }
 }

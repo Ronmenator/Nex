@@ -1228,24 +1228,34 @@ impl Parser {
                 Some(TokenKind::MinusEq) => Some((1, 1, PrattInfix::Assign(AssignOp::SubAssign))),
                 Some(TokenKind::StarEq) => Some((1, 1, PrattInfix::Assign(AssignOp::MulAssign))),
                 Some(TokenKind::SlashEq) => Some((1, 1, PrattInfix::Assign(AssignOp::DivAssign))),
+                Some(TokenKind::AmpEq) => Some((1, 1, PrattInfix::Assign(AssignOp::BitAndAssign))),
+                Some(TokenKind::PipeEq) => Some((1, 1, PrattInfix::Assign(AssignOp::BitOrAssign))),
+                Some(TokenKind::CaretEq) => Some((1, 1, PrattInfix::Assign(AssignOp::BitXorAssign))),
+                Some(TokenKind::ShlEq) => Some((1, 1, PrattInfix::Assign(AssignOp::ShlAssign))),
+                Some(TokenKind::ShrEq) => Some((1, 1, PrattInfix::Assign(AssignOp::ShrAssign))),
                 Some(TokenKind::If) => Some((2, 1, PrattInfix::Ternary)),
                 Some(TokenKind::OrOr) => Some((2, 3, PrattInfix::Binary(BinaryOp::Or))),
                 Some(TokenKind::AndAnd) => Some((4, 5, PrattInfix::Binary(BinaryOp::And))),
-                Some(TokenKind::EqEq) => Some((6, 7, PrattInfix::Binary(BinaryOp::EqEq))),
-                Some(TokenKind::NotEq) => Some((6, 7, PrattInfix::Binary(BinaryOp::NotEq))),
-                Some(TokenKind::Lt) => Some((8, 9, PrattInfix::Binary(BinaryOp::Lt))),
-                Some(TokenKind::LtEq) => Some((8, 9, PrattInfix::Binary(BinaryOp::LtEq))),
-                Some(TokenKind::Gt) => Some((8, 9, PrattInfix::Binary(BinaryOp::Gt))),
-                Some(TokenKind::GtEq) => Some((8, 9, PrattInfix::Binary(BinaryOp::GtEq))),
-                Some(TokenKind::Plus) => Some((10, 11, PrattInfix::Binary(BinaryOp::Add))),
-                Some(TokenKind::Minus) => Some((10, 11, PrattInfix::Binary(BinaryOp::Sub))),
-                Some(TokenKind::Star) => Some((12, 13, PrattInfix::Binary(BinaryOp::Mul))),
-                Some(TokenKind::Slash) => Some((12, 13, PrattInfix::Binary(BinaryOp::Div))),
-                Some(TokenKind::Percent) => Some((12, 13, PrattInfix::Binary(BinaryOp::Mod))),
-                Some(TokenKind::LParen) => Some((16, 17, PrattInfix::Call)),
-                Some(TokenKind::LBracket) => Some((16, 17, PrattInfix::GenericArgs)),
-                Some(TokenKind::Dot) => Some((16, 17, PrattInfix::Member)),
-                Some(TokenKind::DoubleColon) => Some((16, 17, PrattInfix::QualifiedMember)),
+                Some(TokenKind::Pipe) => Some((5, 6, PrattInfix::Binary(BinaryOp::BitOr))),
+                Some(TokenKind::Caret) => Some((6, 7, PrattInfix::Binary(BinaryOp::BitXor))),
+                Some(TokenKind::Amp) => Some((7, 8, PrattInfix::Binary(BinaryOp::BitAnd))),
+                Some(TokenKind::EqEq) => Some((8, 9, PrattInfix::Binary(BinaryOp::EqEq))),
+                Some(TokenKind::NotEq) => Some((8, 9, PrattInfix::Binary(BinaryOp::NotEq))),
+                Some(TokenKind::Lt) => Some((10, 11, PrattInfix::Binary(BinaryOp::Lt))),
+                Some(TokenKind::LtEq) => Some((10, 11, PrattInfix::Binary(BinaryOp::LtEq))),
+                Some(TokenKind::Gt) => Some((10, 11, PrattInfix::Binary(BinaryOp::Gt))),
+                Some(TokenKind::GtEq) => Some((10, 11, PrattInfix::Binary(BinaryOp::GtEq))),
+                Some(TokenKind::Shl) => Some((12, 13, PrattInfix::Binary(BinaryOp::Shl))),
+                Some(TokenKind::Shr) => Some((12, 13, PrattInfix::Binary(BinaryOp::Shr))),
+                Some(TokenKind::Plus) => Some((14, 15, PrattInfix::Binary(BinaryOp::Add))),
+                Some(TokenKind::Minus) => Some((14, 15, PrattInfix::Binary(BinaryOp::Sub))),
+                Some(TokenKind::Star) => Some((16, 17, PrattInfix::Binary(BinaryOp::Mul))),
+                Some(TokenKind::Slash) => Some((16, 17, PrattInfix::Binary(BinaryOp::Div))),
+                Some(TokenKind::Percent) => Some((16, 17, PrattInfix::Binary(BinaryOp::Mod))),
+                Some(TokenKind::LParen) => Some((20, 21, PrattInfix::Call)),
+                Some(TokenKind::LBracket) => Some((20, 21, PrattInfix::GenericArgs)),
+                Some(TokenKind::Dot) => Some((20, 21, PrattInfix::Member)),
+                Some(TokenKind::DoubleColon) => Some((20, 21, PrattInfix::QualifiedMember)),
                 _ => None,
             };
 
@@ -1403,7 +1413,7 @@ impl Parser {
         match self.peek_kind() {
             Some(TokenKind::Bang) => {
                 let op = self.advance();
-                let value = self.parse_expression_bp(18);
+                let value = self.parse_expression_bp(22);
                 let value_span = expr_span(&value);
                 Expr::Unary {
                     op: UnaryOp::Not,
@@ -1413,7 +1423,7 @@ impl Parser {
             }
             Some(TokenKind::Minus) => {
                 let op = self.advance();
-                let value = self.parse_expression_bp(18);
+                let value = self.parse_expression_bp(22);
                 let value_span = expr_span(&value);
                 Expr::Unary {
                     op: UnaryOp::Neg,
@@ -1421,9 +1431,19 @@ impl Parser {
                     span: Span::new(op.span.lo, value_span.hi),
                 }
             }
+            Some(TokenKind::Tilde) => {
+                let op = self.advance();
+                let value = self.parse_expression_bp(22);
+                let value_span = expr_span(&value);
+                Expr::Unary {
+                    op: UnaryOp::BitNot,
+                    expr: Box::new(value),
+                    span: Span::new(op.span.lo, value_span.hi),
+                }
+            }
             Some(TokenKind::Plus) => {
                 self.advance();
-                self.parse_expression_bp(18)
+                self.parse_expression_bp(22)
             }
             Some(_) => self.parse_primary(),
             None => Expr::Unsupported {
@@ -2724,6 +2744,11 @@ mod tests {
             AssignOp::SubAssign => "-=",
             AssignOp::MulAssign => "*=",
             AssignOp::DivAssign => "/=",
+            AssignOp::BitAndAssign => "&=",
+            AssignOp::BitOrAssign => "|=",
+            AssignOp::BitXorAssign => "^=",
+            AssignOp::ShlAssign => "<<=",
+            AssignOp::ShrAssign => ">>=",
         }
     }
 

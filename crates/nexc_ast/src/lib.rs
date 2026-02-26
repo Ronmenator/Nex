@@ -240,18 +240,28 @@ pub enum AssignOp {
     SubAssign,
     MulAssign,
     DivAssign,
+    BitAndAssign,
+    BitOrAssign,
+    BitXorAssign,
+    ShlAssign,
+    ShrAssign,
 }
 
 #[derive(Debug, Clone)]
 pub enum BinaryOp {
     Or,
     And,
+    BitOr,
+    BitXor,
+    BitAnd,
     EqEq,
     NotEq,
     Lt,
     LtEq,
     Gt,
     GtEq,
+    Shl,
+    Shr,
     Add,
     Sub,
     Mul,
@@ -263,6 +273,7 @@ pub enum BinaryOp {
 pub enum UnaryOp {
     Not,
     Neg,
+    BitNot,
 }
 
 #[derive(Debug, Clone)]

@@ -70,6 +70,14 @@ pub enum TokenKind {
     Amp,
     Pipe,
     Caret,
+    Tilde,
+    Shl,
+    Shr,
+    AmpEq,
+    PipeEq,
+    CaretEq,
+    ShlEq,
+    ShrEq,
     Question,
     Arrow,
     Return,
@@ -437,18 +445,36 @@ impl Lexer {
                     ));
                 }
                 b'<' => {
-                    tokens.push(self.scan_multi_or_single(
-                        b"<=",
-                        TokenKind::Lt,
-                        TokenKind::LtEq,
-                    ));
+                    let start = self.pos;
+                    if self.matches(b"<<=") {
+                        self.pos += 3;
+                        tokens.push(Token::new(TokenKind::ShlEq, start, self.pos, "<<=".to_string()));
+                    } else if self.matches(b"<<") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::Shl, start, self.pos, "<<".to_string()));
+                    } else {
+                        tokens.push(self.scan_multi_or_single(
+                            b"<=",
+                            TokenKind::Lt,
+                            TokenKind::LtEq,
+                        ));
+                    }
                 }
                 b'>' => {
-                    tokens.push(self.scan_multi_or_single(
-                        b">=",
-                        TokenKind::Gt,
-                        TokenKind::GtEq,
-                    ));
+                    let start = self.pos;
+                    if self.matches(b">>=") {
+                        self.pos += 3;
+                        tokens.push(Token::new(TokenKind::ShrEq, start, self.pos, ">>=".to_string()));
+                    } else if self.matches(b">>") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::Shr, start, self.pos, ">>".to_string()));
+                    } else {
+                        tokens.push(self.scan_multi_or_single(
+                            b">=",
+                            TokenKind::Gt,
+                            TokenKind::GtEq,
+                        ));
+                    }
                 }
                 b'&' => {
                     let start = self.pos;
@@ -460,6 +486,9 @@ impl Lexer {
                             self.pos,
                             "&&".to_string(),
                         ));
+                    } else if self.matches(b"&=") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::AmpEq, start, self.pos, "&=".to_string()));
                     } else {
                         self.pos += 1;
                         tokens.push(Token::new(TokenKind::Amp, start, self.pos, "&".to_string()));
@@ -475,6 +504,9 @@ impl Lexer {
                             self.pos,
                             "||".to_string(),
                         ));
+                    } else if self.matches(b"|=") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::PipeEq, start, self.pos, "|=".to_string()));
                     } else {
                         self.pos += 1;
                         tokens.push(Token::new(TokenKind::Pipe, start, self.pos, "|".to_string()));
@@ -482,8 +514,18 @@ impl Lexer {
                 }
                 b'^' => {
                     let start = self.pos;
+                    if self.matches(b"^=") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::CaretEq, start, self.pos, "^=".to_string()));
+                    } else {
+                        self.pos += 1;
+                        tokens.push(Token::new(TokenKind::Caret, start, self.pos, "^".to_string()));
+                    }
+                }
+                b'~' => {
+                    let start = self.pos;
                     self.pos += 1;
-                    tokens.push(Token::new(TokenKind::Caret, start, self.pos, "^".to_string()));
+                    tokens.push(Token::new(TokenKind::Tilde, start, self.pos, "~".to_string()));
                 }
                 b'?' => {
                     let start = self.pos;

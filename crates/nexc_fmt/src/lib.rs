@@ -363,6 +363,11 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
                 nexc_ast::BinaryOp::GtEq => ">=",
                 nexc_ast::BinaryOp::And => "&&",
                 nexc_ast::BinaryOp::Or => "||",
+                nexc_ast::BinaryOp::BitAnd => "&",
+                nexc_ast::BinaryOp::BitOr => "|",
+                nexc_ast::BinaryOp::BitXor => "^",
+                nexc_ast::BinaryOp::Shl => "<<",
+                nexc_ast::BinaryOp::Shr => ">>",
             };
             format!("{} {op_str} {}", format_expr(lhs), format_expr(rhs))
         }
@@ -370,6 +375,7 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
             let op_str = match op {
                 nexc_ast::UnaryOp::Not => "!",
                 nexc_ast::UnaryOp::Neg => "-",
+                nexc_ast::UnaryOp::BitNot => "~",
             };
             format!("{op_str}{}", format_expr(expr))
         }
@@ -380,6 +386,11 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
                 nexc_ast::AssignOp::SubAssign => "-=",
                 nexc_ast::AssignOp::MulAssign => "*=",
                 nexc_ast::AssignOp::DivAssign => "/=",
+                nexc_ast::AssignOp::BitAndAssign => "&=",
+                nexc_ast::AssignOp::BitOrAssign => "|=",
+                nexc_ast::AssignOp::BitXorAssign => "^=",
+                nexc_ast::AssignOp::ShlAssign => "<<=",
+                nexc_ast::AssignOp::ShrAssign => ">>=",
             };
             format!("{} {op_str} {}", format_expr(target), format_expr(value))
         }

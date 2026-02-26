@@ -210,6 +210,7 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_str_repeat);
     sym!(nex_str_char_at);
     sym!(nex_str_reverse);
+    sym!(nex_str_truncate);
 
     // std.convert
     sym!(nex_parse_int);
@@ -245,13 +246,24 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_list_clear);
     sym!(nex_list_contains_int);
     sym!(nex_list_index_of_int);
+    sym!(nex_list_filter);
+    sym!(nex_list_map);
+    sym!(nex_list_foreach);
+    sym!(nex_list_contains_str);
     sym!(nex_set_new);
     sym!(nex_set_add);
     sym!(nex_set_contains);
     sym!(nex_set_remove);
     sym!(nex_set_size);
+    sym!(nex_map_new);
+    sym!(nex_map_put);
+    sym!(nex_map_get);
+    sym!(nex_map_contains);
+    sym!(nex_map_remove);
+    sym!(nex_map_size);
     sym!(nex_map_keys);
     sym!(nex_map_values);
+    sym!(nex_map_free);
 
     // std.io
     sym!(nex_io_read_line);
@@ -262,6 +274,7 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_io_file_size);
     sym!(nex_io_file_read_bytes);
     sym!(nex_io_file_write_bytes);
+    sym!(nex_io_file_append);
     sym!(nex_io_mkdir);
     sym!(nex_io_list_dir);
 
@@ -895,6 +908,11 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
         | "tensor_item_float" | "tensor_get_float" => return Some(RegType::Float),
         _ => {}
     }
+    // Map functions
+    match name {
+        "nex_map_get" => return Some(RegType::String),
+        _ => {}
+    }
     // JSON functions
     match name {
         "nex_json_get_string" | "nex_json_stringify" | "nex_json_stringify_pretty" => {
@@ -1021,6 +1039,7 @@ fn build_reg_type_map(
                 }
                 IrInstruction::BinOp { dst, op, lhs, rhs, .. } => {
                     let ty = match op.as_str() {
+                        "bitand" | "bitor" | "bitxor" | "shl" | "shr" => RegType::Int,
                         "add" | "sub" | "mul" | "div" | "mod" => {
                             let lty = match lhs {
                                 IrValue::FloatConst(_) => RegType::Float,
@@ -1274,7 +1293,7 @@ fn emit_instruction<M: Module>(
     blocks: &HashMap<String, cranelift_codegen::ir::Block>,
     func_ids: &HashMap<String, FuncId>,
     strings: &StringPool,
-    _has_return_type: bool,
+    has_return_type: bool,
     reg_types: &HashMap<String, RegType>,
     global_data: &HashMap<String, cranelift_module::DataId>,
 ) -> bool {
@@ -1282,7 +1301,12 @@ fn emit_instruction<M: Module>(
         IrInstruction::Nop | IrInstruction::EmitDiag { .. } => false,
 
         IrInstruction::Return(None) => {
-            builder.ins().return_(&[]);
+            if has_return_type {
+                let zero = builder.ins().iconst(types::I64, 0);
+                builder.ins().return_(&[zero]);
+            } else {
+                builder.ins().return_(&[]);
+            }
             true
         }
         IrInstruction::Return(Some(val)) => {
@@ -1359,6 +1383,11 @@ fn emit_instruction<M: Module>(
                 }
                 "and" => builder.ins().band(l, r),
                 "or" => builder.ins().bor(l, r),
+                "bitand" => builder.ins().band(l, r),
+                "bitor" => builder.ins().bor(l, r),
+                "bitxor" => builder.ins().bxor(l, r),
+                "shl" => builder.ins().ishl(l, r),
+                "shr" => builder.ins().sshr(l, r),
                 _ => builder.ins().iadd(l, r),
             };
             set_var(builder, module, dst, result, vars, global_data);
@@ -1373,6 +1402,7 @@ fn emit_instruction<M: Module>(
                     let one = builder.ins().iconst(types::I64, 1);
                     builder.ins().bxor(v, one)
                 }
+                "bitnot" => builder.ins().bnot(v),
                 _ => v,
             };
             set_var(builder, module, dst, result, vars, global_data);
@@ -1930,6 +1960,7 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "str_repeat" => Some("nex_str_repeat"),
         "char_at" => Some("nex_str_char_at"),
         "str_reverse" => Some("nex_str_reverse"),
+        "str_truncate" => Some("nex_str_truncate"),
         // std.convert
         "parse_int" => Some("nex_parse_int"),
         "parse_float" => Some("nex_parse_float"),
@@ -1954,13 +1985,24 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "list_clear" => Some("nex_list_clear"),
         "list_contains_int" => Some("nex_list_contains_int"),
         "list_index_of_int" => Some("nex_list_index_of_int"),
+        "list_filter" => Some("nex_list_filter"),
+        "list_map" => Some("nex_list_map"),
+        "list_foreach" => Some("nex_list_foreach"),
+        "list_contains_str" => Some("nex_list_contains_str"),
         "set_new" => Some("nex_set_new"),
         "set_add" => Some("nex_set_add"),
         "set_contains" => Some("nex_set_contains"),
         "set_remove" => Some("nex_set_remove"),
         "set_size" => Some("nex_set_size"),
+        "map_new" => Some("nex_map_new"),
+        "map_put" => Some("nex_map_put"),
+        "map_get" => Some("nex_map_get"),
+        "map_contains" => Some("nex_map_contains"),
+        "map_remove" => Some("nex_map_remove"),
+        "map_size" => Some("nex_map_size"),
         "map_keys" => Some("nex_map_keys"),
         "map_values" => Some("nex_map_values"),
+        "map_free" => Some("nex_map_free"),
         // std.io
         "read_line" => Some("nex_io_read_line"),
         "file_exists" => Some("nex_io_file_exists"),
@@ -1970,6 +2012,7 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "file_size" => Some("nex_io_file_size"),
         "file_read_bytes" => Some("nex_io_file_read_bytes"),
         "file_write_bytes" => Some("nex_io_file_write_bytes"),
+        "file_append" => Some("nex_io_file_append"),
         "mkdir" => Some("nex_io_mkdir"),
         "list_dir" => Some("nex_io_list_dir"),
         // std.path
@@ -2859,6 +2902,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_str_repeat", &sig_ptr_ptr2),
         ("nex_str_char_at", &sig_ptr_ptr2),
         ("nex_str_reverse", &sig_ptr_ptr),
+        ("nex_str_truncate", &sig_ptr_ptr2),
         // std.convert
         ("nex_parse_int", &sig_ptr_ptr),
         ("nex_parse_float", &sig_i64_ret_f64),
@@ -2891,13 +2935,24 @@ fn declare_runtime_imports<M: Module>(
         ("nex_list_clear", &sig_void_ptr),
         ("nex_list_contains_int", &sig_ptr_ptr2),
         ("nex_list_index_of_int", &sig_ptr_ptr2),
+        ("nex_list_filter", &sig_ptr_ptr2),
+        ("nex_list_map", &sig_ptr_ptr2),
+        ("nex_list_foreach", &sig_void_ptr2),
+        ("nex_list_contains_str", &sig_ptr_ptr2),
         ("nex_set_new", &sig_ret_ptr),
         ("nex_set_add", &sig_void_ptr2),
         ("nex_set_contains", &sig_ptr_ptr2),
         ("nex_set_remove", &sig_void_ptr2),
         ("nex_set_size", &sig_ptr_ptr),
+        ("nex_map_new", &sig_ret_ptr),
+        ("nex_map_put", &sig_void_ptr3),
+        ("nex_map_get", &sig_ptr_ptr2),
+        ("nex_map_contains", &sig_ptr_ptr2),
+        ("nex_map_remove", &sig_void_ptr2),
+        ("nex_map_size", &sig_ptr_ptr),
         ("nex_map_keys", &sig_ptr_ptr),
         ("nex_map_values", &sig_ptr_ptr),
+        ("nex_map_free", &sig_void_ptr),
         // std.io
         ("nex_io_read_line", &sig_ret_ptr),
         ("nex_io_file_exists", &sig_ptr_ptr),
@@ -2907,6 +2962,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_io_file_size", &sig_ptr_ptr),
         ("nex_io_file_read_bytes", &sig_ptr_ptr3),
         ("nex_io_file_write_bytes", &sig_ptr_ptr3),
+        ("nex_io_file_append", &sig_ptr_ptr2),
         ("nex_io_mkdir", &sig_ptr_ptr),
         ("nex_io_list_dir", &sig_ptr_ptr),
         // std.path

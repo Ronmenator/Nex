@@ -94,3 +94,11 @@ pub unsafe extern "C" fn nex_str_reverse(s: *const c_char) -> *mut c_char {
     let reversed: String = cstr_to_str(s).chars().rev().collect();
     str_to_cstr(&reversed)
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_str_truncate(s: *const c_char, max_len: i64) -> *mut c_char {
+    let src = cstr_to_str(s);
+    let n = max_len.max(0) as usize;
+    let truncated: String = src.chars().take(n).collect();
+    str_to_cstr(&truncated)
+}
