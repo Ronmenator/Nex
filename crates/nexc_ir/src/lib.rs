@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use std::path::PathBuf;
 
@@ -121,6 +121,18 @@ struct IrLowering {
     builtin_operators: HashMap<(String, String), String>,
     /// (type_name, method_name) → (ffi_function_name, returns_value)
     builtin_methods: HashMap<(String, String), (String, bool)>,
+    /// Counter for generating unique lambda function names
+    lambda_counter: u32,
+    /// Synthesized lambda functions to be appended to the module
+    synthesized_functions: Vec<IrFunction>,
+    /// Async function names (calls to these get wrapped in nex_task_spawn)
+    async_functions: Vec<String>,
+    /// Enum names known in this module
+    known_enums: Vec<String>,
+    /// (enum_name, variant_name) → variant index (integer value)
+    enum_variants: HashMap<(String, String), i64>,
+    /// Variable names in the current function scope (for closure capture analysis)
+    current_scope_vars: HashSet<String>,
 }
 
 impl IrLowering {
@@ -139,6 +151,12 @@ impl IrLowering {
             class_fields: HashMap::new(),
             builtin_operators: HashMap::new(),
             builtin_methods: HashMap::new(),
+            lambda_counter: 0,
+            synthesized_functions: Vec::new(),
+            async_functions: Vec::new(),
+            known_enums: Vec::new(),
+            enum_variants: HashMap::new(),
+            current_scope_vars: HashSet::new(),
         }
     }
 
@@ -183,6 +201,12 @@ impl IrLowering {
         self.temp_counter = 0;
         self.block_counter = 0;
         self.pending_label = None;
+
+        // Seed scope vars with function parameter names (for closure capture analysis)
+        self.current_scope_vars.clear();
+        for p in &func.params {
+            self.current_scope_vars.insert(p.name.clone());
+        }
 
         // Track parameter types for operator overloading and method resolution
         for p in &func.params {
@@ -348,6 +372,7 @@ impl IrLowering {
                 self.emit(IrInstruction::Return(None));
             }
             Stmt::VarDecl(var) => {
+                self.current_scope_vars.insert(var.name.clone());
                 let dst = format!("%{}", var.name);
                 self.emit(IrInstruction::Allocate {
                     dst,
@@ -796,6 +821,27 @@ impl IrLowering {
                     }
                 }
 
+                // Check for async function call: wrap in nex_task_spawn
+                if let Expr::Identifier { name, .. } = callee.as_ref() {
+                    if self.async_functions.contains(name) && args.is_empty() {
+                        // Get function address
+                        let addr_reg = self.fresh_temp();
+                        self.emit(IrInstruction::Call {
+                            dst: Some(addr_reg.clone()),
+                            target: format!("__func_addr__{name}"),
+                            args: vec![],
+                        });
+                        // Spawn task
+                        let dst = self.fresh_temp();
+                        self.emit(IrInstruction::Call {
+                            dst: Some(dst.clone()),
+                            target: "nex_task_spawn".into(),
+                            args: vec![IrValue::Register(addr_reg)],
+                        });
+                        return IrValue::Register(dst);
+                    }
+                }
+
                 // Check for method calls on instances with known types
                 if let Expr::MemberAccess {
                     receiver,
@@ -898,6 +944,19 @@ impl IrLowering {
                 IrValue::Register(dst)
             }
             Expr::MemberAccess { receiver, name, .. } => {
+                // Check for enum variant access: Color.Red → Load %Color.Red
+                if let Expr::Identifier { name: recv_name, .. } = receiver.as_ref() {
+                    if self.known_enums.contains(recv_name) {
+                        if self.enum_variants.contains_key(&(recv_name.clone(), name.clone())) {
+                            let dst = self.fresh_temp();
+                            self.emit(IrInstruction::Load {
+                                dst: dst.clone(),
+                                src: format!("%{recv_name}.{name}"),
+                            });
+                            return IrValue::Register(dst);
+                        }
+                    }
+                }
                 // If the receiver has a known type and the field exists in
                 // class_fields, emit a Load from the namespaced global
                 // (e.g. self.tok_emb → Load %GPT.tok_emb).
@@ -924,9 +983,398 @@ impl IrLowering {
                 });
                 IrValue::Register(dst)
             }
+            Expr::Lambda { params, return_type, body, span } => {
+                // Lambda lifting with closure support.
+                // 1. Analyze free variables (captures)
+                // 2. Create a synthesized function with __env as first param
+                // 3. Inject capture loads at the top of the function body
+                // 4. At creation site, allocate closure + store captures
+
+                self.lambda_counter += 1;
+                let lambda_name = format!("__lambda_{}", self.lambda_counter);
+
+                // Free variable analysis: find identifiers referenced in the
+                // body that are local variables in the enclosing scope.
+                let mut bound: HashSet<String> = params.iter().map(|p| p.name.clone()).collect();
+                // Also treat known classes, enums, and async functions as bound
+                // (they're global names, not capturable variables)
+                for c in &self.known_classes { bound.insert(c.clone()); }
+                for e in &self.known_enums { bound.insert(e.clone()); }
+                for a in &self.async_functions { bound.insert(a.clone()); }
+
+                let all_free = collect_free_vars(body, &bound);
+                // Only capture variables that exist in the current function scope
+                let captures: Vec<String> = all_free
+                    .into_iter()
+                    .filter(|name| self.current_scope_vars.contains(name))
+                    .collect();
+
+                // Save current lowering state
+                let saved_blocks = std::mem::take(&mut self.blocks);
+                let saved_current = std::mem::take(&mut self.current_block);
+                let saved_temp = self.temp_counter;
+                let saved_block_counter = self.block_counter;
+                let saved_pending = self.pending_label.take();
+                let saved_scope_vars = std::mem::take(&mut self.current_scope_vars);
+
+                self.temp_counter = 0;
+                self.block_counter = 0;
+
+                // Inject capture loads at the top of the lambda body:
+                // For each captured variable, emit a call to nex_closure_get_cap
+                // and store the result in a local register with the same name.
+                for (i, cap_name) in captures.iter().enumerate() {
+                    let cap_reg = self.fresh_temp();
+                    self.emit(IrInstruction::Call {
+                        dst: Some(cap_reg.clone()),
+                        target: "nex_closure_get_cap".into(),
+                        args: vec![
+                            IrValue::Register("%__env".into()),
+                            IrValue::IntConst(i as i64),
+                        ],
+                    });
+                    self.emit(IrInstruction::Store {
+                        dst: format!("%{cap_name}"),
+                        src: IrValue::Register(cap_reg),
+                    });
+                }
+
+                // Lower the lambda body
+                match body.as_ref() {
+                    nexc_ast::Expr::Block(block) => {
+                        self.lower_block(block);
+                    }
+                    _ => {
+                        // Single expression body: lower and return it
+                        let val = self.lower_expr(body);
+                        self.emit(IrInstruction::Return(Some(val)));
+                    }
+                }
+
+                // Seal blocks
+                if !self.current_block.is_empty() || self.blocks.is_empty() {
+                    if !self.block_terminated() {
+                        self.emit(IrInstruction::Return(None));
+                    }
+                    self.seal_block("entry");
+                }
+
+                // Build params: __env first, then the lambda's declared params
+                let mut ir_params: Vec<(String, Type)> = vec![
+                    ("__env".into(), Type::Unknown),
+                ];
+                ir_params.extend(params.iter().map(|p| {
+                    let ty = p
+                        .type_hint
+                        .as_ref()
+                        .map(|t| type_expr_to_type(t))
+                        .unwrap_or(Type::Unknown);
+                    (p.name.clone(), ty)
+                }));
+
+                let ret_ty = return_type
+                    .as_ref()
+                    .map(|t| type_expr_to_type(t))
+                    .unwrap_or(Type::Unknown);
+
+                let lambda_fn = IrFunction {
+                    name: lambda_name.clone(),
+                    params: ir_params,
+                    return_type: ret_ty,
+                    blocks: std::mem::take(&mut self.blocks),
+                    span: Some(*span),
+                    file: None,
+                };
+                self.synthesized_functions.push(lambda_fn);
+
+                // Restore lowering state
+                self.blocks = saved_blocks;
+                self.current_block = saved_current;
+                self.temp_counter = saved_temp;
+                self.block_counter = saved_block_counter;
+                self.pending_label = saved_pending;
+                self.current_scope_vars = saved_scope_vars;
+
+                // Emit closure allocation at the creation site:
+                // 1. Get function address
+                let addr_reg = self.fresh_temp();
+                self.emit(IrInstruction::Call {
+                    dst: Some(addr_reg.clone()),
+                    target: format!("__func_addr__{lambda_name}"),
+                    args: vec![],
+                });
+                // 2. Allocate closure: nex_closure_alloc(func_ptr, n_captures)
+                let closure_reg = self.fresh_temp();
+                self.emit(IrInstruction::Call {
+                    dst: Some(closure_reg.clone()),
+                    target: "nex_closure_alloc".into(),
+                    args: vec![
+                        IrValue::Register(addr_reg),
+                        IrValue::IntConst(captures.len() as i64),
+                    ],
+                });
+                // 3. Store each captured value
+                for (i, cap_name) in captures.iter().enumerate() {
+                    self.emit(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_closure_set_cap".into(),
+                        args: vec![
+                            IrValue::Register(closure_reg.clone()),
+                            IrValue::IntConst(i as i64),
+                            IrValue::Register(format!("%{cap_name}")),
+                        ],
+                    });
+                }
+                IrValue::Register(closure_reg)
+            }
+            Expr::Await { expr, .. } => {
+                // Lower the expression (should be a task handle)
+                let handle = self.lower_expr(expr);
+                let dst = self.fresh_temp();
+                self.emit(IrInstruction::Call {
+                    dst: Some(dst.clone()),
+                    target: "nex_task_await".into(),
+                    args: vec![handle],
+                });
+                IrValue::Register(dst)
+            }
             Expr::Block(block) => {
                 self.lower_block(block);
                 IrValue::NullConst
+            }
+            Expr::StringInterp { parts, .. } => {
+                // Lower to chain of string concatenations
+                let mut result: Option<IrValue> = None;
+                for part in parts {
+                    let part_val = match part {
+                        nexc_ast::StringInterpPart::Literal(s) => {
+                            IrValue::StringConst(s.clone())
+                        }
+                        nexc_ast::StringInterpPart::Expr(e) => {
+                            let val = self.lower_expr(e);
+                            // coerce to string via add with empty string
+                            let coerced = self.fresh_temp();
+                            self.emit(IrInstruction::BinOp {
+                                dst: coerced.clone(),
+                                op: "add".into(),
+                                lhs: IrValue::StringConst(String::new()),
+                                rhs: val,
+                            });
+                            IrValue::Register(coerced)
+                        }
+                    };
+                    result = Some(match result {
+                        None => part_val,
+                        Some(acc) => {
+                            let cat = self.fresh_temp();
+                            self.emit(IrInstruction::BinOp {
+                                dst: cat.clone(),
+                                op: "add".into(),
+                                lhs: acc,
+                                rhs: part_val,
+                            });
+                            IrValue::Register(cat)
+                        }
+                    });
+                }
+                result.unwrap_or(IrValue::StringConst(String::new()))
+            }
+            Expr::Ternary { condition, then_expr, else_expr, .. } => {
+                let cond_val = self.lower_expr(condition);
+                let then_label = self.fresh_label();
+                let else_label = self.fresh_label();
+                let merge_label = self.fresh_label();
+                let result_reg = self.fresh_temp();
+
+                self.emit(IrInstruction::Branch {
+                    cond: cond_val,
+                    then_label: then_label.clone(),
+                    else_label: else_label.clone(),
+                });
+                let pre_tern_label = self.fresh_label();
+                self.seal_block(&pre_tern_label);
+
+                // Then branch — set pending_label so the block gets the right name
+                self.pending_label = Some(then_label.clone());
+                let then_val = self.lower_expr(then_expr);
+                self.emit(IrInstruction::Store {
+                    dst: result_reg.clone(),
+                    src: then_val,
+                });
+                self.emit(IrInstruction::Jump {
+                    target: merge_label.clone(),
+                });
+                self.seal_block(&then_label);
+
+                // Else branch — set pending_label so the block gets the right name
+                self.pending_label = Some(else_label.clone());
+                let else_val = self.lower_expr(else_expr);
+                self.emit(IrInstruction::Store {
+                    dst: result_reg.clone(),
+                    src: else_val,
+                });
+                self.emit(IrInstruction::Jump {
+                    target: merge_label.clone(),
+                });
+                self.seal_block(&else_label);
+
+                self.pending_label = Some(merge_label);
+                IrValue::Register(result_reg)
+            }
+            Expr::Match { scrutinee, arms, .. } => {
+                let scrut_val = self.lower_expr(scrutinee);
+                let scrut_reg = self.fresh_temp();
+                self.emit(IrInstruction::Store {
+                    dst: scrut_reg.clone(),
+                    src: scrut_val,
+                });
+
+                let result_reg = self.fresh_temp();
+                let merge_label = self.fresh_label();
+
+                let mut arm_labels = Vec::new();
+                let mut next_labels = Vec::new();
+                for _i in 0..arms.len() {
+                    arm_labels.push(self.fresh_label());
+                    next_labels.push(self.fresh_label());
+                }
+
+                for (i, arm) in arms.iter().enumerate() {
+                    if i == 0 {
+                        // First arm: fall through from scrutinee evaluation
+                    } else {
+                        self.pending_label = Some(next_labels[i - 1].clone());
+                    }
+
+                    let scrut_load = IrValue::Register(scrut_reg.clone());
+                    let check_label = self.fresh_label();
+
+                    match &arm.pattern {
+                        nexc_ast::Pattern::Wildcard(_) => {
+                            self.emit(IrInstruction::Jump {
+                                target: arm_labels[i].clone(),
+                            });
+                            self.seal_block(&check_label);
+                        }
+                        nexc_ast::Pattern::Binding(name, _) => {
+                            self.emit(IrInstruction::Store {
+                                dst: format!("%{name}"),
+                                src: scrut_load,
+                            });
+                            if let Some(guard) = &arm.guard {
+                                let guard_val = self.lower_expr(guard);
+                                let fail_label = if i + 1 < arms.len() {
+                                    next_labels[i].clone()
+                                } else {
+                                    merge_label.clone()
+                                };
+                                self.emit(IrInstruction::Branch {
+                                    cond: guard_val,
+                                    then_label: arm_labels[i].clone(),
+                                    else_label: fail_label,
+                                });
+                                self.seal_block(&check_label);
+                            } else {
+                                self.emit(IrInstruction::Jump {
+                                    target: arm_labels[i].clone(),
+                                });
+                                self.seal_block(&check_label);
+                            }
+                        }
+                        nexc_ast::Pattern::Literal(lit, _) => {
+                            let lit_val = match lit {
+                                nexc_ast::Literal::Int(v) => IrValue::IntConst(*v),
+                                nexc_ast::Literal::Float(v) => IrValue::FloatConst(*v),
+                                nexc_ast::Literal::Bool(v) => IrValue::BoolConst(*v),
+                                nexc_ast::Literal::String(v) => IrValue::StringConst(v.clone()),
+                                nexc_ast::Literal::Char(c) => IrValue::IntConst(*c as i64),
+                                nexc_ast::Literal::Null => IrValue::NullConst,
+                            };
+                            let cmp_reg = self.fresh_temp();
+                            let is_string = matches!(lit, nexc_ast::Literal::String(_));
+                            if is_string {
+                                self.emit(IrInstruction::Call {
+                                    dst: Some(cmp_reg.clone()),
+                                    target: "nex_str_eq".into(),
+                                    args: vec![scrut_load, lit_val],
+                                });
+                            } else {
+                                self.emit(IrInstruction::BinOp {
+                                    dst: cmp_reg.clone(),
+                                    op: "eq".into(),
+                                    lhs: scrut_load,
+                                    rhs: lit_val,
+                                });
+                            }
+
+                            let mut match_cond = IrValue::Register(cmp_reg);
+
+                            if let Some(guard) = &arm.guard {
+                                let guard_val = self.lower_expr(guard);
+                                let and_reg = self.fresh_temp();
+                                self.emit(IrInstruction::BinOp {
+                                    dst: and_reg.clone(),
+                                    op: "and".into(),
+                                    lhs: match_cond,
+                                    rhs: guard_val,
+                                });
+                                match_cond = IrValue::Register(and_reg);
+                            }
+
+                            let fail_label = if i + 1 < arms.len() {
+                                next_labels[i].clone()
+                            } else {
+                                merge_label.clone()
+                            };
+                            self.emit(IrInstruction::Branch {
+                                cond: match_cond,
+                                then_label: arm_labels[i].clone(),
+                                else_label: fail_label,
+                            });
+                            self.seal_block(&check_label);
+                        }
+                        nexc_ast::Pattern::EnumVariant { enum_name, variant, .. } => {
+                            let variant_idx = self.enum_variants
+                                .get(&(enum_name.clone(), variant.clone()))
+                                .copied()
+                                .unwrap_or(0);
+                            let cmp_reg = self.fresh_temp();
+                            self.emit(IrInstruction::BinOp {
+                                dst: cmp_reg.clone(),
+                                op: "eq".into(),
+                                lhs: scrut_load,
+                                rhs: IrValue::IntConst(variant_idx),
+                            });
+
+                            let fail_label = if i + 1 < arms.len() {
+                                next_labels[i].clone()
+                            } else {
+                                merge_label.clone()
+                            };
+                            self.emit(IrInstruction::Branch {
+                                cond: IrValue::Register(cmp_reg),
+                                then_label: arm_labels[i].clone(),
+                                else_label: fail_label,
+                            });
+                            self.seal_block(&check_label);
+                        }
+                    }
+
+                    // Arm body — set pending_label so the block gets the right name
+                    self.pending_label = Some(arm_labels[i].clone());
+                    let body_val = self.lower_expr(&arm.body);
+                    self.emit(IrInstruction::Store {
+                        dst: result_reg.clone(),
+                        src: body_val,
+                    });
+                    self.emit(IrInstruction::Jump {
+                        target: merge_label.clone(),
+                    });
+                    self.seal_block(&arm_labels[i]);
+                }
+
+                self.pending_label = Some(merge_label);
+                IrValue::Register(result_reg)
             }
             Expr::Unsupported { raw, .. } => {
                 self.emit(IrInstruction::EmitDiag {
@@ -1204,6 +1652,178 @@ fn list_method_to_ffi(method: &str) -> Option<&str> {
     }
 }
 
+/// Collect free variables from a lambda body expression.
+/// Returns identifier names that are not bound by the lambda parameters
+/// or locally declared inside the body.
+fn collect_free_vars(
+    expr: &nexc_ast::Expr,
+    bound: &HashSet<String>,
+) -> Vec<String> {
+    let mut free = Vec::new();
+    let mut seen = HashSet::new();
+    collect_free_vars_expr(expr, bound, &mut free, &mut seen);
+    free
+}
+
+fn collect_free_vars_expr(
+    expr: &nexc_ast::Expr,
+    bound: &HashSet<String>,
+    free: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+) {
+    use nexc_ast::Expr;
+    match expr {
+        Expr::Identifier { name, .. } => {
+            if !bound.contains(name) && seen.insert(name.clone()) {
+                free.push(name.clone());
+            }
+        }
+        Expr::Literal { .. } | Expr::Unsupported { .. } => {}
+        Expr::StringInterp { parts, .. } => {
+            for part in parts {
+                if let nexc_ast::StringInterpPart::Expr(e) = part {
+                    collect_free_vars_expr(e, bound, free, seen);
+                }
+            }
+        }
+        Expr::Ternary { condition, then_expr, else_expr, .. } => {
+            collect_free_vars_expr(condition, bound, free, seen);
+            collect_free_vars_expr(then_expr, bound, free, seen);
+            collect_free_vars_expr(else_expr, bound, free, seen);
+        }
+        Expr::Match { scrutinee, arms, .. } => {
+            collect_free_vars_expr(scrutinee, bound, free, seen);
+            for arm in arms {
+                // Binding patterns introduce new bound variables for the arm body
+                let mut arm_bound = bound.clone();
+                if let nexc_ast::Pattern::Binding(name, _) = &arm.pattern {
+                    arm_bound.insert(name.clone());
+                }
+                if let Some(guard) = &arm.guard {
+                    collect_free_vars_expr(guard, &arm_bound, free, seen);
+                }
+                collect_free_vars_expr(&arm.body, &arm_bound, free, seen);
+            }
+        }
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_free_vars_expr(lhs, bound, free, seen);
+            collect_free_vars_expr(rhs, bound, free, seen);
+        }
+        Expr::Unary { expr: e, .. } => {
+            collect_free_vars_expr(e, bound, free, seen);
+        }
+        Expr::Assign { target, value, .. } => {
+            collect_free_vars_expr(target, bound, free, seen);
+            collect_free_vars_expr(value, bound, free, seen);
+        }
+        Expr::Call { callee, args, .. } => {
+            collect_free_vars_expr(callee, bound, free, seen);
+            for arg in args {
+                collect_free_vars_expr(arg, bound, free, seen);
+            }
+        }
+        Expr::MemberAccess { receiver, .. } => {
+            collect_free_vars_expr(receiver, bound, free, seen);
+        }
+        Expr::Lambda { params, body, .. } => {
+            // Nested lambda: its own params are bound inside it
+            let mut inner_bound = bound.clone();
+            for p in params {
+                inner_bound.insert(p.name.clone());
+            }
+            collect_free_vars_expr(body, &inner_bound, free, seen);
+        }
+        Expr::Await { expr: e, .. } => {
+            collect_free_vars_expr(e, bound, free, seen);
+        }
+        Expr::Block(block) => {
+            collect_free_vars_block(block, bound, free, seen);
+        }
+    }
+}
+
+fn collect_free_vars_block(
+    block: &nexc_ast::Block,
+    bound: &HashSet<String>,
+    free: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+) {
+    // Block introduces a scope — locally declared vars become bound
+    let mut local_bound = bound.clone();
+    for stmt in &block.statements {
+        collect_free_vars_stmt(stmt, &mut local_bound, free, seen);
+    }
+}
+
+fn collect_free_vars_stmt(
+    stmt: &nexc_ast::Stmt,
+    bound: &mut HashSet<String>,
+    free: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+) {
+    use nexc_ast::Stmt;
+    match stmt {
+        Stmt::Expr(expr) => collect_free_vars_expr(expr, bound, free, seen),
+        Stmt::Return(Some(expr), _) | Stmt::Throw(expr, _) => {
+            collect_free_vars_expr(expr, bound, free, seen);
+        }
+        Stmt::Return(None, _) | Stmt::Continue(_) | Stmt::Break(_) => {}
+        Stmt::VarDecl(vd) => {
+            if let Some(init) = &vd.initializer {
+                collect_free_vars_expr(init, bound, free, seen);
+            }
+            bound.insert(vd.name.clone());
+        }
+        Stmt::Using(u) => {
+            collect_free_vars_expr(&u.expr, bound, free, seen);
+            collect_free_vars_block(&u.body, bound, free, seen);
+        }
+        Stmt::If(if_stmt) => {
+            collect_free_vars_expr(&if_stmt.condition, bound, free, seen);
+            collect_free_vars_stmt(&if_stmt.then_branch, bound, free, seen);
+            if let Some(else_branch) = &if_stmt.else_branch {
+                collect_free_vars_stmt(else_branch, bound, free, seen);
+            }
+        }
+        Stmt::While(w) => {
+            collect_free_vars_expr(&w.condition, bound, free, seen);
+            collect_free_vars_stmt(&w.body, bound, free, seen);
+        }
+        Stmt::For(f) => {
+            if let Some(init) = &f.init {
+                collect_free_vars_expr(init, bound, free, seen);
+            }
+            if let Some(cond) = &f.condition {
+                collect_free_vars_expr(cond, bound, free, seen);
+            }
+            if let Some(step) = &f.step {
+                collect_free_vars_expr(step, bound, free, seen);
+            }
+            if let Some((var_name, iterable)) = &f.for_each {
+                collect_free_vars_expr(iterable, bound, free, seen);
+                bound.insert(var_name.clone());
+            }
+            collect_free_vars_stmt(&f.body, bound, free, seen);
+        }
+        Stmt::Try(t) => {
+            collect_free_vars_block(&t.body, bound, free, seen);
+            for catch in &t.catches {
+                let mut catch_bound = bound.clone();
+                if let Some(var) = &catch.variable_name {
+                    catch_bound.insert(var.clone());
+                }
+                collect_free_vars_block(&catch.body, &catch_bound, free, &mut seen.clone());
+            }
+            if let Some(finally) = &t.finally {
+                collect_free_vars_block(finally, bound, free, seen);
+            }
+        }
+        Stmt::Block(block) => {
+            collect_free_vars_block(block, bound, free, seen);
+        }
+    }
+}
+
 fn type_expr_to_type(te: &nexc_ast::TypeExpr) -> Type {
     match &te.kind {
         nexc_ast::TypeExprKind::Named(n) => match n.as_str() {
@@ -1257,11 +1877,23 @@ pub fn lower_typed_module_with_prefix(
 
     let file_path = PathBuf::from(&typed.file.path);
 
-    // Pre-populate known class/struct names for method resolution.
+    // Pre-populate known class/struct/enum/async names for method resolution.
     for item in &typed.file.items {
         match item {
             nexc_ast::Item::Class(c) => lowering.known_classes.push(c.name.clone()),
             nexc_ast::Item::Struct(s) => lowering.known_classes.push(s.name.clone()),
+            nexc_ast::Item::Function(f) if f.is_async => {
+                lowering.async_functions.push(f.name.clone());
+            }
+            nexc_ast::Item::Enum(e) => {
+                lowering.known_enums.push(e.name.clone());
+                for (i, variant) in e.variants.iter().enumerate() {
+                    lowering.enum_variants.insert(
+                        (e.name.clone(), variant.name.clone()),
+                        i as i64,
+                    );
+                }
+            }
             _ => {}
         }
     }
@@ -1429,6 +2061,18 @@ pub fn lower_typed_module_with_prefix(
                     }
                 }
             }
+            nexc_ast::Item::Enum(e) => {
+                for (i, variant) in e.variants.iter().enumerate() {
+                    let gname = format!("%{}.{}", e.name, variant.name);
+                    if !globals.contains(&gname) {
+                        globals.push(gname.clone());
+                    }
+                    init_instructions.push(IrInstruction::Store {
+                        dst: gname,
+                        src: IrValue::IntConst(i as i64),
+                    });
+                }
+            }
             _ => {}
         }
     }
@@ -1594,18 +2238,34 @@ pub fn lower_typed_module_with_prefix(
     // field types so the codegen knows e.g. `%Node.name` is a String.
     let mut types = typed.types.clone();
     for item in &typed.file.items {
-        let (class_name, fields) = match item {
-            nexc_ast::Item::Class(c) => (&c.name, &c.fields),
-            nexc_ast::Item::Struct(s) => (&s.name, &s.fields),
-            _ => continue,
-        };
-        for field in fields {
-            if let Some(ty_expr) = &field.ty {
-                let ty = type_expr_to_type(ty_expr);
-                types.insert(format!("{class_name}.{}", field.name), ty);
+        match item {
+            nexc_ast::Item::Class(c) => {
+                for field in &c.fields {
+                    if let Some(ty_expr) = &field.ty {
+                        let ty = type_expr_to_type(ty_expr);
+                        types.insert(format!("{}.{}", c.name, field.name), ty);
+                    }
+                }
             }
+            nexc_ast::Item::Struct(s) => {
+                for field in &s.fields {
+                    if let Some(ty_expr) = &field.ty {
+                        let ty = type_expr_to_type(ty_expr);
+                        types.insert(format!("{}.{}", s.name, field.name), ty);
+                    }
+                }
+            }
+            nexc_ast::Item::Enum(e) => {
+                for variant in &e.variants {
+                    types.insert(format!("{}.{}", e.name, variant.name), Type::Int);
+                }
+            }
+            _ => {}
         }
     }
+
+    // Append synthesized lambda functions
+    functions.extend(lowering.synthesized_functions.drain(..));
 
     IrModule {
         name: typed.file.path.clone(),

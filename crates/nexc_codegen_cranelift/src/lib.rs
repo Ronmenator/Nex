@@ -143,6 +143,7 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_println_char);
 
     sym!(nex_str_concat);
+    sym!(nex_str_eq);
     sym!(nex_int_to_str);
     sym!(nex_double_to_str);
     sym!(nex_bool_to_str);
@@ -291,6 +292,17 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_mutex_lock);
     sym!(nex_mutex_unlock);
     sym!(nex_mutex_free);
+
+    // std.async
+    sym!(nex_task_spawn);
+    sym!(nex_task_await);
+    sym!(nex_task_is_done);
+
+    // std.closure
+    sym!(nex_closure_alloc);
+    sym!(nex_closure_set_cap);
+    sym!(nex_closure_get_cap);
+    sym!(nex_closure_get_fn);
 
     // std.logging
     sym!(nex_log_debug);
@@ -1351,6 +1363,27 @@ fn emit_instruction<M: Module>(
                 return false;
             }
 
+            // Handle __func_addr__<name>: get function pointer as i64
+            if target.starts_with("__func_addr__") {
+                let real_name = &target["__func_addr__".len()..];
+                let resolved_fid = func_ids.get(real_name).copied().or_else(|| {
+                    func_ids.iter()
+                        .find(|(k, _)| k.ends_with(&format!("::{real_name}")))
+                        .map(|(_, &id)| id)
+                });
+                if let Some(fid) = resolved_fid {
+                    let func_ref = module.declare_func_in_func(fid, builder.func);
+                    let addr = builder.ins().func_addr(types::I64, func_ref);
+                    if let Some(d) = dst {
+                        set_var(builder, module, d, addr, vars, global_data);
+                    }
+                } else if let Some(d) = dst {
+                    let z = builder.ins().iconst(types::I64, 0);
+                    set_var(builder, module, d, z, vars, global_data);
+                }
+                return false;
+            }
+
             let arg_vals: Vec<cranelift_codegen::ir::Value> = args
                 .iter()
                 .map(|a| resolve_value(builder, module, a, vars, strings, func_ids, global_data))
@@ -1374,9 +1407,41 @@ fn emit_instruction<M: Module>(
                     };
                     set_var(builder, module, d, rv, vars, global_data);
                 }
-            } else if let Some(d) = dst {
-                let z = builder.ins().iconst(types::I64, 0);
-                set_var(builder, module, d, z, vars, global_data);
+            } else {
+                // Unknown function — check if it's a variable holding a closure
+                // (lambda/closure call via call_indirect).
+                // Closure layout: [func_ptr, n_captures, cap0, ...]
+                // The lifted function takes __env (closure ptr) as first arg.
+                let var_name = format!("%{target}");
+                if vars.contains_key(&var_name) {
+                    let closure_ptr = resolve_value(builder, module, &IrValue::Register(var_name), vars, strings, func_ids, global_data);
+                    // Load func_ptr from closure[0]
+                    let func_ptr = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::trusted(), closure_ptr, 0);
+                    // Build a call signature: __env (i64) + all original args, returns i64
+                    let mut sig = module.make_signature();
+                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64)); // __env
+                    for _ in &arg_vals {
+                        sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    }
+                    sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    let sig_ref = builder.import_signature(sig);
+                    // Prepend closure_ptr as __env argument
+                    let mut all_args = vec![closure_ptr];
+                    all_args.extend(arg_vals);
+                    let call = builder.ins().call_indirect(sig_ref, func_ptr, &all_args);
+                    if let Some(d) = dst {
+                        let results = builder.inst_results(call);
+                        let rv = if !results.is_empty() {
+                            results[0]
+                        } else {
+                            builder.ins().iconst(types::I64, 0)
+                        };
+                        set_var(builder, module, d, rv, vars, global_data);
+                    }
+                } else if let Some(d) = dst {
+                    let z = builder.ins().iconst(types::I64, 0);
+                    set_var(builder, module, d, z, vars, global_data);
+                }
             }
             false
         }
@@ -2624,6 +2689,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_print_char", &sig_void_ptr),
         ("nex_println_char", &sig_void_ptr),
         ("nex_str_concat", &sig_ptr_ptr2),
+        ("nex_str_eq", &sig_ptr_ptr2),
         ("nex_int_to_str", &sig_ptr_ptr),
         ("nex_double_to_str", &sig_f64_ret_i64),
         ("nex_bool_to_str", &sig_ptr_ptr),
@@ -2775,6 +2841,15 @@ fn declare_runtime_imports<M: Module>(
         ("nex_mutex_lock", &sig_void_ptr),
         ("nex_mutex_unlock", &sig_void_ptr),
         ("nex_mutex_free", &sig_void_ptr),
+        // std.async
+        ("nex_task_spawn", &sig_ptr_ptr),
+        ("nex_task_await", &sig_ptr_ptr),
+        ("nex_task_is_done", &sig_ptr_ptr),
+        // std.closure
+        ("nex_closure_alloc", &sig_ptr_ptr2),
+        ("nex_closure_set_cap", &sig_void_ptr3),
+        ("nex_closure_get_cap", &sig_ptr_ptr2),
+        ("nex_closure_get_fn", &sig_ptr_ptr),
         // std.crypto
         ("nex_crypto_sha256", &sig_ptr_ptr),
         ("nex_crypto_sha512", &sig_ptr_ptr),

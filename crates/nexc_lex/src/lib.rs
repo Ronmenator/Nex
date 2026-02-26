@@ -86,6 +86,11 @@ pub enum TokenKind {
     Class,
     Struct,
     Interface,
+    Enum,
+    Async,
+    Await,
+    Match,
+    InterpolatedString,
     Def,
     If,
     Else,
@@ -134,6 +139,7 @@ pub fn should_insert_terminator(kind: &TokenKind) -> bool {
             | TokenKind::BooleanLiteral
             | TokenKind::NullLiteral
             | TokenKind::CharLiteral
+            | TokenKind::InterpolatedString
             | TokenKind::RParen
             | TokenKind::RBracket
             | TokenKind::RBrace
@@ -284,6 +290,9 @@ impl Lexer {
                 }
                 b'\r' | b'\n' => {
                     self.emit_newline(&mut tokens);
+                }
+                b'$' if self.pos + 1 < self.len && self.source[self.pos + 1] == b'"' => {
+                    tokens.push(self.scan_interpolated_string(sink));
                 }
                 b'"' => {
                     tokens.push(self.scan_string(sink));
@@ -813,6 +822,98 @@ impl Lexer {
         )
     }
 
+    fn scan_interpolated_string(&mut self, sink: &mut DiagnosticSink) -> Token {
+        let start = self.pos;
+        self.pos += 2; // skip '$"'
+        let mut brace_depth: u32 = 0;
+        let mut escaped = false;
+        let mut in_inner_string = false;
+
+        while self.pos < self.len {
+            let ch = self.source[self.pos];
+
+            if escaped {
+                escaped = false;
+                self.pos += 1;
+                continue;
+            }
+
+            if ch == b'\\' {
+                escaped = true;
+                self.pos += 1;
+                continue;
+            }
+
+            // Inside a nested string within {expr}, skip until closing quote
+            if in_inner_string {
+                if ch == b'"' {
+                    in_inner_string = false;
+                }
+                self.pos += 1;
+                continue;
+            }
+
+            if brace_depth > 0 && ch == b'"' {
+                in_inner_string = true;
+                self.pos += 1;
+                continue;
+            }
+
+            if ch == b'{' {
+                brace_depth += 1;
+                self.pos += 1;
+                continue;
+            }
+
+            if ch == b'}' {
+                brace_depth = brace_depth.saturating_sub(1);
+                self.pos += 1;
+                continue;
+            }
+
+            if ch == b'"' && brace_depth == 0 {
+                self.pos += 1; // consume closing "
+                break;
+            }
+
+            if ch == b'\r' || ch == b'\n' {
+                sink.push(Diagnostic {
+                    id: "lex_interp_string_newline".to_string(),
+                    severity: Severity::Error,
+                    span: Some(Span::new(start, self.pos)),
+                    file: self.file.clone().map(PathBuf::from),
+                    message: "newline in interpolated string literal".to_string(),
+                    notes: Vec::new(),
+                    suggestions: Vec::new(),
+                });
+                break;
+            }
+
+            self.pos += 1;
+        }
+
+        if self.pos <= start + 2 || self.source.get(self.pos - 1).copied() != Some(b'"') {
+            sink.push(Diagnostic {
+                id: "lex_interp_string_unterminated".to_string(),
+                severity: Severity::Error,
+                span: Some(Span::new(start, self.len)),
+                file: self.file.clone().map(PathBuf::from),
+                message: "unterminated interpolated string literal".to_string(),
+                notes: Vec::new(),
+                suggestions: Vec::new(),
+            });
+        }
+
+        Token::new(
+            TokenKind::InterpolatedString,
+            start,
+            self.pos.min(self.len),
+            std::str::from_utf8(&self.source[start..self.pos.min(self.len)])
+                .unwrap_or("")
+                .to_string(),
+        )
+    }
+
     fn scan_multi_or_single(
         &mut self,
         tail: &[u8],
@@ -868,6 +969,10 @@ fn token_kind_for_identifier(name: &str) -> TokenKind {
         "class" => TokenKind::Class,
         "struct" => TokenKind::Struct,
         "interface" => TokenKind::Interface,
+        "enum" => TokenKind::Enum,
+        "async" => TokenKind::Async,
+        "await" => TokenKind::Await,
+        "match" => TokenKind::Match,
         "def" => TokenKind::Def,
         "if" => TokenKind::If,
         "else" => TokenKind::Else,

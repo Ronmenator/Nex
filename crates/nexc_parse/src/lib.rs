@@ -49,8 +49,17 @@ impl Parser {
                 Some(TokenKind::Struct) => {
                     file.items.push(Item::Struct(self.parse_struct(false)));
                 }
+                Some(TokenKind::Enum) => {
+                    file.items.push(Item::Enum(self.parse_enum(false)));
+                }
                 Some(TokenKind::Interface) => {
                     file.items.push(Item::Interface(self.parse_interface(false)));
+                }
+                Some(TokenKind::Async) => {
+                    self.advance(); // consume `async`
+                    let mut func = self.parse_function(false, false);
+                    func.is_async = true;
+                    file.items.push(Item::Function(func));
                 }
                 Some(TokenKind::Def)
                 | Some(TokenKind::Virtual)
@@ -77,8 +86,17 @@ impl Parser {
                         Some(TokenKind::Struct) => {
                             file.items.push(Item::Struct(self.parse_struct(true)));
                         }
+                        Some(TokenKind::Enum) => {
+                            file.items.push(Item::Enum(self.parse_enum(true)));
+                        }
                         Some(TokenKind::Interface) => {
                             file.items.push(Item::Interface(self.parse_interface(true)));
+                        }
+                        Some(TokenKind::Async) => {
+                            self.advance(); // consume `async`
+                            let mut func = self.parse_function(true, false);
+                            func.is_async = true;
+                            file.items.push(Item::Function(func));
                         }
                         Some(TokenKind::Def)
                         | Some(TokenKind::Virtual)
@@ -418,6 +436,120 @@ impl Parser {
         }
     }
 
+    fn parse_enum(&mut self, is_public: bool) -> EnumDecl {
+        let span = self.current_span();
+        self.advance(); // consume `enum`
+        let name = self.consume_identifier().unwrap_or_else(|| {
+            self.push_error("expected enum name");
+            "Enum".to_string()
+        });
+
+        if !self.consume_if(&TokenKind::LBrace) {
+            self.push_error("expected '{' after enum name");
+            self.recover_to_item_boundary();
+            return EnumDecl {
+                name,
+                visibility: if is_public {
+                    Visibility::Public
+                } else {
+                    Visibility::Internal
+                },
+                variants: Vec::new(),
+                span,
+            };
+        }
+
+        let mut variants = Vec::new();
+
+        while !self.is_eof() {
+            self.skip_terminators();
+            if self.consume_if(&TokenKind::RBrace) {
+                break;
+            }
+
+            let variant_span = self.current_span();
+            if let Some(variant_name) = self.consume_identifier() {
+                variants.push(EnumVariant {
+                    name: variant_name,
+                    span: variant_span,
+                });
+                // Allow optional comma between variants
+                self.consume_if(&TokenKind::Comma);
+            } else {
+                self.push_error("expected variant name in enum body");
+                self.recover_to_block_boundary();
+            }
+        }
+
+        EnumDecl {
+            name,
+            visibility: if is_public {
+                Visibility::Public
+            } else {
+                Visibility::Internal
+            },
+            variants,
+            span,
+        }
+    }
+
+    fn parse_lambda(&mut self) -> Expr {
+        let span = self.current_span();
+        self.advance(); // consume opening `|`
+
+        // Parse parameters delimited by closing `|`
+        let mut params = Vec::new();
+        if !self.consume_if(&TokenKind::Pipe) {
+            // Not an empty param list — parse params until `|`
+            while !self.is_eof() {
+                let param_span = self.current_span();
+                let name = self.consume_identifier().unwrap_or_else(|| {
+                    self.push_error("expected parameter name in lambda");
+                    "param".to_string()
+                });
+                let type_hint = if self.consume_if(&TokenKind::Colon) {
+                    self.parse_type_expr()
+                } else {
+                    None
+                };
+                params.push(ParamDecl {
+                    name,
+                    type_hint,
+                    span: param_span,
+                });
+                if self.consume_if(&TokenKind::Comma) {
+                    continue;
+                }
+                break;
+            }
+            if !self.consume_if(&TokenKind::Pipe) {
+                self.push_error("expected '|' after lambda parameters");
+            }
+        }
+
+        // Optional return type
+        let return_type = if self.consume_if(&TokenKind::Arrow) {
+            self.parse_type_expr()
+        } else {
+            None
+        };
+
+        // Body: either a block `{ ... }` or a single expression
+        let body = if matches!(self.peek_kind(), Some(TokenKind::LBrace)) {
+            self.advance();
+            Expr::Block(self.parse_block())
+        } else {
+            self.parse_expression()
+        };
+
+        Expr::Lambda {
+            params,
+            return_type,
+            body: Box::new(body),
+            span,
+        }
+    }
+
     fn parse_function(&mut self, is_public: bool, signature_only: bool) -> FunctionDecl {
         let span = self.current_span();
         let mut is_virtual = false;
@@ -493,6 +625,7 @@ impl Parser {
             is_virtual,
             is_override,
             is_static,
+            is_async: false,
             operator,
             body,
             span,
@@ -987,6 +1120,7 @@ impl Parser {
                 Some(TokenKind::MinusEq) => Some((1, 1, PrattInfix::Assign(AssignOp::SubAssign))),
                 Some(TokenKind::StarEq) => Some((1, 1, PrattInfix::Assign(AssignOp::MulAssign))),
                 Some(TokenKind::SlashEq) => Some((1, 1, PrattInfix::Assign(AssignOp::DivAssign))),
+                Some(TokenKind::If) => Some((2, 1, PrattInfix::Ternary)),
                 Some(TokenKind::OrOr) => Some((2, 3, PrattInfix::Binary(BinaryOp::Or))),
                 Some(TokenKind::AndAnd) => Some((4, 5, PrattInfix::Binary(BinaryOp::And))),
                 Some(TokenKind::EqEq) => Some((6, 7, PrattInfix::Binary(BinaryOp::EqEq))),
@@ -1034,6 +1168,26 @@ impl Parser {
                         op,
                         lhs: Box::new(lhs),
                         rhs: Box::new(rhs),
+                        span,
+                    };
+                }
+                PrattInfix::Ternary => {
+                    // Python-style: then_expr if condition else else_expr
+                    // lhs is the then_expr
+                    self.advance(); // consume 'if'
+                    let condition = self.parse_expression_bp(3); // parse condition (higher than ternary bp to avoid recursion)
+                    if !self.consume_if(&TokenKind::Else) {
+                        self.push_error("expected 'else' in ternary expression");
+                    }
+                    let else_expr = self.parse_expression_bp(r_bp); // right-associative for chaining
+                    let span = Span::new(
+                        expr_span(&lhs).lo,
+                        expr_span(&else_expr).hi,
+                    );
+                    lhs = Expr::Ternary {
+                        then_expr: Box::new(lhs),
+                        condition: Box::new(condition),
+                        else_expr: Box::new(else_expr),
                         span,
                     };
                 }
@@ -1272,6 +1426,25 @@ impl Parser {
                 self.advance();
                 Expr::Block(self.parse_block())
             }
+            Some(TokenKind::Pipe) => {
+                self.parse_lambda()
+            }
+            Some(TokenKind::InterpolatedString) => {
+                let token = self.advance();
+                self.parse_interpolated_string(&token)
+            }
+            Some(TokenKind::Match) => {
+                self.parse_match_expr()
+            }
+            Some(TokenKind::Await) => {
+                let span = self.current_span();
+                self.advance(); // consume `await`
+                let expr = self.parse_expression();
+                Expr::Await {
+                    expr: Box::new(expr),
+                    span,
+                }
+            }
             Some(tok) => {
                 let token = self.advance();
                 self.push_error(&format!("unexpected token in expression: {tok:?}"));
@@ -1285,6 +1458,296 @@ impl Parser {
                 span: self.current_span(),
             },
         }
+    }
+
+    fn parse_interpolated_string(&mut self, token: &Token) -> Expr {
+        let raw = &token.lexeme;
+        // Strip $" prefix and " suffix
+        let inner = if raw.starts_with("$\"") && raw.ends_with('"') && raw.len() >= 3 {
+            &raw[2..raw.len() - 1]
+        } else {
+            // Malformed — return empty string
+            return Expr::StringInterp {
+                parts: vec![],
+                span: token.span,
+            };
+        };
+
+        let mut parts: Vec<StringInterpPart> = Vec::new();
+        let bytes = inner.as_bytes();
+        let mut i = 0;
+        let mut literal_buf = String::new();
+
+        while i < bytes.len() {
+            if bytes[i] == b'\\' && i + 1 < bytes.len() {
+                // Handle escape sequences
+                match bytes[i + 1] {
+                    b'n' => literal_buf.push('\n'),
+                    b't' => literal_buf.push('\t'),
+                    b'r' => literal_buf.push('\r'),
+                    b'\\' => literal_buf.push('\\'),
+                    b'"' => literal_buf.push('"'),
+                    b'{' => literal_buf.push('{'),
+                    b'}' => literal_buf.push('}'),
+                    other => {
+                        literal_buf.push('\\');
+                        literal_buf.push(other as char);
+                    }
+                }
+                i += 2;
+                continue;
+            }
+
+            if bytes[i] == b'{' {
+                // Flush any accumulated literal
+                if !literal_buf.is_empty() {
+                    parts.push(StringInterpPart::Literal(literal_buf.clone()));
+                    literal_buf.clear();
+                }
+
+                // Find matching closing brace, tracking depth
+                let mut depth: u32 = 1;
+                let expr_start = i + 1;
+                i += 1;
+                let mut in_str = false;
+                let mut esc = false;
+                while i < bytes.len() && depth > 0 {
+                    if esc {
+                        esc = false;
+                        i += 1;
+                        continue;
+                    }
+                    if bytes[i] == b'\\' {
+                        esc = true;
+                        i += 1;
+                        continue;
+                    }
+                    if in_str {
+                        if bytes[i] == b'"' {
+                            in_str = false;
+                        }
+                        i += 1;
+                        continue;
+                    }
+                    if bytes[i] == b'"' {
+                        in_str = true;
+                        i += 1;
+                        continue;
+                    }
+                    if bytes[i] == b'{' {
+                        depth += 1;
+                    } else if bytes[i] == b'}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    i += 1;
+                }
+
+                let expr_end = i;
+                let expr_src = std::str::from_utf8(&bytes[expr_start..expr_end]).unwrap_or("");
+                i += 1; // skip closing }
+
+                // Sub-lex and sub-parse the expression
+                let mut diag_sink = nexc_diag::DiagnosticSink::new();
+                let tokens = nexc_lex::lex(expr_src, None, &mut diag_sink);
+                if tokens.is_empty() {
+                    parts.push(StringInterpPart::Literal(String::new()));
+                } else {
+                    let mut sub_parser = Parser::new(&tokens, self.file.clone());
+                    let expr = sub_parser.parse_expression();
+                    // Propagate sub-parser diagnostics
+                    for d in sub_parser.diagnostics() {
+                        self.diagnostics.push(d.clone());
+                    }
+                    parts.push(StringInterpPart::Expr(expr));
+                }
+            } else {
+                literal_buf.push(bytes[i] as char);
+                i += 1;
+            }
+        }
+
+        // Flush remaining literal
+        if !literal_buf.is_empty() {
+            parts.push(StringInterpPart::Literal(literal_buf));
+        }
+
+        Expr::StringInterp {
+            parts,
+            span: token.span,
+        }
+    }
+
+    fn parse_match_expr(&mut self) -> Expr {
+        let start = self.current_span();
+        self.advance(); // consume 'match'
+
+        // Parse scrutinee expression
+        let scrutinee = self.parse_expression();
+
+        // Expect opening brace
+        if !self.consume_if(&TokenKind::LBrace) {
+            self.push_error("expected '{' after match scrutinee");
+            return Expr::Unsupported {
+                raw: "match".into(),
+                span: start,
+            };
+        }
+
+        let mut arms = Vec::new();
+        self.skip_terminators();
+
+        while !matches!(self.peek_kind(), Some(TokenKind::RBrace) | None) {
+            let arm_start = self.current_span();
+
+            // Parse pattern
+            let pattern = self.parse_pattern();
+
+            // Optional guard: `if condition`
+            let guard = if matches!(self.peek_kind(), Some(TokenKind::If)) {
+                self.advance(); // consume 'if'
+                Some(Box::new(self.parse_expression_bp(3))) // higher than ternary
+            } else {
+                None
+            };
+
+            // Expect '->'
+            if !self.consume_if(&TokenKind::Arrow) {
+                self.push_error("expected '->' after match pattern");
+                break;
+            }
+
+            // Parse arm body — either a block or an expression
+            let body = if matches!(self.peek_kind(), Some(TokenKind::LBrace)) {
+                self.advance();
+                Expr::Block(self.parse_block())
+            } else {
+                self.parse_expression()
+            };
+
+            let arm_end = self.current_span();
+            arms.push(MatchArm {
+                pattern,
+                guard,
+                body: Box::new(body),
+                span: Span::new(arm_start.lo, arm_end.hi),
+            });
+
+            self.skip_terminators();
+        }
+
+        let end = self.current_span();
+        self.consume_if(&TokenKind::RBrace);
+
+        Expr::Match {
+            scrutinee: Box::new(scrutinee),
+            arms,
+            span: Span::new(start.lo, end.hi),
+        }
+    }
+
+    fn parse_pattern(&mut self) -> Pattern {
+        let span = self.current_span();
+
+        // Wildcard: `_`
+        if matches!(self.peek_kind(), Some(TokenKind::Identifier)) {
+            let token = &self.tokens[self.pos];
+            if token.lexeme == "_" {
+                self.advance();
+                return Pattern::Wildcard(span);
+            }
+        }
+
+        // Negative number literal: `-123`
+        if matches!(self.peek_kind(), Some(TokenKind::Minus)) {
+            let minus_span = self.current_span();
+            self.advance(); // consume '-'
+            if matches!(self.peek_kind(), Some(TokenKind::IntLiteral)) {
+                let token = self.advance();
+                let value = self.parse_int_literal(&token.lexeme);
+                return Pattern::Literal(
+                    Literal::Int(-value),
+                    Span::new(minus_span.lo, token.span.hi),
+                );
+            }
+            if matches!(self.peek_kind(), Some(TokenKind::FloatLiteral)) {
+                let token = self.advance();
+                let value = self.parse_float_literal(&token.lexeme);
+                return Pattern::Literal(
+                    Literal::Float(-value),
+                    Span::new(minus_span.lo, token.span.hi),
+                );
+            }
+            self.push_error("expected number after '-' in pattern");
+            return Pattern::Wildcard(span);
+        }
+
+        // Int literal
+        if matches!(self.peek_kind(), Some(TokenKind::IntLiteral)) {
+            let token = self.advance();
+            let value = self.parse_int_literal(&token.lexeme);
+            return Pattern::Literal(Literal::Int(value), token.span);
+        }
+
+        // Float literal
+        if matches!(self.peek_kind(), Some(TokenKind::FloatLiteral)) {
+            let token = self.advance();
+            let value = self.parse_float_literal(&token.lexeme);
+            return Pattern::Literal(Literal::Float(value), token.span);
+        }
+
+        // String literal
+        if matches!(self.peek_kind(), Some(TokenKind::StringLiteral)) {
+            let token = self.advance();
+            let raw = token.lexeme;
+            let stripped = if raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2 {
+                raw[1..raw.len() - 1].to_string()
+            } else {
+                raw
+            };
+            return Pattern::Literal(Literal::String(stripped), token.span);
+        }
+
+        // Boolean literal
+        if matches!(self.peek_kind(), Some(TokenKind::BooleanLiteral)) {
+            let token = self.advance();
+            return Pattern::Literal(Literal::Bool(token.lexeme == "true"), token.span);
+        }
+
+        // Null literal
+        if matches!(self.peek_kind(), Some(TokenKind::NullLiteral)) {
+            let token = self.advance();
+            return Pattern::Literal(Literal::Null, token.span);
+        }
+
+        // Identifier — could be EnumVariant (Name.Variant) or Binding (name)
+        if matches!(self.peek_kind(), Some(TokenKind::Identifier)) {
+            let token = self.advance();
+            let name = token.lexeme;
+
+            // Check for Enum.Variant pattern
+            if self.consume_if(&TokenKind::Dot) {
+                if let Some(TokenKind::Identifier) = self.peek_kind() {
+                    let variant_token = self.advance();
+                    return Pattern::EnumVariant {
+                        enum_name: name,
+                        variant: variant_token.lexeme,
+                        span: Span::new(token.span.lo, variant_token.span.hi),
+                    };
+                } else {
+                    self.push_error("expected variant name after '.'");
+                    return Pattern::Wildcard(span);
+                }
+            }
+
+            // Otherwise it's a binding pattern
+            return Pattern::Binding(name, token.span);
+        }
+
+        self.push_error("expected pattern");
+        Pattern::Wildcard(span)
     }
 
     fn parse_type_expr(&mut self) -> Option<TypeExpr> {
@@ -1808,6 +2271,7 @@ fn span_between(left: &Expr, right: &Expr) -> Span {
 enum PrattInfix {
     Assign(AssignOp),
     Binary(BinaryOp),
+    Ternary,
     Call,
     GenericArgs,
     Member,
@@ -1823,6 +2287,11 @@ fn expr_span(expr: &Expr) -> Span {
         | Expr::Assign { span, .. }
         | Expr::Call { span, .. }
         | Expr::MemberAccess { span, .. }
+        | Expr::Lambda { span, .. }
+        | Expr::Await { span, .. }
+        | Expr::StringInterp { span, .. }
+        | Expr::Ternary { span, .. }
+        | Expr::Match { span, .. }
         | Expr::Unsupported { span, .. } => *span,
         Expr::Block(Block { span, .. }) => *span,
     }
@@ -1982,6 +2451,14 @@ mod tests {
                 )
             }
             Item::Statement(statement) => format!("Statement {}", summarize_stmt(statement)),
+            Item::Enum(e) => {
+                format!(
+                    "Enum {} vis={} variants={}",
+                    e.name,
+                    vis_name(matches!(e.visibility, Visibility::Public)),
+                    e.variants.len()
+                )
+            }
         }
     }
 
@@ -2057,7 +2534,12 @@ mod tests {
                     format!("{}.{}", summarize_expr(receiver), name)
                 }
             }
+            Expr::Lambda { params, .. } => format!("Lambda({})", params.len()),
+            Expr::Await { expr, .. } => format!("Await({})", summarize_expr(expr)),
             Expr::Block(block) => format!("Block({})", block.statements.len()),
+            Expr::StringInterp { parts, .. } => format!("StringInterp({})", parts.len()),
+            Expr::Ternary { .. } => "Ternary".to_string(),
+            Expr::Match { arms, .. } => format!("Match({})", arms.len()),
             Expr::Unsupported { raw, .. } => format!("Unsupported({raw})"),
         }
     }

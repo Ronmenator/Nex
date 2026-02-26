@@ -409,6 +409,7 @@ impl LowerCtx {
             is_virtual: false,
             is_override: false,
             is_static: false,
+            is_async: false,
             operator: None,
             body: Some(Expr::Block(Block {
                 statements: stmts,
@@ -804,6 +805,7 @@ impl LowerCtx {
                     is_virtual: false,
                     is_override: false,
                     is_static: false,
+                    is_async: false,
                     operator: None,
                     body: Some(Expr::Block(Block {
                         statements: body_stmts,
@@ -862,6 +864,7 @@ impl LowerCtx {
                     is_virtual: false,
                     is_override: false,
                     is_static: false,
+                    is_async: false,
                     operator: None,
                     body: Some(Expr::Block(Block {
                         statements: setter_body,
@@ -1058,6 +1061,7 @@ fn func(
         is_virtual,
         is_override,
         is_static: false,
+        is_async: false,
         operator: None,
         body: Some(Expr::Block(Block {
             statements: stmts,
@@ -1088,6 +1092,7 @@ fn func_ret(
         is_virtual,
         is_override,
         is_static: false,
+        is_async: false,
         operator: None,
         body: Some(Expr::Block(Block {
             statements: stmts,

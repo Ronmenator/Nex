@@ -65,6 +65,7 @@ impl Printer {
             Item::Class(c) => self.print_class(c),
             Item::Interface(i) => self.print_interface(i),
             Item::Struct(s) => self.print_struct(s),
+            Item::Enum(e) => self.print_enum(e),
             Item::Variable(v) => self.print_var_decl(v),
             Item::Using(u) => self.print_using(u),
             Item::Statement(s) => self.print_stmt(s),
@@ -206,6 +207,21 @@ impl Printer {
         }
         for method in &s.methods {
             self.print_function(method, true);
+        }
+        self.indent -= 1;
+        self.line("}");
+    }
+
+    fn print_enum(&mut self, e: &nexc_ast::EnumDecl) {
+        let vis = visibility_prefix(e.visibility);
+        self.line(&format!("{vis}enum {} {{", e.name));
+        self.indent += 1;
+        for (i, variant) in e.variants.iter().enumerate() {
+            if i + 1 < e.variants.len() {
+                self.line(&format!("{},", variant.name));
+            } else {
+                self.line(&variant.name);
+            }
         }
         self.indent -= 1;
         self.line("}");
@@ -377,6 +393,56 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
             } else {
                 format!("{}.{}", format_expr(receiver), name)
             }
+        }
+        nexc_ast::Expr::Lambda { params, return_type, .. } => {
+            let ps: Vec<String> = params
+                .iter()
+                .map(|p| {
+                    if let Some(ty) = &p.type_hint {
+                        format!("{}: {}", p.name, format_type_expr(ty))
+                    } else {
+                        p.name.clone()
+                    }
+                })
+                .collect();
+            let ret = return_type
+                .as_ref()
+                .map(|t| format!(" -> {}", format_type_expr(t)))
+                .unwrap_or_default();
+            format!("|{}|{} {{ ... }}", ps.join(", "), ret)
+        }
+        nexc_ast::Expr::Await { expr, .. } => format!("await {}", format_expr(expr)),
+        nexc_ast::Expr::StringInterp { parts, .. } => {
+            let mut s = String::from("$\"");
+            for part in parts {
+                match part {
+                    nexc_ast::StringInterpPart::Literal(lit) => s.push_str(lit),
+                    nexc_ast::StringInterpPart::Expr(e) => {
+                        s.push('{');
+                        s.push_str(&format_expr(e));
+                        s.push('}');
+                    }
+                }
+            }
+            s.push('"');
+            s
+        }
+        nexc_ast::Expr::Ternary { then_expr, condition, else_expr, .. } => {
+            format!("{} if {} else {}", format_expr(then_expr), format_expr(condition), format_expr(else_expr))
+        }
+        nexc_ast::Expr::Match { scrutinee, arms, .. } => {
+            let mut s = format!("match {} {{ ", format_expr(scrutinee));
+            for arm in arms {
+                let pat = match &arm.pattern {
+                    nexc_ast::Pattern::Literal(l, _) => format!("{:?}", l),
+                    nexc_ast::Pattern::EnumVariant { enum_name, variant, .. } => format!("{}.{}", enum_name, variant),
+                    nexc_ast::Pattern::Wildcard(_) => "_".into(),
+                    nexc_ast::Pattern::Binding(name, _) => name.clone(),
+                };
+                s.push_str(&format!("{} -> {}, ", pat, format_expr(&arm.body)));
+            }
+            s.push('}');
+            s
         }
         nexc_ast::Expr::Block(_) => "{ ... }".into(),
         nexc_ast::Expr::Unsupported { raw, .. } => raw.clone(),

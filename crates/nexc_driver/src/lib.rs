@@ -642,6 +642,144 @@ fn resolve_cross_module_calls(ir: &mut IrModule) {
             }
         }
     }
+
+    // Resolve cross-module constructor calls and field access.
+    // When a class is defined in module A and used in module B, the IR from B
+    // may contain bare constructor calls (e.g. `Foo` instead of `Foo::init`)
+    // and MemberAccess instructions (instead of Load from the class global).
+    resolve_cross_module_classes(ir);
+}
+
+/// Resolve cross-module class constructor calls and field access in merged IR.
+///
+/// 1. Rewrite bare constructor calls: `Call { target: "Foo" }` → `Call { target: "Foo::init" }`
+///    when a function named `Foo::init` (or `prefix::Foo::init`) exists.
+/// 2. Rewrite `MemberAccess { receiver, field }` → `Load { src: "%ClassName.field" }`
+///    when we can infer the receiver's class type and the global exists.
+fn resolve_cross_module_classes(ir: &mut IrModule) {
+    use std::collections::HashMap;
+
+    // Build class info from globals: "%Foo.label" → class "Foo" has field "label".
+    let mut class_fields: HashMap<String, Vec<String>> = HashMap::new();
+    for g in &ir.globals {
+        let name = g.strip_prefix('%').unwrap_or(g);
+        if let Some(dot) = name.find('.') {
+            let class_name = &name[..dot];
+            let field_name = &name[dot + 1..];
+            class_fields
+                .entry(class_name.to_string())
+                .or_default()
+                .push(field_name.to_string());
+        }
+    }
+
+    // Build a map from class name → init function name.
+    // Matches "Foo::init", "prefix::Foo::init", etc.
+    let func_names: Vec<String> = ir.functions.iter().map(|f| f.name.clone()).collect();
+    let func_set: std::collections::HashSet<&str> =
+        func_names.iter().map(|s| s.as_str()).collect();
+    let mut class_init_map: HashMap<String, String> = HashMap::new();
+    for name in &func_names {
+        // Match patterns like "Foo::init" or "prefix::Foo::init".
+        if name.ends_with("::init") {
+            let prefix = &name[..name.len() - 6]; // strip "::init"
+            // The class name is the last component of the prefix.
+            let class_name = prefix.rsplit("::").next().unwrap_or(prefix);
+            if class_fields.contains_key(class_name) {
+                class_init_map
+                    .entry(class_name.to_string())
+                    .or_insert_with(|| name.clone());
+            }
+        }
+    }
+
+    // Pass 1: Rewrite bare constructor calls.
+    // If Call { target: "Foo" } and "Foo" is not a known function but "Foo::init" exists,
+    // rewrite the target.
+    for func in &mut ir.functions {
+        for block in &mut func.blocks {
+            for inst in &mut block.instructions {
+                if let nexc_ir::IrInstruction::Call { target, .. } = inst {
+                    if !func_set.contains(target.as_str()) {
+                        if let Some(init_name) = class_init_map.get(target.as_str()) {
+                            *target = init_name.clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Pass 2: Infer register types from constructor calls and rewrite MemberAccess.
+    // Track which registers hold class instances by scanning Call instructions
+    // whose target is a known ::init function.
+    for func in &mut ir.functions {
+        let mut reg_types: HashMap<String, String> = HashMap::new();
+
+        // Scan all blocks to build register → class type mapping.
+        for block in &func.blocks {
+            for inst in &block.instructions {
+                match inst {
+                    nexc_ir::IrInstruction::Call {
+                        dst: Some(dst),
+                        target,
+                        ..
+                    } => {
+                        // If target is "Foo::init" or "prefix::Foo::init",
+                        // the dst register holds a Foo instance.
+                        if target.ends_with("::init") {
+                            let prefix = &target[..target.len() - 6];
+                            let class_name =
+                                prefix.rsplit("::").next().unwrap_or(prefix);
+                            if class_fields.contains_key(class_name) {
+                                reg_types
+                                    .insert(dst.clone(), class_name.to_string());
+                            }
+                        }
+                    }
+                    nexc_ir::IrInstruction::Store {
+                        dst,
+                        src: nexc_ir::IrValue::Register(src_reg),
+                    } => {
+                        // Propagate type: if src has a known class type, dst gets it too.
+                        if let Some(ty) = reg_types.get(src_reg).cloned() {
+                            reg_types.insert(dst.clone(), ty);
+                        }
+                    }
+                    nexc_ir::IrInstruction::Load { dst, src } => {
+                        if let Some(ty) = reg_types.get(src).cloned() {
+                            reg_types.insert(dst.clone(), ty);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Rewrite MemberAccess to Load where we can infer the class type.
+        let globals_set: std::collections::HashSet<&str> =
+            ir.globals.iter().map(|s| s.as_str()).collect();
+        for block in &mut func.blocks {
+            for inst in &mut block.instructions {
+                if let nexc_ir::IrInstruction::MemberAccess {
+                    dst,
+                    receiver: nexc_ir::IrValue::Register(recv_reg),
+                    field,
+                } = inst
+                {
+                    if let Some(class_name) = reg_types.get(recv_reg.as_str()) {
+                        let global_name = format!("%{class_name}.{field}");
+                        if globals_set.contains(global_name.as_str()) {
+                            *inst = nexc_ir::IrInstruction::Load {
+                                dst: dst.clone(),
+                                src: global_name,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn read_previous_meta_if_imported(path: &str, sink: &mut DiagnosticSink) -> Option<NexMeta> {

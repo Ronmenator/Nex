@@ -943,6 +943,7 @@ fn item_visibility(item: &Item) -> Visibility {
         Item::Class(c) => c.visibility,
         Item::Interface(i) => i.visibility,
         Item::Struct(s) => s.visibility,
+        Item::Enum(e) => e.visibility,
         Item::Variable(v) => v.visibility,
         Item::Using(_) => Visibility::Internal,
         Item::Statement(_) => Visibility::Internal,
@@ -956,6 +957,7 @@ fn item_name(item: &Item) -> Option<String> {
         Item::Class(c) => Some(c.name.clone()),
         Item::Interface(i) => Some(i.name.clone()),
         Item::Struct(s) => Some(s.name.clone()),
+        Item::Enum(e) => Some(e.name.clone()),
         Item::Variable(v) => Some(v.name.clone()),
         Item::Using(_) | Item::Statement(_) => None,
     }

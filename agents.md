@@ -3,3 +3,10 @@
 2. When a change is made, ensure that the docs/site documentation is updated, added, removed, modified for any of the changes.
 
 3. The vscode-extension must always reflect all the latest changes of the entire language.
+
+
+DOCUMENTS TO KEEP UPDATED AT ALL TIMES:
+1. docs/site - html documentation for the entire system
+2. docs/NEX_LANGUAGE_REFERENCE.md - document that describes the Nex language in detail for other AI's
+3. README.md - a description for the github page (with links to everything) about how to build, how to use Nex, installations, etc...
+4. vscode-extension - the vscode extention, all LSP for language, intellisense, snippets, examples, etc.

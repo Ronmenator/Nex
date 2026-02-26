@@ -359,7 +359,10 @@ fn run_inline(code: &str, args: &[String]) -> i32 {
     }
 
     let mut lib_texts: Vec<(String, String)> = Vec::new();
-    for (_module_name, path) in &lib_modules {
+    // Sort lib modules for deterministic compilation order.
+    let mut sorted_lib_modules: Vec<(&String, &PathBuf)> = lib_modules.iter().collect();
+    sorted_lib_modules.sort_by_key(|(name, _)| *name);
+    for (_module_name, path) in sorted_lib_modules {
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {
@@ -549,7 +552,11 @@ fn build_project_modules(root: &PathBuf) -> i32 {
     let mut had_error = false;
     let mut obj_paths: Vec<PathBuf> = Vec::new();
 
-    for (module, path) in &modules {
+    // Sort modules for deterministic compilation order.
+    let mut sorted_modules: Vec<(&String, &PathBuf)> = modules.iter().collect();
+    sorted_modules.sort_by_key(|(name, _)| *name);
+
+    for (module, path) in sorted_modules {
         let source_text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {
@@ -898,10 +905,16 @@ fn run_jit(source_path: &PathBuf, args: &[String]) -> i32 {
 
     // Read and collect module sources, using relative paths for siblings
     // so canonical_module_name() derives correct module names.
+    // Sort modules by name to ensure deterministic compilation order.
+    // HashMap iteration order is non-deterministic and can cause intermittent
+    // verifier errors when the merged IR's function/type ordering changes.
+    let mut sorted_modules: Vec<(&String, &PathBuf)> = all_modules.iter().collect();
+    sorted_modules.sort_by_key(|(name, _)| *name);
+
     let mut sibling_texts: Vec<(String, String)> = Vec::new();
     let mut lib_texts: Vec<(String, String)> = Vec::new();
 
-    for (module_name, path) in &all_modules {
+    for (module_name, path) in sorted_modules {
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {

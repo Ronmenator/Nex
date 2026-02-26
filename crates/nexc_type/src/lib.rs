@@ -23,6 +23,7 @@ pub enum Type {
     Generic(String, Vec<Type>),
     Nullable(Box<Type>),
     Function(Vec<Type>, Box<Type>),
+    Enum(String),
     Unknown,
 }
 
@@ -66,6 +67,7 @@ impl Type {
                 let p: Vec<_> = params.iter().map(|t| t.display_name()).collect();
                 format!("({}) -> {}", p.join(", "), ret.display_name())
             }
+            Type::Enum(n) => n.clone(),
             Type::Unknown => "<unknown>".into(),
         }
     }
@@ -135,6 +137,11 @@ pub fn declare_types(file: &SourceFile, sink: &mut DiagnosticSink) -> TypedModul
                 module
                     .types
                     .insert(i.name.clone(), Type::Named(i.name.clone()));
+            }
+            Item::Enum(e) => {
+                module
+                    .types
+                    .insert(e.name.clone(), Type::Enum(e.name.clone()));
             }
             Item::Function(f) => {
                 let params: Vec<(String, Type)> = f
@@ -577,6 +584,63 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
         Expr::Block(block) => {
             check_block(block, scope, sink);
             Type::Unit
+        }
+        Expr::Await { expr, .. } => {
+            let inner_ty = infer_expr(expr, scope, sink);
+            // Await unwraps a Task<T> to T; for now accept Unknown
+            match inner_ty {
+                Type::Unknown | Type::Var => inner_ty,
+                _ => Type::Unknown,
+            }
+        }
+        Expr::Lambda { params, return_type, body, .. } => {
+            let param_types: Vec<Type> = params
+                .iter()
+                .map(|p| {
+                    p.type_hint
+                        .as_ref()
+                        .map(|t| resolve_type_expr(t))
+                        .unwrap_or(Type::Unknown)
+                })
+                .collect();
+            // Register lambda params in scope for body type inference
+            for (p, ty) in params.iter().zip(param_types.iter()) {
+                scope.variables.insert(p.name.clone(), ty.clone());
+            }
+            let body_ty = infer_expr(body, scope, sink);
+            let ret_ty = return_type
+                .as_ref()
+                .map(|t| resolve_type_expr(t))
+                .unwrap_or(body_ty);
+            Type::Function(param_types, Box::new(ret_ty))
+        }
+        Expr::StringInterp { parts, .. } => {
+            for part in parts {
+                if let nexc_ast::StringInterpPart::Expr(e) = part {
+                    infer_expr(e, scope, sink);
+                }
+            }
+            Type::String
+        }
+        Expr::Ternary { condition, then_expr, else_expr, .. } => {
+            infer_expr(condition, scope, sink);
+            let then_ty = infer_expr(then_expr, scope, sink);
+            let _else_ty = infer_expr(else_expr, scope, sink);
+            then_ty
+        }
+        Expr::Match { scrutinee, arms, .. } => {
+            infer_expr(scrutinee, scope, sink);
+            let mut result_ty = Type::Unknown;
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    infer_expr(guard, scope, sink);
+                }
+                let arm_ty = infer_expr(&arm.body, scope, sink);
+                if result_ty == Type::Unknown {
+                    result_ty = arm_ty;
+                }
+            }
+            result_ty
         }
         Expr::Unsupported { .. } => Type::Unknown,
     }

@@ -15,6 +15,8 @@ pub mod json;
 pub mod process;
 pub mod net;
 pub mod threading;
+pub mod async_runtime;
+pub mod closure_runtime;
 pub mod logging;
 pub mod testing;
 
@@ -30,6 +32,8 @@ pub use json::*;
 pub use process::*;
 pub use net::*;
 pub use threading::*;
+pub use async_runtime::*;
+pub use closure_runtime::*;
 pub use logging::*;
 pub use testing::*;
 
@@ -371,6 +375,17 @@ pub unsafe extern "C" fn nex_str_concat(a: *const c_char, b: *const c_char) -> *
     }
     *r.add(la + lb) = 0;
     r
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_str_eq(a: *const c_char, b: *const c_char) -> i64 {
+    if a.is_null() && b.is_null() {
+        return 1;
+    }
+    if a.is_null() || b.is_null() {
+        return 0;
+    }
+    if libc::strcmp(a, b) == 0 { 1 } else { 0 }
 }
 
 #[no_mangle]

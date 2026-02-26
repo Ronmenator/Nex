@@ -102,6 +102,7 @@ pub struct FunctionDecl {
     pub is_virtual: bool,
     pub is_override: bool,
     pub is_static: bool,
+    pub is_async: bool,
     pub operator: Option<String>,
     pub body: Option<Expr>,
     pub span: Span,
@@ -154,6 +155,20 @@ pub struct StructDecl {
     pub interfaces: Vec<Name>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<FunctionDecl>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub name: Name,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumDecl {
+    pub name: Name,
+    pub visibility: Visibility,
+    pub variants: Vec<EnumVariant>,
     pub span: Span,
 }
 
@@ -246,6 +261,32 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug, Clone)]
+pub enum StringInterpPart {
+    Literal(String),
+    Expr(Expr),
+}
+
+#[derive(Debug, Clone)]
+pub enum Pattern {
+    Literal(Literal, Span),
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+        span: Span,
+    },
+    Wildcard(Span),
+    Binding(String, Span),
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub guard: Option<Box<Expr>>,
+    pub body: Box<Expr>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expr {
     Identifier {
         name: String,
@@ -284,6 +325,31 @@ pub enum Expr {
         span: Span,
         qualifier: Option<String>,
     },
+    Lambda {
+        params: Vec<ParamDecl>,
+        return_type: Option<TypeExpr>,
+        body: Box<Expr>,
+        span: Span,
+    },
+    Await {
+        expr: Box<Expr>,
+        span: Span,
+    },
+    StringInterp {
+        parts: Vec<StringInterpPart>,
+        span: Span,
+    },
+    Ternary {
+        then_expr: Box<Expr>,
+        condition: Box<Expr>,
+        else_expr: Box<Expr>,
+        span: Span,
+    },
+    Match {
+        scrutinee: Box<Expr>,
+        arms: Vec<MatchArm>,
+        span: Span,
+    },
     Block(Block),
     Unsupported {
         raw: String,
@@ -320,6 +386,7 @@ pub enum Item {
     Class(ClassDecl),
     Interface(InterfaceDecl),
     Struct(StructDecl),
+    Enum(EnumDecl),
     Variable(VarDecl),
     Using(UsingDecl),
     Statement(Stmt),
