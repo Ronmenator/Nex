@@ -1536,6 +1536,14 @@ println(Reflect.typeName(ti))        // "Animal"
 | `Reflect.typeNameAt(index)` | `String` | Name of type at registry index |
 | `Reflect.invoke(typeId, methodName, args, argCount)` | `Int` | Call method dynamically (up to 8 args) |
 | `Reflect.createInstance(typeId, args, argCount)` | `Int` | Create instance via init method |
+| `Reflect.getFieldString(typeId, index)` | `String` | Read string field value by index |
+| `Reflect.getFieldInt(typeId, index)` | `Int` | Read int field value by index |
+| `Reflect.getFieldFloat(typeId, index)` | `Double` | Read float/double field value by index |
+| `Reflect.getFieldBool(typeId, index)` | `Int` | Read bool field value (0 or 1) by index |
+| `Reflect.setFieldString(typeId, index, value)` | `Unit` | Write string field value by index |
+| `Reflect.setFieldInt(typeId, index, value)` | `Unit` | Write int field value by index |
+| `Reflect.setFieldFloat(typeId, index, value)` | `Unit` | Write float/double field value by index |
+| `Reflect.setFieldBool(typeId, index, value)` | `Unit` | Write bool field value by index |
 
 ### Complete Example
 
@@ -1904,6 +1912,8 @@ mutex_unlock(mtx)
 
 ## 24. JSON
 
+### 24.1 Low-Level API (std.json)
+
 ```nex
 import std.json
 
@@ -1918,7 +1928,84 @@ active = json_get_bool(obj, "active")   // Bool
 
 // Create JSON string
 output = json_stringify(obj)
+
+// Build JSON objects programmatically
+handle = json_new_object()
+json_set_string(handle, "name", "Alice")
+json_set_int(handle, "age", 30)
+json_set_float(handle, "score", 95.5)
+json_set_bool(handle, "active", 1)
+pretty = json_stringify_pretty(handle)   // Pretty-printed JSON string
+json_free(handle)
 ```
+
+### 24.2 High-Level API (Json Library)
+
+Add to `project.toml`:
+
+```toml
+[libs]
+json = { path = "../libs/json" }
+```
+
+The `Json` class provides reflection-based serialization for any `[Reflectable]` type:
+
+```nex
+import json.Json
+
+[Reflectable]
+class Person {
+    name: String
+    age: Int
+    active: Bool
+
+    def init(name: String, age: Int, active: Bool) -> Unit {
+        self.name = name
+        self.age = age
+        self.active = active
+        return
+    }
+}
+
+def main() -> Unit {
+    // Serialize — reads field values via reflection
+    p = Person("Alice", 30, true)
+    json = Json.stringify("Person", p, true)
+    println(json)
+    // {
+    //   "name": "Alice",
+    //   "age": 30,
+    //   "active": true
+    // }
+
+    // Convenience methods
+    json = Json.toJson("Person", p)          // pretty-printed
+    json = Json.toJsonCompact("Person", p)   // compact single line
+
+    // Deserialize — writes field values via reflection
+    Json.parse("Person", "{\"name\":\"Bob\",\"age\":25,\"active\":false}")
+    // Person.name is now "Bob", Person.age is now 25, etc.
+
+    // Utility
+    println(Json.canSerialize("Person"))     // true
+    println(Json.fieldCount("Person"))       // 3
+    return
+}
+```
+
+**Json API Reference:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Json.stringify(typeName, obj, indent)` | `String` | Serialize to JSON (indent=true for pretty) |
+| `Json.toJson(typeName, obj)` | `String` | Serialize to pretty-printed JSON |
+| `Json.toJsonCompact(typeName, obj)` | `String` | Serialize to compact JSON |
+| `Json.parse(typeName, content)` | `Unit` | Deserialize JSON into type fields |
+| `Json.fromJson(typeName, content)` | `Unit` | Alias for parse |
+| `Json.canSerialize(typeName)` | `Bool` | Check if type supports serialization |
+| `Json.fieldCount(typeName)` | `Int` | Number of serializable fields |
+
+**Supported field types:** `String`, `Int`, `Int64`, `Float`, `Double`, `Bool`
 
 ---
 

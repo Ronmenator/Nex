@@ -12,6 +12,8 @@ pub struct FieldInfo {
     pub name: String,
     pub type_name: String,
     pub is_public: bool,
+    /// Address of the global variable backing this field (set after JIT).
+    pub addr: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +73,17 @@ impl ReflectRegistry {
 }
 
 static REGISTRY: Mutex<Option<ReflectRegistry>> = Mutex::new(None);
+
+/// Pre-built map of global variable names → addresses, populated by codegen
+/// after JIT finalization.  Used for lazy field address resolution.
+static GLOBAL_ADDRS: Mutex<Option<HashMap<String, usize>>> = Mutex::new(None);
+
+/// Called from codegen after JIT finalization to store the global address map.
+/// Field addresses are resolved lazily when first accessed.
+pub fn set_global_addrs(addrs: HashMap<String, usize>) {
+    let mut guard = GLOBAL_ADDRS.lock().unwrap();
+    *guard = Some(addrs);
+}
 
 fn with_registry<F, R>(f: F) -> R
 where
@@ -174,6 +187,7 @@ pub unsafe extern "C" fn nex_reflect_add_field(
                 name: n,
                 type_name: t,
                 is_public: is_public != 0,
+                addr: 0,
             });
         }
     });
@@ -642,6 +656,165 @@ pub fn patch_method_pointers(lookup: &dyn Fn(&str) -> Option<*const u8>) {
                 // Try just the method name (for top-level or init functions)
                 if let Some(ptr) = lookup(&method.name) {
                     method.func_ptr = ptr as usize;
+                }
+            }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Lazy field address resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve a field's address from the global address map (if not yet resolved).
+/// Returns the address, or 0 if not found.
+fn resolve_field_addr(type_name: &str, field: &mut FieldInfo) -> usize {
+    if field.addr != 0 {
+        return field.addr;
+    }
+    let global_name = format!("%{}.{}", type_name, field.name);
+    let guard = GLOBAL_ADDRS.lock().unwrap();
+    if let Some(addrs) = guard.as_ref() {
+        if let Some(&addr) = addrs.get(&global_name) {
+            field.addr = addr;
+            return addr;
+        }
+    }
+    0
+}
+
+// ---------------------------------------------------------------------------
+// Field value access (read/write field globals via reflection)
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_getFieldString(type_id: i64, index: i64) -> *mut c_char {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    let ptr = *(addr as *const *const c_char);
+                    if !ptr.is_null() {
+                        let s = CStr::from_ptr(ptr).to_string_lossy();
+                        return leak_cstring(&s);
+                    }
+                }
+            }
+        }
+        leak_cstring("")
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_getFieldInt(type_id: i64, index: i64) -> i64 {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    return *(addr as *const i64);
+                }
+            }
+        }
+        0
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_getFieldFloat(type_id: i64, index: i64) -> f64 {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    return *(addr as *const f64);
+                }
+            }
+        }
+        0.0
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_getFieldBool(type_id: i64, index: i64) -> i64 {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    return *(addr as *const i64);
+                }
+            }
+        }
+        0
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_setFieldString(
+    type_id: i64,
+    index: i64,
+    value: *const c_char,
+) {
+    let s = cstr_to_string(value);
+    let new_ptr = CString::new(s).unwrap_or_default().into_raw();
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    *(addr as *mut *mut c_char) = new_ptr;
+                }
+            }
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_setFieldInt(type_id: i64, index: i64, value: i64) {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    *(addr as *mut i64) = value;
+                }
+            }
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_setFieldFloat(type_id: i64, index: i64, value: f64) {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    *(addr as *mut f64) = value;
+                }
+            }
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_reflect_setFieldBool(type_id: i64, index: i64, value: i64) {
+    with_registry(|reg| {
+        if let Some(info) = reg.types.get_mut(type_id as usize) {
+            let type_name = info.name.clone();
+            if let Some(field) = info.fields.get_mut(index as usize) {
+                let addr = resolve_field_addr(&type_name, field);
+                if addr != 0 {
+                    *(addr as *mut i64) = value;
                 }
             }
         }

@@ -600,6 +600,9 @@ impl IrLowering {
                 }
                 self.seal_block(&then_label);
 
+                // Set pending_label so the else body's first seal_block
+                // uses the correct else_label (not a fresh one).
+                self.pending_label = Some(else_label.clone());
                 if let Some(else_branch) = &if_stmt.else_branch {
                     self.lower_stmt(else_branch);
                 }

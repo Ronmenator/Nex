@@ -1505,8 +1505,9 @@ impl Parser {
                 } else {
                     raw
                 };
+                let unescaped = unescape_string(&stripped);
                 Expr::Literal {
-                    value: Literal::String(stripped),
+                    value: Literal::String(unescaped),
                     span: token.span,
                 }
             }
@@ -2418,6 +2419,33 @@ fn resolve_type_name_kind(name: &str) -> TypeExprKind {
         "Unit" => TypeExprKind::Unit,
         _ => TypeExprKind::Named(name.to_string()),
     }
+}
+
+/// Process C-style escape sequences in a string literal.
+fn unescape_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('r') => out.push('\r'),
+                Some('0') => out.push('\0'),
+                Some('\\') => out.push('\\'),
+                Some('"') => out.push('"'),
+                Some('\'') => out.push('\''),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn render_type_expr(ty: &TypeExpr) -> String {

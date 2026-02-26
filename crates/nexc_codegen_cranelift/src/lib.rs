@@ -43,7 +43,7 @@ fn generate_object_impl(ir: &IrModule, pic: bool) -> Result<Vec<u8>, String> {
     let mut module = ObjectModule::new(obj_builder);
     let mut ctx = module.make_context();
 
-    let _func_ids = translate_module(&mut module, ir, &mut ctx)?;
+    let (_func_ids, _global_data) = translate_module(&mut module, ir, &mut ctx)?;
 
     let product = module.finish();
     let bytes = product.emit().map_err(|e| format!("emit object: {e}"))?;
@@ -76,7 +76,7 @@ pub fn jit_execute(
     let mut module = JITModule::new(jit_builder);
     let mut ctx = module.make_context();
 
-    let func_ids = translate_module(&mut module, ir, &mut ctx)?;
+    let (func_ids, global_data) = translate_module(&mut module, ir, &mut ctx)?;
 
     module.finalize_definitions().map_err(|e| format!("JIT finalize: {e}"))?;
 
@@ -86,6 +86,19 @@ pub fn jit_execute(
             .get(name)
             .map(|id| module.get_finalized_function(*id))
     });
+
+    // Build global address map for lazy field resolution via reflection.
+    // Types are registered at runtime (during main's init preamble), so we
+    // cannot patch addresses eagerly.  Instead we store the full map and
+    // resolve on first field access.
+    {
+        let mut addrs = std::collections::HashMap::new();
+        for (name, &id) in &global_data {
+            let (ptr, _) = module.get_finalized_data(id);
+            addrs.insert(name.clone(), ptr as usize);
+        }
+        nex_runtime::reflect::set_global_addrs(addrs);
+    }
 
     let main_name = if func_ids.contains_key("main") {
         "main"
@@ -269,6 +282,14 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_json_get_int);
     sym!(nex_json_get_float);
     sym!(nex_json_get_bool);
+    sym!(nex_json_new_object);
+    sym!(nex_json_set_string);
+    sym!(nex_json_set_int);
+    sym!(nex_json_set_float);
+    sym!(nex_json_set_bool);
+    sym!(nex_json_set_null);
+    sym!(nex_json_stringify_pretty);
+    sym!(nex_json_free);
 
     // std.process
     sym!(nex_process_exec);
@@ -355,6 +376,14 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_reflect_invoke);
     sym!(nex_reflect_create_instance);
     sym!(nex_reflect_reset);
+    sym!(nex_reflect_getFieldString);
+    sym!(nex_reflect_getFieldInt);
+    sym!(nex_reflect_getFieldFloat);
+    sym!(nex_reflect_getFieldBool);
+    sym!(nex_reflect_setFieldString);
+    sym!(nex_reflect_setFieldInt);
+    sym!(nex_reflect_setFieldFloat);
+    sym!(nex_reflect_setFieldBool);
 
     // NOTE: torch, crypto, http, regex symbols are loaded dynamically via
     // register_native_libs() from their respective native DLLs.
@@ -765,7 +794,7 @@ fn translate_module<M: Module>(
     module: &mut M,
     ir: &IrModule,
     ctx: &mut Context,
-) -> Result<HashMap<String, FuncId>, String> {
+) -> Result<(HashMap<String, FuncId>, HashMap<String, cranelift_module::DataId>), String> {
     let mut func_ids: HashMap<String, FuncId> = HashMap::new();
     let mut string_data = StringPool::new();
 
@@ -827,7 +856,7 @@ fn translate_module<M: Module>(
             .map_err(|e| format!("define {}: {e}", func.name))?;
     }
 
-    Ok(func_ids)
+    Ok((func_ids, global_data))
 }
 
 // ---------------------------------------------------------------------------
@@ -866,19 +895,34 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
         | "tensor_item_float" | "tensor_get_float" => return Some(RegType::Float),
         _ => {}
     }
+    // JSON functions
+    match name {
+        "nex_json_get_string" | "nex_json_stringify" | "nex_json_stringify_pretty" => {
+            return Some(RegType::String);
+        }
+        "nex_json_get_float" => {
+            return Some(RegType::Float);
+        }
+        _ => {}
+    }
     // Reflection query functions
     match name {
         "nex_reflect_type_name" | "nex_reflect_type_module"
         | "nex_reflect_type_field_name" | "nex_reflect_type_field_type"
         | "nex_reflect_type_method_name" | "nex_reflect_type_method_return_type"
-        | "nex_reflect_type_name_at" | "nex_reflect_type_interfaces" => {
+        | "nex_reflect_type_name_at" | "nex_reflect_type_interfaces"
+        | "nex_reflect_getFieldString" => {
             return Some(RegType::String);
+        }
+        "nex_reflect_getFieldFloat" => {
+            return Some(RegType::Float);
         }
         "nex_reflect_register_type" | "nex_reflect_find_type"
         | "nex_reflect_type_kind" | "nex_reflect_type_field_count"
         | "nex_reflect_type_method_count" | "nex_reflect_type_implements"
         | "nex_reflect_type_is_reflectable" | "nex_reflect_type_count"
-        | "nex_reflect_invoke" | "nex_reflect_create_instance" => {
+        | "nex_reflect_invoke" | "nex_reflect_create_instance"
+        | "nex_reflect_getFieldInt" | "nex_reflect_getFieldBool" => {
             return Some(RegType::Int);
         }
         _ => {}
@@ -1280,9 +1324,18 @@ fn emit_instruction<M: Module>(
                 "mul" => builder.ins().imul(l, r),
                 "div" => builder.ins().sdiv(l, r),
                 "mod" => builder.ins().srem(l, r),
+                "eq" if lhs_type == RegType::String || rhs_type == RegType::String => {
+                    call_runtime2(builder, module, func_ids, "nex_str_eq", l, r)
+                }
                 "eq" => {
+
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, l, r);
                     builder.ins().uextend(types::I64, c)
+                }
+                "ne" if lhs_type == RegType::String || rhs_type == RegType::String => {
+                    let eq = call_runtime2(builder, module, func_ids, "nex_str_eq", l, r);
+                    let one = builder.ins().iconst(types::I64, 1);
+                    builder.ins().bxor(eq, one)
                 }
                 "ne" => {
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::NotEqual, l, r);
@@ -1448,14 +1501,10 @@ fn emit_instruction<M: Module>(
 
             if let Some(fid) = resolved_fid {
                 let func_ref = module.declare_func_in_func(fid, builder.func);
-                let call = builder.ins().call(func_ref, &arg_vals);
+                let coerced = coerce_call_args(builder, func_ref, &arg_vals);
+                let call = builder.ins().call(func_ref, &coerced);
                 if let Some(d) = dst {
-                    let results = builder.inst_results(call);
-                    let rv = if !results.is_empty() {
-                        results[0]
-                    } else {
-                        builder.ins().iconst(types::I64, 0)
-                    };
+                    let rv = coerce_return_value(builder, call);
                     set_var(builder, module, d, rv, vars, global_data);
                 }
             } else {
@@ -1939,6 +1988,14 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "json_get_int" => Some("nex_json_get_int"),
         "json_get_float" => Some("nex_json_get_float"),
         "json_get_bool" => Some("nex_json_get_bool"),
+        "json_new_object" => Some("nex_json_new_object"),
+        "json_set_string" => Some("nex_json_set_string"),
+        "json_set_int" => Some("nex_json_set_int"),
+        "json_set_float" => Some("nex_json_set_float"),
+        "json_set_bool" => Some("nex_json_set_bool"),
+        "json_set_null" => Some("nex_json_set_null"),
+        "json_stringify_pretty" => Some("nex_json_stringify_pretty"),
+        "json_free" => Some("nex_json_free"),
         // std.regex
         "regex_new" => Some("nex_regex_new"),
         "regex_is_match" => Some("nex_regex_is_match"),
@@ -2571,6 +2628,10 @@ fn collect_needed_imports(ir: &IrModule) -> std::collections::HashSet<String> {
                             needed.insert(s.to_string());
                         }
                     }
+                    IrInstruction::BinOp { op, .. } if op == "eq" || op == "ne" => {
+                        // String equality via nex_str_eq may be dispatched at codegen time.
+                        needed.insert("nex_str_eq".to_string());
+                    }
                     _ => {}
                 }
             }
@@ -2687,6 +2748,18 @@ fn declare_runtime_imports<M: Module>(
     // f64() – math_random
     let mut sig_ret_f64 = Signature::new(cc);
     sig_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // f64(i64, i64) – reflect getFieldFloat(type_id, index) -> f64
+    let mut sig_i64x2_ret_f64 = Signature::new(cc);
+    sig_i64x2_ret_f64.params.push(AbiParam::new(types::I64));
+    sig_i64x2_ret_f64.params.push(AbiParam::new(types::I64));
+    sig_i64x2_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // void(i64, i64, f64) – reflect setFieldFloat / json_set_float
+    let mut sig_void_i64x2_f64 = Signature::new(cc);
+    sig_void_i64x2_f64.params.push(AbiParam::new(types::I64));
+    sig_void_i64x2_f64.params.push(AbiParam::new(types::I64));
+    sig_void_i64x2_f64.params.push(AbiParam::new(types::F64));
 
     // f64(i64) – tensor_item_float, parse_float
     let mut sig_i64_ret_f64 = Signature::new(cc);
@@ -2852,6 +2925,14 @@ fn declare_runtime_imports<M: Module>(
         ("nex_json_get_int", &sig_ptr_ptr2),
         ("nex_json_get_float", &sig_ptr_ptr2),
         ("nex_json_get_bool", &sig_ptr_ptr2),
+        ("nex_json_new_object", &sig_ret_ptr),
+        ("nex_json_set_string", &sig_void_ptr3),
+        ("nex_json_set_int", &sig_void_ptr3),
+        ("nex_json_set_float", &sig_void_i64x2_f64),
+        ("nex_json_set_bool", &sig_void_ptr3),
+        ("nex_json_set_null", &sig_void_ptr2),
+        ("nex_json_stringify_pretty", &sig_ptr_ptr),
+        ("nex_json_free", &sig_void_ptr),
         // std.regex
         ("nex_regex_new", &sig_ptr_ptr),
         ("nex_regex_is_match", &sig_ptr_ptr2),
@@ -2988,6 +3069,15 @@ fn declare_runtime_imports<M: Module>(
         ("nex_reflect_invoke", &sig_ptr_ptr4),            // (type_id, method_name, args_ptr, arg_count) -> i64
         ("nex_reflect_create_instance", &sig_ptr_ptr3),   // (type_id, args_ptr, arg_count) -> i64
         ("nex_reflect_reset", &sig_void),                 // ()
+        // Field value access
+        ("nex_reflect_getFieldString", &sig_ptr_ptr2),    // (type_id, index) -> *c_char
+        ("nex_reflect_getFieldInt", &sig_ptr_ptr2),       // (type_id, index) -> i64
+        ("nex_reflect_getFieldFloat", &sig_i64x2_ret_f64),// (type_id, index) -> f64
+        ("nex_reflect_getFieldBool", &sig_ptr_ptr2),      // (type_id, index) -> i64
+        ("nex_reflect_setFieldString", &sig_void_ptr3),   // (type_id, index, value)
+        ("nex_reflect_setFieldInt", &sig_void_ptr3),      // (type_id, index, value)
+        ("nex_reflect_setFieldFloat", &sig_void_i64x2_f64),// (type_id, index, value: f64)
+        ("nex_reflect_setFieldBool", &sig_void_ptr3),     // (type_id, index, value)
     ];
 
     let ui_imports: Vec<(&str, &Signature)> = vec![

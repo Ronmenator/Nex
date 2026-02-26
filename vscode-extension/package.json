@@ -2,7 +2,7 @@
   "name": "nex-language",
   "displayName": "Nex Language",
   "description": "Language support for Nex (.nex): syntax highlighting, LSP, and build commands.",
-  "version": "0.1.119",
+  "version": "0.1.129",
   "publisher": "nex",
   "engines": {
     "vscode": "^1.85.0"
