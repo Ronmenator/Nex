@@ -1928,6 +1928,37 @@ fn seed_builtin_dispatch(lowering: &mut IrLowering) {
     // Loss (as Tensor method for convenience)
     methods.insert(("Tensor".into(), "cross_entropy".into()), ("loss_cross_entropy".into(), true));
     methods.insert(("Tensor".into(), "mse_loss".into()), ("loss_mse".into(), true));
+    // Math (additional)
+    methods.insert(("Tensor".into(), "sin".into()), ("tensor_sin".into(), true));
+    methods.insert(("Tensor".into(), "cos".into()), ("tensor_cos".into(), true));
+    methods.insert(("Tensor".into(), "tanh".into()), ("tensor_tanh".into(), true));
+    methods.insert(("Tensor".into(), "sigmoid".into()), ("tensor_sigmoid".into(), true));
+    methods.insert(("Tensor".into(), "square".into()), ("tensor_square".into(), true));
+    methods.insert(("Tensor".into(), "rsqrt".into()), ("tensor_rsqrt".into(), true));
+    methods.insert(("Tensor".into(), "clamp".into()), ("tensor_clamp".into(), true));
+    // Reduction (additional)
+    methods.insert(("Tensor".into(), "sum_dim".into()), ("tensor_sum_dim".into(), true));
+    methods.insert(("Tensor".into(), "mean_dim".into()), ("tensor_mean_dim".into(), true));
+    methods.insert(("Tensor".into(), "max_dim".into()), ("tensor_max_dim".into(), true));
+    methods.insert(("Tensor".into(), "min_dim".into()), ("tensor_min_dim".into(), true));
+    // Creation from existing
+    methods.insert(("Tensor".into(), "ones_like".into()), ("tensor_ones_like".into(), true));
+    methods.insert(("Tensor".into(), "zeros_like".into()), ("tensor_zeros_like".into(), true));
+    methods.insert(("Tensor".into(), "full_like".into()), ("tensor_full_like".into(), true));
+    // Comparison / masking (additional)
+    methods.insert(("Tensor".into(), "where_self".into()), ("tensor_where_self".into(), true));
+    // Multi-dim view
+    methods.insert(("Tensor".into(), "view3".into()), ("tensor_view3".into(), true));
+    methods.insert(("Tensor".into(), "view4".into()), ("tensor_view4".into(), true));
+    // Dtype conversion (additional)
+    methods.insert(("Tensor".into(), "to_bf16".into()), ("tensor_to_bf16".into(), true));
+    methods.insert(("Tensor".into(), "to_half".into()), ("tensor_to_half".into(), true));
+    // Utilities
+    methods.insert(("Tensor".into(), "outer".into()), ("tensor_outer".into(), true));
+    methods.insert(("Tensor".into(), "repeat".into()), ("tensor_repeat".into(), true));
+    methods.insert(("Tensor".into(), "ndim".into()), ("tensor_ndim".into(), true));
+    methods.insert(("Tensor".into(), "numel".into()), ("tensor_numel".into(), true));
+    methods.insert(("Tensor".into(), "get_float".into()), ("tensor_get_float".into(), true));
 
     // Tensor method return types (for chaining type resolution)
     for m in &[
@@ -1938,6 +1969,12 @@ fn seed_builtin_dispatch(lowering: &mut IrLowering) {
         "to_device", "to_long", "to_float", "cat", "index_select",
         "cross_entropy", "mse_loss", "argmax",
         "gt_scalar", "lt_scalar", "eq_scalar",
+        // Phase 1 additions:
+        "sin", "cos", "tanh", "sigmoid", "square", "rsqrt", "clamp",
+        "sum_dim", "mean_dim", "max_dim", "min_dim",
+        "ones_like", "zeros_like", "full_like", "where_self",
+        "view3", "view4", "to_bf16", "to_half",
+        "outer", "repeat",
     ] {
         returns.insert(("Tensor".into(), m.to_string()), "Tensor".into());
     }
@@ -1950,6 +1987,8 @@ fn seed_builtin_dispatch(lowering: &mut IrLowering) {
     // ── Optimizer methods ───────────────────────────────────────────────
     methods.insert(("Optimizer".into(), "step".into()), ("optim_step".into(), false));
     methods.insert(("Optimizer".into(), "zero_grad".into()), ("optim_zero_grad".into(), false));
+    methods.insert(("Optimizer".into(), "step_and_zero".into()), ("optim_step_and_zero".into(), false));
+    methods.insert(("Optimizer".into(), "set_lr".into()), ("optim_set_lr".into(), false));
 
     // =====================================================================
     // nex3d struct types — dispatch to pure-Nex free functions

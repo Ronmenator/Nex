@@ -1,7 +1,12 @@
+use std::cell::RefCell;
 use std::os::raw::c_char;
 use std::ptr;
 use tch::{Device, Kind, Tensor, nn};
 use tch::nn::{Module, OptimizerConfig};
+
+thread_local! {
+    static NO_GRAD_GUARD: RefCell<Option<tch::NoGradGuard>> = RefCell::new(None);
+}
 
 unsafe fn cstr_to_str<'a>(s: *const c_char) -> &'a str {
     if s.is_null() { return ""; }
@@ -268,9 +273,14 @@ pub unsafe extern "C" fn nex_torch_tensor_grad(t: *mut Tensor) -> *mut Tensor {
 
 #[no_mangle]
 pub unsafe extern "C" fn nex_torch_no_grad(flag: i32) {
-    if flag != 0 {
-        tch::no_grad_guard();
-    }
+    NO_GRAD_GUARD.with(|cell: &RefCell<Option<tch::NoGradGuard>>| {
+        let mut guard = cell.borrow_mut();
+        if flag != 0 {
+            *guard = Some(tch::no_grad_guard());
+        } else {
+            *guard = None; // drop guard, re-enable gradients
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -456,8 +466,145 @@ pub unsafe extern "C" fn nex_torch_optim_zero_grad(opt: *mut NexOptimizer) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn nex_torch_optim_adamw(
+    module: *mut NexModule, lr: f64, beta1: f64, beta2: f64, weight_decay: f64,
+) -> *mut NexOptimizer {
+    if module.is_null() { return ptr::null_mut(); }
+    let m = &*module;
+    let opt = nn::Adam { beta1, beta2, wd: weight_decay, ..Default::default() }
+        .build(&m.vs, lr).unwrap();
+    Box::into_raw(Box::new(NexOptimizer { inner: opt }))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_optim_step_and_zero(opt: *mut NexOptimizer) {
+    if opt.is_null() { return; }
+    (*opt).inner.step();
+    (*opt).inner.zero_grad();
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn nex_torch_optim_free(opt: *mut NexOptimizer) {
     if !opt.is_null() { drop(Box::from_raw(opt)); }
+}
+
+// ---------------------------------------------------------------------------
+// Train/Eval mode
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_set_training(module: *mut NexModule, is_training: i32) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    let _ = m.vs.set_kind(if is_training != 0 { Kind::Float } else { Kind::Float });
+    // Note: tch-rs VarStore doesn't have a direct set_train method.
+    // For now this is a placeholder. Dropout behavior is controlled at layer level.
+}
+
+// ---------------------------------------------------------------------------
+// Tensor view (multi-dim reshape)
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_view3(
+    t: *mut Tensor, d0: i64, d1: i64, d2: i64,
+) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).view([d0, d1, d2])))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_view4(
+    t: *mut Tensor, d0: i64, d1: i64, d2: i64, d3: i64,
+) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).view([d0, d1, d2, d3])))
+}
+
+// ---------------------------------------------------------------------------
+// Scaled Dot-Product Attention (SDPA)
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_sdpa(
+    q: *mut Tensor, k: *mut Tensor, v: *mut Tensor, is_causal: i32,
+) -> *mut Tensor {
+    if q.is_null() || k.is_null() || v.is_null() { return ptr::null_mut(); }
+    let mask: Option<&Tensor> = None;
+    let dropout = 0.0;
+    let result = Tensor::scaled_dot_product_attention(
+        &*q, &*k, &*v, mask, dropout, is_causal != 0, None, false,
+    );
+    Box::into_raw(Box::new(result))
+}
+
+// ---------------------------------------------------------------------------
+// Dtype conversion
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_to_bf16(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).to_kind(Kind::BFloat16)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_to_half(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).to_kind(Kind::Half)))
+}
+
+// ---------------------------------------------------------------------------
+// Tensor utilities
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_outer(a: *mut Tensor, b: *mut Tensor) -> *mut Tensor {
+    if a.is_null() || b.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*a).outer(&*b)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_repeat(t: *mut Tensor, d0: i64, d1: i64) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).repeat(&[d0, d1])))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_tanh(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).tanh()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_sigmoid(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).sigmoid()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_square(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).square()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_rsqrt(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).rsqrt()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_scale_gradients(module: *mut NexModule, scale: f64) {
+    if module.is_null() { return; }
+    let m = &*module;
+    let _guard = tch::no_grad_guard();
+    for var in m.vs.trainable_variables() {
+        let g = var.grad();
+        if g.defined() {
+            let _ = var.grad().g_mul_scalar_(scale);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

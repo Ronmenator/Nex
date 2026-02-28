@@ -827,6 +827,22 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_nn_init_normal",
     "nex_torch_tensor_sin",
     "nex_torch_tensor_cos",
+    // torch — Phase 1 additions
+    "nex_torch_tensor_tanh",
+    "nex_torch_tensor_sigmoid",
+    "nex_torch_tensor_square",
+    "nex_torch_tensor_rsqrt",
+    "nex_torch_tensor_view3",
+    "nex_torch_tensor_view4",
+    "nex_torch_tensor_sdpa",
+    "nex_torch_tensor_to_bf16",
+    "nex_torch_tensor_to_half",
+    "nex_torch_tensor_outer",
+    "nex_torch_tensor_repeat",
+    "nex_torch_optim_adamw",
+    "nex_torch_optim_step_and_zero",
+    "nex_torch_nn_set_training",
+    "nex_torch_nn_scale_gradients",
     // crypto
     "nex_crypto_sha256",
     "nex_crypto_sha512",
@@ -2706,9 +2722,30 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "nn_rms_norm" => Some("nex_torch_nn_rms_norm"),
         "nn_clip_grad_norm" => Some("nex_torch_nn_clip_grad_norm"),
         "nn_init_normal" => Some("nex_torch_nn_init_normal"),
-        // Trigonometric
+        // Trigonometric / math
         "tensor_sin" => Some("nex_torch_tensor_sin"),
         "tensor_cos" => Some("nex_torch_tensor_cos"),
+        "tensor_tanh" => Some("nex_torch_tensor_tanh"),
+        "tensor_sigmoid" => Some("nex_torch_tensor_sigmoid"),
+        "tensor_square" => Some("nex_torch_tensor_square"),
+        "tensor_rsqrt" => Some("nex_torch_tensor_rsqrt"),
+        // Multi-dim view
+        "tensor_view3" => Some("nex_torch_tensor_view3"),
+        "tensor_view4" => Some("nex_torch_tensor_view4"),
+        // Scaled Dot-Product Attention
+        "tensor_sdpa" => Some("nex_torch_tensor_sdpa"),
+        // Dtype conversion
+        "tensor_to_bf16" => Some("nex_torch_tensor_to_bf16"),
+        "tensor_to_half" => Some("nex_torch_tensor_to_half"),
+        // Tensor utilities
+        "tensor_outer" => Some("nex_torch_tensor_outer"),
+        "tensor_repeat" => Some("nex_torch_tensor_repeat"),
+        // Optimizer (additional)
+        "optim_adamw" => Some("nex_torch_optim_adamw"),
+        "optim_step_and_zero" => Some("nex_torch_optim_step_and_zero"),
+        // NN (additional)
+        "nn_set_training" => Some("nex_torch_nn_set_training"),
+        "nn_scale_gradients" => Some("nex_torch_nn_scale_gradients"),
         // Utility
         "torch_manual_seed" => Some("nex_torch_manual_seed"),
         "torch_version" => Some("nex_torch_version"),
@@ -3170,6 +3207,15 @@ fn declare_runtime_imports<M: Module>(
     let mut sig_void_i64_f64 = Signature::new(cc);
     sig_void_i64_f64.params.push(AbiParam::new(types::I64));
     sig_void_i64_f64.params.push(AbiParam::new(types::F64));
+
+    // i64(i64, f64, f64, f64, f64) – optim_adamw(module, lr, beta1, beta2, wd)
+    let mut sig_i64_f64x4_ret_i64 = Signature::new(cc);
+    sig_i64_f64x4_ret_i64.params.push(AbiParam::new(types::I64));
+    sig_i64_f64x4_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64x4_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64x4_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64x4_ret_i64.params.push(AbiParam::new(types::F64));
+    sig_i64_f64x4_ret_i64.returns.push(AbiParam::new(types::I64));
 
     let imports: Vec<(&str, &Signature)> = vec![
         ("nex_gc_alloc", &sig_gc_alloc),
@@ -3819,6 +3865,24 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_manual_seed", &sig_void_ptr),
         ("nex_torch_version", &sig_ret_ptr),
         ("nex_torch_tensor_to_string", &sig_ptr_ptr),
+        // Phase 1 additions — unary tensor ops
+        ("nex_torch_tensor_tanh", &sig_ptr_ptr),
+        ("nex_torch_tensor_sigmoid", &sig_ptr_ptr),
+        ("nex_torch_tensor_square", &sig_ptr_ptr),
+        ("nex_torch_tensor_rsqrt", &sig_ptr_ptr),
+        ("nex_torch_tensor_to_bf16", &sig_ptr_ptr),
+        ("nex_torch_tensor_to_half", &sig_ptr_ptr),
+        // Phase 1 additions — multi-arg tensor ops
+        ("nex_torch_tensor_view3", &sig_ptr_ptr4),      // (t, d0, d1, d2) -> tensor
+        ("nex_torch_tensor_view4", &sig_ptr_ptr5),      // (t, d0, d1, d2, d3) -> tensor
+        ("nex_torch_tensor_sdpa", &sig_ptr_ptr4),       // (q, k, v, is_causal) -> tensor
+        ("nex_torch_tensor_outer", &sig_ptr_ptr2),      // (a, b) -> tensor
+        ("nex_torch_tensor_repeat", &sig_ptr_ptr3),     // (t, d0, d1) -> tensor
+        // Phase 1 additions — optimizer & module
+        ("nex_torch_optim_adamw", &sig_i64_f64x4_ret_i64), // (module, lr, beta1, beta2, wd) -> opt
+        ("nex_torch_optim_step_and_zero", &sig_void_ptr),
+        ("nex_torch_nn_set_training", &sig_void_ptr2),  // (module, flag)
+        ("nex_torch_nn_scale_gradients", &sig_void_i64_f64), // (module, scale)
     ];
 
     // Helper: declare an import only if not already declared, and if it passes
