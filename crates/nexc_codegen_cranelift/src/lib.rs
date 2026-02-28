@@ -474,7 +474,7 @@ fn register_native_libs(
             .map(std::path::PathBuf::from)
             .or_else(|| {
                 // Auto-detect common libtorch locations.
-                for p in &["D:\\libtorch", "C:\\libtorch"] {
+                for p in &["F:\\libtorch", "D:\\libtorch", "C:\\libtorch"] {
                     let path = std::path::Path::new(p);
                     if path.join("lib").is_dir() {
                         return Some(path.to_path_buf());

@@ -729,11 +729,12 @@ fn create_dir_symlink(original: &Path, link: &Path) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Try to find a libtorch installation. Checks:
-/// 1. Common install locations (D:\libtorch, C:\libtorch)
+/// 1. Common install locations (F:\libtorch, D:\libtorch, C:\libtorch)
 /// 2. User/system environment variables (reads registry on Windows for setx values)
 fn detect_libtorch() -> Option<PathBuf> {
     // Check common paths first.
     let common_paths = [
+        PathBuf::from("F:\\libtorch"),
         PathBuf::from("D:\\libtorch"),
         PathBuf::from("C:\\libtorch"),
     ];
