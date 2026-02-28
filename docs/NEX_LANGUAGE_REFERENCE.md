@@ -1785,6 +1785,9 @@ str_repeat(s, count)                // Repeat N times
 str_char_at(s, index)               // Character at index
 str_reverse(s)                      // Reverse string
 str_truncate(s, max_len)            // Truncate to max_len characters (UTF-8 aware)
+
+// Short aliases also available: starts_with, ends_with, contains,
+// index_of, to_upper, to_lower, char_at
 ```
 
 ### 19.4 std.convert
@@ -1796,6 +1799,7 @@ parse_int(s)           // String → Int
 parse_float(s)         // String → Double
 parse_bool(s)          // String → Bool ("true"/"false")
 char_to_str(c)         // Char → String
+byte_to_str(b)         // Byte (0-255) → single-byte String (raw, not UTF-8)
 str_to_chars(s)        // String → List of Chars
 ```
 
@@ -1995,6 +1999,8 @@ file_delete("temp.txt")              // Delete file
 file_rename("old.txt", "new.txt")    // Rename file
 file_copy("src.txt", "dst.txt")      // Copy file
 file_size("data.txt")                // File size in bytes
+file_read_all("data.txt")             // Read entire file as String
+file_write_text("out.txt", "content") // Create/overwrite file with text
 file_append("log.txt", "new line\n") // Append to file (creates if missing)
 
 // Directory operations

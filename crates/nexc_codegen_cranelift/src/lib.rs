@@ -217,6 +217,7 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_parse_float);
     sym!(nex_parse_bool);
     sym!(nex_char_to_str);
+    sym!(nex_byte_to_str);
     sym!(nex_str_to_chars);
 
     // std.env
@@ -274,6 +275,8 @@ fn register_runtime_symbols(builder: &mut cranelift_jit::JITBuilder) {
     sym!(nex_io_file_size);
     sym!(nex_io_file_read_bytes);
     sym!(nex_io_file_write_bytes);
+    sym!(nex_io_file_write_text);
+    sym!(nex_io_file_read_all);
     sym!(nex_io_file_append);
     sym!(nex_io_mkdir);
     sym!(nex_io_list_dir);
@@ -958,6 +961,19 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
         | "tensor_item_float" | "tensor_get_float" => return Some(RegType::Float),
         _ => {}
     }
+    // String stdlib functions that return strings
+    match name {
+        "nex_str_substring" | "nex_str_trim" | "nex_str_trim_start" | "nex_str_trim_end"
+        | "nex_str_replace" | "nex_str_to_upper" | "nex_str_to_lower"
+        | "nex_str_reverse" | "nex_str_truncate" | "nex_str_repeat"
+        | "nex_str_split" | "nex_str_concat"
+        | "nex_int_to_str" | "nex_float_to_str" | "nex_bool_to_str"
+        | "nex_char_to_str" | "nex_byte_to_str"
+        | "nex_file_read_all" | "nex_io_file_read_all"
+        | "nex_readline"
+        | "nex_env_get" | "nex_env_args_get" | "nex_env_cwd" => return Some(RegType::String),
+        _ => {}
+    }
     // Map functions
     match name {
         "nex_map_get" => return Some(RegType::String),
@@ -1031,6 +1047,9 @@ fn build_reg_type_map(
                 Type::Int | Type::Int64 | Type::Byte => RegType::Int,
                 Type::Float | Type::Double => RegType::Float,
                 Type::Bool => RegType::Bool,
+                // Generic types (List[T], Map[K,V], etc.) and Named types (classes)
+                // are heap-allocated pointers represented as i64
+                Type::Generic(..) | Type::Named(..) => RegType::Int,
                 _ => RegType::Unknown,
             };
             (f.name.as_str(), rt)
@@ -1046,6 +1065,7 @@ fn build_reg_type_map(
             Type::Int | Type::Int64 | Type::Byte => RegType::Int,
             Type::Float | Type::Double => RegType::Float,
             Type::Bool => RegType::Bool,
+            Type::Generic(..) | Type::Named(..) => RegType::Int,
             _ => RegType::Unknown,
         };
         map.insert(format!("%{name}"), reg_ty);
@@ -1482,9 +1502,12 @@ fn emit_instruction<M: Module>(
             else_label,
         } => {
             let cv = resolve_value(builder, module, cond, vars, strings, func_ids, global_data);
+            // Cranelift's brif expects an i8 condition, but all our values are i64.
+            // Narrow to i8 so brif doesn't misinterpret the upper bits.
+            let cv_i8 = builder.ins().ireduce(types::I8, cv);
             let then_blk = blocks[then_label];
             let else_blk = blocks[else_label];
-            builder.ins().brif(cv, then_blk, &[], else_blk, &[]);
+            builder.ins().brif(cv_i8, then_blk, &[], else_blk, &[]);
             true
         }
 
@@ -2025,15 +2048,15 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "str_trim" => Some("nex_str_trim"),
         "str_trim_start" => Some("nex_str_trim_start"),
         "str_trim_end" => Some("nex_str_trim_end"),
-        "starts_with" => Some("nex_str_starts_with"),
-        "ends_with" => Some("nex_str_ends_with"),
-        "contains" => Some("nex_str_contains"),
-        "index_of" => Some("nex_str_index_of"),
+        "starts_with" | "str_starts_with" => Some("nex_str_starts_with"),
+        "ends_with" | "str_ends_with" => Some("nex_str_ends_with"),
+        "contains" | "str_contains" => Some("nex_str_contains"),
+        "index_of" | "str_index_of" => Some("nex_str_index_of"),
         "str_replace" => Some("nex_str_replace"),
-        "to_upper" => Some("nex_str_to_upper"),
-        "to_lower" => Some("nex_str_to_lower"),
+        "to_upper" | "str_to_upper" => Some("nex_str_to_upper"),
+        "to_lower" | "str_to_lower" => Some("nex_str_to_lower"),
         "str_repeat" => Some("nex_str_repeat"),
-        "char_at" => Some("nex_str_char_at"),
+        "char_at" | "str_char_at" => Some("nex_str_char_at"),
         "str_reverse" => Some("nex_str_reverse"),
         "str_truncate" => Some("nex_str_truncate"),
         // std.convert
@@ -2041,6 +2064,7 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "parse_float" => Some("nex_parse_float"),
         "parse_bool" => Some("nex_parse_bool"),
         "char_to_str" => Some("nex_char_to_str"),
+        "byte_to_str" => Some("nex_byte_to_str"),
         "str_to_chars" => Some("nex_str_to_chars"),
         // std.env
         "env_get" => Some("nex_env_get"),
@@ -2087,6 +2111,8 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "file_size" => Some("nex_io_file_size"),
         "file_read_bytes" => Some("nex_io_file_read_bytes"),
         "file_write_bytes" => Some("nex_io_file_write_bytes"),
+        "file_write_text" | "File::write_text" => Some("nex_io_file_write_text"),
+        "file_read_all" | "File::read_all" => Some("nex_io_file_read_all"),
         "file_append" => Some("nex_io_file_append"),
         "mkdir" => Some("nex_io_mkdir"),
         "list_dir" => Some("nex_io_list_dir"),
@@ -3037,6 +3063,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_parse_float", &sig_i64_ret_f64),
         ("nex_parse_bool", &sig_ptr_ptr),
         ("nex_char_to_str", &sig_ptr_ptr),
+        ("nex_byte_to_str", &sig_ptr_ptr),
         ("nex_str_to_chars", &sig_ptr_ptr),
         // std.env
         ("nex_env_get", &sig_ptr_ptr),
@@ -3091,6 +3118,8 @@ fn declare_runtime_imports<M: Module>(
         ("nex_io_file_size", &sig_ptr_ptr),
         ("nex_io_file_read_bytes", &sig_ptr_ptr3),
         ("nex_io_file_write_bytes", &sig_ptr_ptr3),
+        ("nex_io_file_write_text", &sig_ptr_ptr2),
+        ("nex_io_file_read_all", &sig_ptr_ptr),
         ("nex_io_file_append", &sig_ptr_ptr2),
         ("nex_io_mkdir", &sig_ptr_ptr),
         ("nex_io_list_dir", &sig_ptr_ptr),

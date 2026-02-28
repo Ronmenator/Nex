@@ -133,6 +133,10 @@ struct IrLowering {
     enum_variants: HashMap<(String, String), i64>,
     /// Variable names in the current function scope (for closure capture analysis)
     current_scope_vars: HashSet<String>,
+    /// Stack of (header_label, exit_label) for nested loops — used by break/continue
+    loop_stack: Vec<(String, String)>,
+    /// function_name → return type name (for user-defined function return type tracking)
+    function_returns: HashMap<String, String>,
 }
 
 impl IrLowering {
@@ -157,6 +161,8 @@ impl IrLowering {
             known_enums: Vec::new(),
             enum_variants: HashMap::new(),
             current_scope_vars: HashSet::new(),
+            loop_stack: Vec::new(),
+            function_returns: HashMap::new(),
         }
     }
 
@@ -248,7 +254,13 @@ impl IrLowering {
             }
         }
 
-        if !self.current_block.is_empty() || self.blocks.is_empty() {
+        // Seal the remaining block.  We must also seal when `pending_label`
+        // is set — this happens when the function body ends with a while/for
+        // loop or an if/match statement.  Without this, the pending exit
+        // label is never turned into an IrBlock and becomes a phantom target
+        // in the codegen, which resolves to the wrong fallthrough block
+        // (causing break to loop back instead of exiting, etc.).
+        if !self.current_block.is_empty() || self.blocks.is_empty() || self.pending_label.is_some() {
             if !self.block_terminated() {
                 self.emit(IrInstruction::Return(None));
             }
@@ -488,6 +500,10 @@ impl IrLowering {
                     if name.starts_with("nn_") && name != "nn_free" {
                         return Some("Module".into());
                     }
+                    // Check user-defined function return types
+                    if let Some(ret_type) = self.function_returns.get(name.as_str()) {
+                        return Some(ret_type.clone());
+                    }
                     None
                 }
                 nexc_ast::Expr::MemberAccess {
@@ -654,7 +670,9 @@ impl IrLowering {
                 });
                 self.seal_block(&header);
 
+                self.loop_stack.push((header.clone(), exit_label.clone()));
                 self.lower_stmt(&while_stmt.body);
+                self.loop_stack.pop();
                 self.emit(IrInstruction::Jump { target: header });
                 self.seal_block(&body_label);
 
@@ -728,7 +746,9 @@ impl IrLowering {
                         src: IrValue::Register(elem_dst),
                     });
 
+                    self.loop_stack.push((header.clone(), exit_label.clone()));
                     self.lower_stmt(&for_stmt.body);
+                    self.loop_stack.pop();
 
                     // Step: __i = __i + 1
                     let next_idx = self.fresh_temp();
@@ -775,7 +795,9 @@ impl IrLowering {
                     }
                     self.seal_block(&header);
 
+                    self.loop_stack.push((header.clone(), exit_label.clone()));
                     self.lower_stmt(&for_stmt.body);
+                    self.loop_stack.pop();
                     if let Some(step) = &for_stmt.step {
                         self.lower_expr(step);
                     }
@@ -848,8 +870,19 @@ impl IrLowering {
             Stmt::Block(block) => {
                 self.lower_block(block);
             }
-            Stmt::Continue(_) | Stmt::Break(_) => {
-                self.emit(IrInstruction::Nop);
+            Stmt::Break(_) => {
+                if let Some((_header, exit_label)) = self.loop_stack.last() {
+                    self.emit(IrInstruction::Jump {
+                        target: exit_label.clone(),
+                    });
+                }
+            }
+            Stmt::Continue(_) => {
+                if let Some((header_label, _exit)) = self.loop_stack.last() {
+                    self.emit(IrInstruction::Jump {
+                        target: header_label.clone(),
+                    });
+                }
             }
         }
     }
@@ -1227,7 +1260,18 @@ impl IrLowering {
                             } else if let nexc_ast::Expr::Identifier { name, .. } =
                                 receiver.as_ref()
                             {
-                                self.var_types.get(name).map(|s| s.as_str())
+                                // First try variable type, then check if it's a
+                                // class/struct name used as a static method qualifier
+                                // (e.g. File.write_text, Math.sqrt).
+                                self.var_types.get(name).map(|s| s.as_str()).or_else(|| {
+                                    if self.known_classes.iter().any(|c| c == name)
+                                        || name.chars().next().map_or(false, |c| c.is_uppercase())
+                                    {
+                                        Some(name.as_str())
+                                    } else {
+                                        None
+                                    }
+                                })
                             } else {
                                 None
                             }
@@ -2186,20 +2230,33 @@ pub fn lower_typed_module(
     layouts: &[ClassLayout],
     _sink: &mut DiagnosticSink,
 ) -> IrModule {
-    lower_typed_module_with_prefix(typed, layouts, _sink, None)
+    lower_typed_module_with_prefix(typed, layouts, _sink, None, &HashMap::new())
 }
 
 /// Like `lower_typed_module` but prefixes all top-level function, class method,
 /// and struct method names with `module_prefix::` when provided.  This prevents
 /// symbol collisions when multiple libraries export identically-named symbols
 /// (e.g. `nex3d::color::COLOR_WHITE` vs `nex_ui::style::COLOR_WHITE`).
+///
+/// `external_function_returns` provides return type info for functions defined
+/// in other modules (populated by the driver's pre-scan of all source files).
+/// This enables correct method dispatch for cross-module collection returns
+/// (e.g. a function in module A returning `List` that module B calls and
+/// then invokes `.add()` / `.length()` on the result).
 pub fn lower_typed_module_with_prefix(
     typed: &TypedModule,
     layouts: &[ClassLayout],
     _sink: &mut DiagnosticSink,
     module_prefix: Option<&str>,
+    external_function_returns: &HashMap<String, String>,
 ) -> IrModule {
     let mut lowering = IrLowering::new();
+
+    // Seed with cross-module function return types so that resolve_expr_type()
+    // can correctly dispatch methods on return values from imported functions.
+    for (name, ret_ty) in external_function_returns {
+        lowering.function_returns.entry(name.clone()).or_insert_with(|| ret_ty.clone());
+    }
     let mut functions = Vec::new();
     let mut globals = Vec::new();
     let mut init_instructions = Vec::new();
@@ -2213,6 +2270,19 @@ pub fn lower_typed_module_with_prefix(
             nexc_ast::Item::Struct(s) => lowering.known_classes.push(s.name.clone()),
             nexc_ast::Item::Function(f) if f.is_async => {
                 lowering.async_functions.push(f.name.clone());
+            }
+            nexc_ast::Item::Function(f) => {
+                if let Some(ret_ty) = &f.return_type {
+                    match &ret_ty.kind {
+                        nexc_ast::TypeExprKind::Named(name) => {
+                            lowering.function_returns.insert(f.name.clone(), name.clone());
+                        }
+                        nexc_ast::TypeExprKind::Generic(base, _) => {
+                            lowering.function_returns.insert(f.name.clone(), base.clone());
+                        }
+                        _ => {}
+                    }
+                }
             }
             nexc_ast::Item::Enum(e) => {
                 lowering.known_enums.push(e.name.clone());
@@ -2708,10 +2778,18 @@ pub fn lower_typed_module_with_prefix(
             for block in &mut func.blocks {
                 for inst in &mut block.instructions {
                     if let IrInstruction::Call { target, .. } = inst {
-                        // Check if the target, after prefixing, matches a local function.
-                        let prefixed = prefix_name(target.clone());
-                        if local_names.contains(&prefixed) {
-                            *target = prefixed;
+                        // Handle __func_addr__ references (lambda pointers)
+                        if let Some(inner) = target.strip_prefix("__func_addr__") {
+                            let prefixed_inner = prefix_name(inner.to_string());
+                            if local_names.contains(&prefixed_inner) {
+                                *target = format!("__func_addr__{prefixed_inner}");
+                            }
+                        } else {
+                            // Check if the target, after prefixing, matches a local function.
+                            let prefixed = prefix_name(target.clone());
+                            if local_names.contains(&prefixed) {
+                                *target = prefixed;
+                            }
                         }
                     }
                 }
@@ -2775,8 +2853,11 @@ pub fn lower_typed_module_with_prefix(
         }
     }
 
-    // Append synthesized lambda functions
-    functions.extend(lowering.synthesized_functions.drain(..));
+    // Append synthesized lambda functions (with module prefix applied)
+    for mut lf in lowering.synthesized_functions.drain(..) {
+        lf.name = prefix_name(lf.name);
+        functions.push(lf);
+    }
 
     IrModule {
         name: typed.file.path.clone(),

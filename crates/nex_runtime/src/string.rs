@@ -39,24 +39,24 @@ pub unsafe extern "C" fn nex_str_trim_end(s: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_str_starts_with(s: *const c_char, prefix: *const c_char) -> i32 {
-    cstr_to_str(s).starts_with(cstr_to_str(prefix)) as i32
+pub unsafe extern "C" fn nex_str_starts_with(s: *const c_char, prefix: *const c_char) -> i64 {
+    cstr_to_str(s).starts_with(cstr_to_str(prefix)) as i64
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_str_ends_with(s: *const c_char, suffix: *const c_char) -> i32 {
-    cstr_to_str(s).ends_with(cstr_to_str(suffix)) as i32
+pub unsafe extern "C" fn nex_str_ends_with(s: *const c_char, suffix: *const c_char) -> i64 {
+    cstr_to_str(s).ends_with(cstr_to_str(suffix)) as i64
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_str_contains(s: *const c_char, needle: *const c_char) -> i32 {
-    cstr_to_str(s).contains(cstr_to_str(needle)) as i32
+pub unsafe extern "C" fn nex_str_contains(s: *const c_char, needle: *const c_char) -> i64 {
+    cstr_to_str(s).contains(cstr_to_str(needle)) as i64
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_str_index_of(s: *const c_char, needle: *const c_char) -> i32 {
+pub unsafe extern "C" fn nex_str_index_of(s: *const c_char, needle: *const c_char) -> i64 {
     match cstr_to_str(s).find(cstr_to_str(needle)) {
-        Some(i) => i as i32,
+        Some(i) => i as i64,
         None => -1,
     }
 }
@@ -84,9 +84,9 @@ pub unsafe extern "C" fn nex_str_repeat(s: *const c_char, count: i32) -> *mut c_
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_str_char_at(s: *const c_char, index: i32) -> i32 {
+pub unsafe extern "C" fn nex_str_char_at(s: *const c_char, index: i64) -> i64 {
     let src = cstr_to_str(s);
-    src.chars().nth(index.max(0) as usize).map(|c| c as i32).unwrap_or(-1)
+    src.chars().nth(index.max(0) as usize).map(|c| c as i64).unwrap_or(-1)
 }
 
 #[no_mangle]

@@ -11,7 +11,7 @@
 <header class="site-header">
   <button class="menu-toggle">&#9776;</button>
   <div class="logo">Nex <span>Documentation</span></div>
-  <div class="header-right"><span class="version-badge">v0.1.135</span></div>
+  <div class="header-right"><span class="version-badge">v0.1.154</span></div>
 </header>
 <nav class="sidebar"></nav>
 <main class="main-content">
@@ -66,29 +66,29 @@ text <span class="op">=</span> <span class="str">"  hello world  "</span>
 
   <h2>Searching</h2>
 
-  <h4>starts_with</h4>
+  <h4>starts_with / str_starts_with</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">starts_with</span>(s: <span class="typ">String</span>, prefix: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
   </div>
-  <p>Returns <code>true</code> if <code>s</code> begins with <code>prefix</code>.</p>
+  <p>Returns <code>true</code> if <code>s</code> begins with <code>prefix</code>. Also available as <code>str_starts_with</code>.</p>
 
-  <h4>ends_with</h4>
+  <h4>ends_with / str_ends_with</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">ends_with</span>(s: <span class="typ">String</span>, suffix: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
   </div>
-  <p>Returns <code>true</code> if <code>s</code> ends with <code>suffix</code>.</p>
+  <p>Returns <code>true</code> if <code>s</code> ends with <code>suffix</code>. Also available as <code>str_ends_with</code>.</p>
 
-  <h4>contains</h4>
+  <h4>contains / str_contains</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">contains</span>(s: <span class="typ">String</span>, needle: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Bool</span>
   </div>
-  <p>Returns <code>true</code> if <code>s</code> contains <code>needle</code> as a substring.</p>
+  <p>Returns <code>true</code> if <code>s</code> contains <code>needle</code> as a substring. Also available as <code>str_contains</code>.</p>
 
-  <h4>index_of</h4>
+  <h4>index_of / str_index_of</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">index_of</span>(s: <span class="typ">String</span>, needle: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
   </div>
-  <p>Returns the index of the first occurrence of <code>needle</code> in <code>s</code>, or <code>-1</code> if not found.</p>
+  <p>Returns the index of the first occurrence of <code>needle</code> in <code>s</code>, or <code>-1</code> if not found. Also available as <code>str_index_of</code>.</p>
 
   <pre><code><span class="kw">import</span> std.string
 
@@ -114,17 +114,17 @@ msg <span class="op">=</span> <span class="str">"Hello World"</span>
 
   <h2>Case Conversion</h2>
 
-  <h4>to_upper</h4>
+  <h4>to_upper / str_to_upper</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">to_upper</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
   </div>
-  <p>Returns <code>s</code> with all characters converted to uppercase.</p>
+  <p>Returns <code>s</code> with all characters converted to uppercase. Also available as <code>str_to_upper</code>.</p>
 
-  <h4>to_lower</h4>
+  <h4>to_lower / str_to_lower</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">to_lower</span>(s: <span class="typ">String</span>) <span class="op">-&gt;</span> <span class="typ">String</span>
   </div>
-  <p>Returns <code>s</code> with all characters converted to lowercase.</p>
+  <p>Returns <code>s</code> with all characters converted to lowercase. Also available as <code>str_to_lower</code>.</p>
 
   <pre><code><span class="kw">import</span> std.string
 
@@ -149,11 +149,11 @@ msg <span class="op">=</span> <span class="str">"Hello World"</span>
 
   <h2>Character Access</h2>
 
-  <h4>char_at</h4>
+  <h4>char_at / str_char_at</h4>
   <div class="signature">
     <span class="kw">def</span> <span class="fn">char_at</span>(s: <span class="typ">String</span>, index: <span class="typ">Int</span>) <span class="op">-&gt;</span> <span class="typ">Int</span>
   </div>
-  <p>Returns the character code at the given <code>index</code>, or <code>-1</code> if the index is out of bounds.</p>
+  <p>Returns the character code at the given <code>index</code>, or <code>-1</code> if the index is out of bounds. Also available as <code>str_char_at</code>.</p>
 
   <pre><code><span class="kw">import</span> std.string
 

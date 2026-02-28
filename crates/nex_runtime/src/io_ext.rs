@@ -67,6 +67,21 @@ pub unsafe extern "C" fn nex_io_file_write_bytes(path: *const c_char, buf: *cons
     f.write_all(slice).is_ok() as i32
 }
 
+/// File.write_text(path, content) — create/overwrite file with text content.
+#[no_mangle]
+pub unsafe extern "C" fn nex_io_file_write_text(path: *const c_char, data: *const c_char) -> i32 {
+    use std::io::Write;
+    let Ok(mut f) = std::fs::File::create(cstr_to_str(path)) else { return 0 };
+    f.write_all(cstr_to_str(data).as_bytes()).is_ok() as i32
+}
+
+/// File.read_all(path) — read entire file as string.
+#[no_mangle]
+pub unsafe extern "C" fn nex_io_file_read_all(path: *const c_char) -> *mut c_char {
+    let content = std::fs::read_to_string(cstr_to_str(path)).unwrap_or_default();
+    str_to_cstr(&content)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn nex_io_file_append(path: *const c_char, data: *const c_char) -> i32 {
     use std::io::Write;

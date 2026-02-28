@@ -278,5 +278,20 @@
       "$0"
     ],
     "description": "Reflect type introspection"
+  },
+  "File Read All": {
+    "prefix": "fileread",
+    "body": [
+      "content = file_read_all(\"${1:path.txt}\")",
+      "println(content)"
+    ],
+    "description": "Read entire file as string"
+  },
+  "File Write Text": {
+    "prefix": "filewrite",
+    "body": [
+      "file_write_text(\"${1:path.txt}\", ${2:content})"
+    ],
+    "description": "Write text content to a file"
   }
 }

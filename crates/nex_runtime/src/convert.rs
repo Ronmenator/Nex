@@ -41,6 +41,19 @@ pub unsafe extern "C" fn nex_char_to_str(c: i32) -> *mut c_char {
     str_to_cstr(s)
 }
 
+/// Like char_to_str but always produces exactly one byte (0-255).
+/// Useful for binary protocols (WebSocket frames, etc.) where you need
+/// raw bytes rather than UTF-8 encoded characters.
+#[no_mangle]
+pub unsafe extern "C" fn nex_byte_to_str(b: i64) -> *mut c_char {
+    let byte = (b & 0xFF) as u8;
+    let ptr = libc::malloc(2) as *mut c_char;
+    if ptr.is_null() { std::process::abort(); }
+    *(ptr as *mut u8) = byte;
+    *ptr.add(1) = 0;
+    ptr
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn nex_str_to_chars(s: *const c_char) -> *mut i32 {
     let src = cstr_to_str(s);

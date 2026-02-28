@@ -6,7 +6,7 @@ use nexc_meta::{NexMeta, read_meta_if_exists, write_meta};
 use nexc_parse::Parser;
 use nexc_resolve::{build_module_graph_with_libs, build_symbol_table, enforce_visibility, merge_partial_classes, resolve_module};
 use nexc_type::TypedModule;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -32,6 +32,10 @@ pub struct CompileOptions {
     /// don't collide at link time.  When `Some`, all top-level function and
     /// class/struct method definitions are prefixed with this name.
     pub module_prefix: Option<String>,
+    /// Function return types from other modules.  Pre-populated by
+    /// `jit_run_multi` so that cross-module calls can resolve the return
+    /// type for method dispatch (e.g. `splitString()` returns `List`).
+    pub external_function_returns: HashMap<String, String>,
 }
 
 impl Default for CompileOptions {
@@ -44,6 +48,7 @@ impl Default for CompileOptions {
             native_libs: Vec::new(),
             output_kind: OutputKind::Executable,
             module_prefix: None,
+            external_function_returns: HashMap::new(),
         }
     }
 }
@@ -92,7 +97,7 @@ pub fn compile_module(source: &str, options: CompileOptions) -> CompileResult {
     run_validate_inheritance(&stage_ast, &mut typed_mod, &mut sink);
     run_layout(&typed_mod, &mut sink, &mut stage_layouts);
     run_typecheck(&mut typed_mod, &mut sink);
-    let lowered = run_lower(&typed_mod, &mut sink, &stage_layouts, &mut ir, options.module_prefix.as_deref());
+    let lowered = run_lower(&typed_mod, &mut sink, &stage_layouts, &mut ir, options.module_prefix.as_deref(), &options.external_function_returns);
 
     if !sink.has_errors() {
         run_codegen(&lowered, &mut sink, &mut object, options.output_kind);
@@ -322,7 +327,14 @@ pub fn jit_run_multi(
     args: &[String],
     native_libs: &[PathBuf],
 ) -> Result<i32, String> {
-    use std::collections::HashMap;
+    // Pre-scan all source files for function return types.
+    // This enables cross-module method dispatch: when module B calls a
+    // function from module A that returns List, module B's lowering can
+    // correctly dispatch .add()/.length()/etc. to the right FFI functions.
+    let mut all_function_returns: HashMap<String, String> = HashMap::new();
+    for (source, _) in sources {
+        all_function_returns.extend(extract_function_returns_from_source(source));
+    }
 
     let mut merged = IrModule {
         name: "merged".to_string(),
@@ -334,7 +346,13 @@ pub fn jit_run_multi(
     let mut had_error = false;
 
     for (source, options) in sources {
-        let result = compile_module(source, options.clone());
+        let mut opts = options.clone();
+        // Merge pre-scanned function returns into each module's compile options.
+        // The module's own returns (from its AST) take precedence via `entry().or_insert`.
+        for (name, ret_ty) in &all_function_returns {
+            opts.external_function_returns.entry(name.clone()).or_insert_with(|| ret_ty.clone());
+        }
+        let result = compile_module(source, opts);
 
         for d in &result.diagnostics {
             if matches!(d.severity, Severity::Error) {
@@ -551,8 +569,9 @@ fn run_lower(
     layouts: &[ClassLayout],
     out_ir: &mut Option<IrModule>,
     module_prefix: Option<&str>,
+    external_function_returns: &HashMap<String, String>,
 ) -> IrModule {
-    let lowered = nexc_ir::lower_typed_module_with_prefix(typed, layouts, sink, module_prefix);
+    let lowered = nexc_ir::lower_typed_module_with_prefix(typed, layouts, sink, module_prefix, external_function_returns);
     *out_ir = Some(lowered.clone());
     lowered
 }
@@ -782,6 +801,54 @@ fn resolve_cross_module_classes(ir: &mut IrModule) {
     }
 }
 
+/// Lightweight pre-scan of a Nex source text to extract function return types.
+///
+/// Looks for patterns like `def name(...) -> ReturnType` and extracts
+/// `name → ReturnType`.  This does not require a full parse — it is a
+/// best-effort line-by-line scan used to populate cross-module metadata
+/// before compilation so that each module's lowering pass can correctly
+/// dispatch methods on values returned by functions from other modules.
+fn extract_function_returns_from_source(source: &str) -> HashMap<String, String> {
+    let mut returns = HashMap::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        // Skip comments and blank lines.
+        if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with("/*") {
+            continue;
+        }
+        // Find "def " keyword (could be preceded by public/static/virtual/override/async).
+        let Some(def_pos) = trimmed.find("def ") else {
+            continue;
+        };
+        let after_def = &trimmed[def_pos + 4..];
+        // Skip operator overloads: "def operator+(...)"
+        if after_def.starts_with("operator") {
+            continue;
+        }
+        // Extract function name (up to first '(' or '[').
+        let name_end = after_def
+            .find(|c: char| c == '(' || c == '[')
+            .unwrap_or(after_def.len());
+        let fn_name = after_def[..name_end].trim();
+        if fn_name.is_empty() || fn_name == "init" {
+            continue;
+        }
+        // Look for "->" after the parameter list.
+        if let Some(arrow_pos) = trimmed.rfind("->") {
+            let after_arrow = trimmed[arrow_pos + 2..].trim();
+            // Extract type name: alphanumeric chars up to '{', whitespace, or end.
+            let type_name: String = after_arrow
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            if !type_name.is_empty() && type_name != "Unit" {
+                returns.insert(fn_name.to_string(), type_name);
+            }
+        }
+    }
+    returns
+}
+
 fn read_previous_meta_if_imported(path: &str, sink: &mut DiagnosticSink) -> Option<NexMeta> {
     let source = PathBuf::from(format!("{}.nexmeta", path));
     match read_meta_if_exists(&source) {
@@ -987,7 +1054,7 @@ fn invoke_linker(
                 .unwrap_or_default();
 
             let win_libs = if cfg!(windows) {
-                " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib d3dcompiler_47.lib ole32.lib oleaut32.lib dwmapi.lib dxgi.lib d3d11.lib dxguid.lib"
+                " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib ole32.lib oleaut32.lib"
             } else {
                 ""
             };
@@ -1080,7 +1147,7 @@ fn invoke_linker_multi(
                 .unwrap_or_default();
 
             let win_libs = if cfg!(windows) {
-                " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib d3dcompiler_47.lib ole32.lib oleaut32.lib dwmapi.lib dxgi.lib d3d11.lib dxguid.lib"
+                " ws2_32.lib advapi32.lib userenv.lib ntdll.lib bcrypt.lib kernel32.lib user32.lib gdi32.lib ole32.lib oleaut32.lib"
             } else {
                 ""
             };
@@ -1276,5 +1343,204 @@ fn invoke_linker_multi_shared(
             let _ = std::fs::remove_file(&bat_path);
             result
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_returns_simple_function() {
+        let source = r#"
+def makeList() -> List {
+    items = List()
+    return items
+}
+"#;
+        let returns = extract_function_returns_from_source(source);
+        assert_eq!(returns.get("makeList"), Some(&"List".to_string()));
+    }
+
+    #[test]
+    fn extract_returns_multiple_functions() {
+        let source = r#"
+def splitString(s: String, delim: String) -> List {
+    return str_split(s, delim)
+}
+
+def createMap() -> Map {
+    return Map()
+}
+
+def greet(name: String) -> Unit {
+    println("Hello " + name)
+    return
+}
+
+def count() -> Int {
+    return 42
+}
+"#;
+        let returns = extract_function_returns_from_source(source);
+        assert_eq!(returns.get("splitString"), Some(&"List".to_string()));
+        assert_eq!(returns.get("createMap"), Some(&"Map".to_string()));
+        assert_eq!(returns.get("greet"), None);
+        assert_eq!(returns.get("count"), Some(&"Int".to_string()));
+    }
+
+    #[test]
+    fn extract_returns_with_modifiers() {
+        let source = r#"
+public def makeItems() -> List {
+    return List()
+}
+
+public static def create() -> String {
+    return "hello"
+}
+"#;
+        let returns = extract_function_returns_from_source(source);
+        assert_eq!(returns.get("makeItems"), Some(&"List".to_string()));
+        assert_eq!(returns.get("create"), Some(&"String".to_string()));
+    }
+
+    #[test]
+    fn extract_returns_skips_init_and_operators() {
+        let source = r#"
+class Foo {
+    def init(x: Int) -> Unit {
+        return
+    }
+    public static def operator+(a: Foo, b: Foo) -> Foo {
+        return Foo(0)
+    }
+}
+"#;
+        let returns = extract_function_returns_from_source(source);
+        assert_eq!(returns.get("init"), None);
+        assert_eq!(returns.get("operator"), None);
+    }
+
+    #[test]
+    fn cross_module_list_return_dispatch() {
+        // Module A: defines a function that returns List
+        let module_a = r#"
+def makeNumbers() -> List {
+    items = List()
+    items.add(1)
+    items.add(2)
+    items.add(3)
+    return items
+}
+"#;
+        // Module B: calls makeNumbers() and uses List methods on the result
+        let module_b = r#"
+def main() -> Unit {
+    nums = makeNumbers()
+    println(nums.length())
+    return
+}
+"#;
+        let opts_a = CompileOptions::default();
+        let opts_b = CompileOptions::default();
+        let sources: Vec<(&str, CompileOptions)> = vec![
+            (module_a, opts_a),
+            (module_b, opts_b),
+        ];
+        // This should compile without errors (previously would fail
+        // because module B didn't know makeNumbers returns List).
+        let result = jit_run_multi(&sources, &[], &[]);
+        assert!(result.is_ok(), "cross-module List return should compile and run: {:?}", result);
+    }
+
+    /// When a function ends with a while loop (no code after), the exit_label
+    /// must still get a real IrBlock.  Previously it became a phantom and
+    /// `break` inside the loop would jump to the wrong block.
+    #[test]
+    fn break_in_while_unit_function() {
+        let source = r#"
+def process(s: String) -> Unit {
+    var x = 0
+    while (x < 10) {
+        if (x == 5) {
+            break
+        }
+        x = x + 1
+    }
+}
+
+def main() -> Int {
+    process("test")
+    return 0
+}
+"#;
+        let opts = CompileOptions::default();
+        let result = jit_run(source, opts, &[]);
+        assert!(result.is_ok(), "break in while (Unit fn) should work: {:?}", result);
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    /// Cross-module variant: break must work when the function with the while
+    /// loop is defined in a separate module.
+    #[test]
+    fn break_in_while_cross_module() {
+        let module_a = r#"
+def process(s: String) -> Unit {
+    var x = 0
+    while (x < 10) {
+        if (x == 5) {
+            break
+        }
+        x = x + 1
+    }
+}
+"#;
+        let module_b = r#"
+def main() -> Int {
+    process("test")
+    return 0
+}
+"#;
+        let opts_a = CompileOptions::default();
+        let opts_b = CompileOptions::default();
+        let sources: Vec<(&str, CompileOptions)> = vec![
+            (module_a, opts_a),
+            (module_b, opts_b),
+        ];
+        let result = jit_run_multi(&sources, &[], &[]);
+        assert!(result.is_ok(), "cross-module break in while should work: {:?}", result);
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    /// Bug #14: `-> Unit` function ending with a while loop using str_length
+    /// would fail because the exit_label became a phantom.  `-> Int` worked
+    /// because an explicit `return` gave the exit_label a real block.
+    #[test]
+    fn unit_fn_while_str_length_cross_module() {
+        let module_a = r#"
+def processString(s: String) -> Unit {
+    var remaining = s
+    while (str_length(remaining) > 0) {
+        remaining = str_substring(remaining, 1, str_length(remaining))
+    }
+}
+"#;
+        let module_b = r#"
+def main() -> Int {
+    processString("")
+    processString("abc")
+    return 0
+}
+"#;
+        let opts_a = CompileOptions::default();
+        let opts_b = CompileOptions::default();
+        let sources: Vec<(&str, CompileOptions)> = vec![
+            (module_a, opts_a),
+            (module_b, opts_b),
+        ];
+        let result = jit_run_multi(&sources, &[], &[]);
+        assert!(result.is_ok(), "Unit fn with while+str_length cross-module should work: {:?}", result);
+        assert_eq!(result.unwrap(), 0);
     }
 }

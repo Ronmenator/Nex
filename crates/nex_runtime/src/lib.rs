@@ -430,8 +430,8 @@ pub unsafe extern "C" fn nex_bool_to_str(v: i32) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn nex_str_length(s: *const c_char) -> i32 {
-    if s.is_null() { 0 } else { libc::strlen(s) as i32 }
+pub unsafe extern "C" fn nex_str_length(s: *const c_char) -> i64 {
+    if s.is_null() { 0 } else { libc::strlen(s) as i64 }
 }
 
 #[no_mangle]

@@ -1157,6 +1157,71 @@ def main() {
     }
 }
 
+/// Regression: when a function ends with a while loop and NO code after,
+/// the while exit label must still be a real IrBlock (not a phantom).
+/// Previously `lower_function` skipped the final seal_block when
+/// `current_block` was empty, even though `pending_label` was set.
+/// This caused `break` to resolve to the wrong fallthrough block.
+#[test]
+fn ir_while_exit_label_real_when_no_code_after() {
+    let src = r#"
+def looper() {
+    var i = 0
+    while (i < 10) {
+        if (i == 5) {
+            break
+        }
+        i = i + 1
+    }
+}
+def main() {
+    looper()
+    return
+}
+"#;
+    let result = compile_ok(src);
+    let ir = result.ir.as_ref().expect("no IR");
+    let func = ir.functions.iter().find(|f| f.name == "looper").unwrap();
+
+    // Find the while header's Branch and check that the exit label (else_label)
+    // is a real IrBlock.  The body label being a phantom is fine — it
+    // correctly falls through to the next sequential block.
+    let mut exit_labels = Vec::new();
+    for block in &func.blocks {
+        for inst in &block.instructions {
+            if let nexc_ir::IrInstruction::Branch { else_label, .. } = inst {
+                exit_labels.push(else_label.clone());
+            }
+        }
+    }
+    assert!(!exit_labels.is_empty(), "should have at least one Branch");
+
+    let block_labels: Vec<&str> = func.blocks.iter().map(|b| b.label.as_str()).collect();
+    // The FIRST Branch's else_label is the while exit label — it must be real.
+    let while_exit = &exit_labels[0];
+    assert!(
+        block_labels.contains(&while_exit.as_str()),
+        "while exit label `{while_exit}` should be a real IrBlock, not phantom. \
+         Found blocks: {block_labels:?}"
+    );
+
+    // Also verify that break's Jump target matches the while exit label.
+    let mut break_targets = Vec::new();
+    for block in &func.blocks {
+        for inst in &block.instructions {
+            if let nexc_ir::IrInstruction::Jump { target } = inst {
+                if target == while_exit {
+                    break_targets.push(target.clone());
+                }
+            }
+        }
+    }
+    assert!(
+        !break_targets.is_empty(),
+        "break should Jump to the while exit label `{while_exit}`"
+    );
+}
+
 #[test]
 fn ir_string_concat_generates_binop_add() {
     let src = r#"
