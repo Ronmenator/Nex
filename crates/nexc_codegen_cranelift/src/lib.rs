@@ -1084,16 +1084,25 @@ fn build_reg_type_map(
         map.insert(format!("%{name}"), reg_ty);
     }
     // Cross-function global type inference: scan ALL functions for globals stored
-    // from string constants (e.g. class field initializers like `name_value = ""`
-    // prepended into main). This lets functions that only READ a string global
-    // (e.g. on_greet reading `name_value`) correctly type it as RegType::String
-    // instead of defaulting to RegType::Int and calling nex_int_to_str on the pointer.
+    // from constants (e.g. module-level initializers like `name = ""` or `timer = 0.0f`
+    // prepended into main). This lets functions that only READ a global
+    // correctly type it (e.g. Float for `fps_timer`) instead of defaulting to
+    // RegType::Int and corrupting the value via fcvt_from_sint instead of bitcast.
     for func in ir_module_funcs {
         for block in &func.blocks {
             for inst in &block.instructions {
-                if let IrInstruction::Store { dst, src: IrValue::StringConst(_) } = inst {
+                if let IrInstruction::Store { dst, src } = inst {
                     if global_data.contains_key(dst.as_str()) {
-                        map.insert(dst.clone(), RegType::String);
+                        let ty = match src {
+                            IrValue::StringConst(_) => Some(RegType::String),
+                            IrValue::FloatConst(_) => Some(RegType::Float),
+                            IrValue::IntConst(_) => Some(RegType::Int),
+                            IrValue::BoolConst(_) => Some(RegType::Bool),
+                            _ => None,
+                        };
+                        if let Some(ty) = ty {
+                            map.insert(dst.clone(), ty);
+                        }
                     }
                 }
             }
@@ -1134,15 +1143,16 @@ fn build_reg_type_map(
                                 IrValue::Register(r) => map.get(r).copied().unwrap_or(RegType::Int),
                                 _ => RegType::Int,
                             };
-                            if op == "add" && lty == RegType::String {
+                            let rty = match rhs {
+                                IrValue::FloatConst(_) => RegType::Float,
+                                IrValue::StringConst(_) => RegType::String,
+                                IrValue::Register(r) => map.get(r).copied().unwrap_or(RegType::Int),
+                                _ => RegType::Int,
+                            };
+                            if lty == RegType::String || rty == RegType::String {
                                 RegType::String
-                            } else if op == "add" {
-                                let rty = match rhs {
-                                    IrValue::StringConst(_) => RegType::String,
-                                    IrValue::Register(r) => map.get(r).copied().unwrap_or(RegType::Int),
-                                    _ => RegType::Int,
-                                };
-                                if rty == RegType::String { RegType::String } else { lty }
+                            } else if lty == RegType::Float || rty == RegType::Float {
+                                RegType::Float
                             } else {
                                 lty
                             }
@@ -1424,22 +1434,72 @@ fn emit_instruction<M: Module>(
             let rhs_type = irvalue_reg_type(rhs, reg_types);
             let l = resolve_value(builder, module, lhs, vars, strings, func_ids, global_data);
             let r = resolve_value(builder, module, rhs, vars, strings, func_ids, global_data);
+            let is_float = lhs_type == RegType::Float || rhs_type == RegType::Float;
+            // Helper: convert an I64 operand to F64.
+            // Float values are bitcast (already f64 bit-pattern in I64).
+            // Int values are converted via fcvt_from_sint (real integer → f64).
+            let to_f64 = |builder: &mut FunctionBuilder, v: cranelift_codegen::ir::Value, rt: RegType| -> cranelift_codegen::ir::Value {
+                if rt == RegType::Float {
+                    builder.ins().bitcast(types::F64, MemFlags::new(), v)
+                } else {
+                    builder.ins().fcvt_from_sint(types::F64, v)
+                }
+            };
             let result = match op.as_str() {
                 "add" if lhs_type == RegType::String || rhs_type == RegType::String => {
                     let lstr = coerce_to_str(builder, module, l, lhs_type, func_ids);
                     let rstr = coerce_to_str(builder, module, r, rhs_type, func_ids);
                     call_runtime2(builder, module, func_ids, "nex_str_concat", lstr, rstr)
                 }
+                "add" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let res = builder.ins().fadd(lf, rf);
+                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                }
                 "add" => builder.ins().iadd(l, r),
+                "sub" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let res = builder.ins().fsub(lf, rf);
+                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                }
                 "sub" => builder.ins().isub(l, r),
+                "mul" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let res = builder.ins().fmul(lf, rf);
+                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                }
                 "mul" => builder.ins().imul(l, r),
+                "div" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let res = builder.ins().fdiv(lf, rf);
+                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                }
                 "div" => builder.ins().sdiv(l, r),
+                "mod" if is_float => {
+                    // Float modulo: a - floor(a/b) * b
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let quot = builder.ins().fdiv(lf, rf);
+                    let floored = builder.ins().floor(quot);
+                    let prod = builder.ins().fmul(floored, rf);
+                    let res = builder.ins().fsub(lf, prod);
+                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                }
                 "mod" => builder.ins().srem(l, r),
                 "eq" if lhs_type == RegType::String || rhs_type == RegType::String => {
                     call_runtime2(builder, module, func_ids, "nex_str_eq", l, r)
                 }
+                "eq" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let c = builder.ins().fcmp(cranelift_codegen::ir::condcodes::FloatCC::Equal, lf, rf);
+                    builder.ins().uextend(types::I64, c)
+                }
                 "eq" => {
-
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, l, r);
                     builder.ins().uextend(types::I64, c)
                 }
@@ -1448,20 +1508,50 @@ fn emit_instruction<M: Module>(
                     let one = builder.ins().iconst(types::I64, 1);
                     builder.ins().bxor(eq, one)
                 }
+                "ne" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let c = builder.ins().fcmp(cranelift_codegen::ir::condcodes::FloatCC::NotEqual, lf, rf);
+                    builder.ins().uextend(types::I64, c)
+                }
                 "ne" => {
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::NotEqual, l, r);
+                    builder.ins().uextend(types::I64, c)
+                }
+                "lt" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let c = builder.ins().fcmp(cranelift_codegen::ir::condcodes::FloatCC::LessThan, lf, rf);
                     builder.ins().uextend(types::I64, c)
                 }
                 "lt" => {
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::SignedLessThan, l, r);
                     builder.ins().uextend(types::I64, c)
                 }
+                "le" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let c = builder.ins().fcmp(cranelift_codegen::ir::condcodes::FloatCC::LessThanOrEqual, lf, rf);
+                    builder.ins().uextend(types::I64, c)
+                }
                 "le" => {
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::SignedLessThanOrEqual, l, r);
                     builder.ins().uextend(types::I64, c)
                 }
+                "gt" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let c = builder.ins().fcmp(cranelift_codegen::ir::condcodes::FloatCC::GreaterThan, lf, rf);
+                    builder.ins().uextend(types::I64, c)
+                }
                 "gt" => {
                     let c = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::SignedGreaterThan, l, r);
+                    builder.ins().uextend(types::I64, c)
+                }
+                "ge" if is_float => {
+                    let lf = to_f64(builder, l, lhs_type);
+                    let rf = to_f64(builder, r, rhs_type);
+                    let c = builder.ins().fcmp(cranelift_codegen::ir::condcodes::FloatCC::GreaterThanOrEqual, lf, rf);
                     builder.ins().uextend(types::I64, c)
                 }
                 "ge" => {
@@ -2938,6 +3028,69 @@ fn declare_runtime_imports<M: Module>(
     sig_f64x3_ret_i64.params.push(AbiParam::new(types::F64));
     sig_f64x3_ret_i64.returns.push(AbiParam::new(types::I64));
 
+    // --- F64-aware signatures for nex3d engine (correct Windows x64 ABI) ---
+
+    // f64() – delta_time, elapsed_time, mouse_x/y, mouse_delta_x/y, scroll_delta
+    let mut sig_ret_f64 = Signature::new(cc);
+    sig_ret_f64.returns.push(AbiParam::new(types::F64));
+
+    // void(f64, f64, f64) – camera_pos/target/up, ambient_color
+    let mut sig_void_f64x3 = Signature::new(cc);
+    for _ in 0..3 { sig_void_f64x3.params.push(AbiParam::new(types::F64)); }
+
+    // void(f64, f64, f64, f64) – clear_color, set_perspective
+    let mut sig_void_f64x4 = Signature::new(cc);
+    for _ in 0..4 { sig_void_f64x4.params.push(AbiParam::new(types::F64)); }
+
+    // void(f64 x6) – push_vertex
+    let mut sig_void_f64x6 = Signature::new(cc);
+    for _ in 0..6 { sig_void_f64x6.params.push(AbiParam::new(types::F64)); }
+
+    // void(f64 x9) – push_vertex_lit
+    let mut sig_void_f64x9 = Signature::new(cc);
+    for _ in 0..9 { sig_void_f64x9.params.push(AbiParam::new(types::F64)); }
+
+    // void(f64 x11) – push_vertex_uv
+    let mut sig_void_f64x11 = Signature::new(cc);
+    for _ in 0..11 { sig_void_f64x11.params.push(AbiParam::new(types::F64)); }
+
+    // void(i64, f64, f64) – light_set_spot_angles
+    let mut sig_void_i64_f64x2 = Signature::new(cc);
+    sig_void_i64_f64x2.params.push(AbiParam::new(types::I64));
+    for _ in 0..2 { sig_void_i64_f64x2.params.push(AbiParam::new(types::F64)); }
+
+    // void(i64, f64, f64, f64) – light_set_position/direction/color
+    let mut sig_void_i64_f64x3 = Signature::new(cc);
+    sig_void_i64_f64x3.params.push(AbiParam::new(types::I64));
+    for _ in 0..3 { sig_void_i64_f64x3.params.push(AbiParam::new(types::F64)); }
+
+    // void(i64, f64 x6) – font_draw_text
+    let mut sig_void_i64_f64x6 = Signature::new(cc);
+    sig_void_i64_f64x6.params.push(AbiParam::new(types::I64));
+    for _ in 0..6 { sig_void_i64_f64x6.params.push(AbiParam::new(types::F64)); }
+
+    // void(i64, f64 x8) – spritebatch_draw, spritebatch_draw_src
+    let mut sig_void_i64_f64x8 = Signature::new(cc);
+    sig_void_i64_f64x8.params.push(AbiParam::new(types::I64));
+    for _ in 0..8 { sig_void_i64_f64x8.params.push(AbiParam::new(types::F64)); }
+
+    // f64(i64) – anim_get_time
+    let mut sig_f64_i64 = Signature::new(cc);
+    sig_f64_i64.params.push(AbiParam::new(types::I64));
+    sig_f64_i64.returns.push(AbiParam::new(types::F64));
+
+    // f64(i64, f64) – font_measure_text
+    let mut sig_f64_i64_f64 = Signature::new(cc);
+    sig_f64_i64_f64.params.push(AbiParam::new(types::I64));
+    sig_f64_i64_f64.params.push(AbiParam::new(types::F64));
+    sig_f64_i64_f64.returns.push(AbiParam::new(types::F64));
+
+    // f64(i64, i64) – gamepad_axis, anim_clip_duration
+    let mut sig_f64_i64x2 = Signature::new(cc);
+    sig_f64_i64x2.params.push(AbiParam::new(types::I64));
+    sig_f64_i64x2.params.push(AbiParam::new(types::I64));
+    sig_f64_i64x2.returns.push(AbiParam::new(types::F64));
+
     // i64(f64) – double_to_str
     let mut sig_f64_ret_i64 = Signature::new(cc);
     sig_f64_ret_i64.params.push(AbiParam::new(types::F64));
@@ -3413,7 +3566,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_engine_window_destroy", &sig_void_ptr),
         ("nex_engine_window_is_running", &sig_ptr_ptr),
         // Config
-        ("nex_engine_clear_color", &sig_void_ptr4),
+        ("nex_engine_clear_color", &sig_void_f64x4),
         ("nex_engine_set_update_fn", &sig_void_ptr),
         ("nex_engine_window_width", &sig_ret_ptr),
         ("nex_engine_window_height", &sig_ret_ptr),
@@ -3421,59 +3574,59 @@ fn declare_runtime_imports<M: Module>(
         ("nex_engine_key_down", &sig_ptr_ptr),
         ("nex_engine_key_pressed", &sig_ptr_ptr),
         ("nex_engine_key_released", &sig_ptr_ptr),
-        // Input — mouse
-        ("nex_engine_mouse_x", &sig_ret_ptr),
-        ("nex_engine_mouse_y", &sig_ret_ptr),
-        ("nex_engine_mouse_delta_x", &sig_ret_ptr),
-        ("nex_engine_mouse_delta_y", &sig_ret_ptr),
+        // Input — mouse (return f64)
+        ("nex_engine_mouse_x", &sig_ret_f64),
+        ("nex_engine_mouse_y", &sig_ret_f64),
+        ("nex_engine_mouse_delta_x", &sig_ret_f64),
+        ("nex_engine_mouse_delta_y", &sig_ret_f64),
         ("nex_engine_mouse_button_down", &sig_ptr_ptr),
         ("nex_engine_mouse_button_pressed", &sig_ptr_ptr),
-        // Timing
-        ("nex_engine_delta_time", &sig_ret_ptr),
-        ("nex_engine_elapsed_time", &sig_ret_ptr),
+        // Timing (return f64)
+        ("nex_engine_delta_time", &sig_ret_f64),
+        ("nex_engine_elapsed_time", &sig_ret_f64),
         ("nex_engine_frame_count", &sig_ret_ptr),
-        // Camera
-        ("nex_engine_set_camera_pos", &sig_void_ptr3),
-        ("nex_engine_set_camera_target", &sig_void_ptr3),
-        ("nex_engine_set_camera_up", &sig_void_ptr3),
-        ("nex_engine_set_perspective", &sig_void_ptr4),
-        // Drawing
-        ("nex_engine_push_vertex", &sig_void_ptr6),
-        ("nex_engine_push_vertex_lit", &sig_void_ptr9),
+        // Camera (f64 params)
+        ("nex_engine_set_camera_pos", &sig_void_f64x3),
+        ("nex_engine_set_camera_target", &sig_void_f64x3),
+        ("nex_engine_set_camera_up", &sig_void_f64x3),
+        ("nex_engine_set_perspective", &sig_void_f64x4),
+        // Drawing (f64 params)
+        ("nex_engine_push_vertex", &sig_void_f64x6),
+        ("nex_engine_push_vertex_lit", &sig_void_f64x9),
         ("nex_engine_draw_triangles", &sig_void),
         // Lighting
-        ("nex_engine_set_ambient_color", &sig_void_ptr3),
+        ("nex_engine_set_ambient_color", &sig_void_f64x3),
         ("nex_engine_light_set_type", &sig_void_ptr2),
         ("nex_engine_light_set_enabled", &sig_void_ptr2),
-        ("nex_engine_light_set_position", &sig_void_ptr4),
-        ("nex_engine_light_set_direction", &sig_void_ptr4),
-        ("nex_engine_light_set_color", &sig_void_ptr4),
-        ("nex_engine_light_set_intensity", &sig_void_ptr2),
-        ("nex_engine_light_set_range", &sig_void_ptr2),
-        ("nex_engine_light_set_spot_angles", &sig_void_ptr3),
+        ("nex_engine_light_set_position", &sig_void_i64_f64x3),
+        ("nex_engine_light_set_direction", &sig_void_i64_f64x3),
+        ("nex_engine_light_set_color", &sig_void_i64_f64x3),
+        ("nex_engine_light_set_intensity", &sig_void_i64_f64),
+        ("nex_engine_light_set_range", &sig_void_i64_f64),
+        ("nex_engine_light_set_spot_angles", &sig_void_i64_f64x2),
         ("nex_engine_clear_lights", &sig_void),
         // Texture
-        ("nex_engine_push_vertex_uv", &sig_void_ptr11),
+        ("nex_engine_push_vertex_uv", &sig_void_f64x11),
         ("nex_engine_texture_load", &sig_ptr_ptr),
         ("nex_engine_texture_bind", &sig_void_ptr),
         ("nex_engine_texture_unbind", &sig_void),
         ("nex_engine_texture_width", &sig_ptr_ptr),
         ("nex_engine_texture_height", &sig_ptr_ptr),
-        // SpriteBatch
+        // SpriteBatch (i64 handle + f64 coords)
         ("nex_engine_spritebatch_begin", &sig_void),
         ("nex_engine_spritebatch_end", &sig_void),
-        ("nex_engine_spritebatch_draw", &sig_void_ptr9),
-        ("nex_engine_spritebatch_draw_src", &sig_void_ptr9),
-        // Font
-        ("nex_engine_font_draw_text", &sig_void_ptr7),
-        ("nex_engine_font_measure_text", &sig_ptr_ptr2),
+        ("nex_engine_spritebatch_draw", &sig_void_i64_f64x8),
+        ("nex_engine_spritebatch_draw_src", &sig_void_i64_f64x8),
+        // Font (i64 ptr + f64 coords)
+        ("nex_engine_font_draw_text", &sig_void_i64_f64x6),
+        ("nex_engine_font_measure_text", &sig_f64_i64_f64),
         // Render States
         ("nex_engine_set_blend_mode", &sig_void_ptr),
         ("nex_engine_set_cull_mode", &sig_void_ptr),
         ("nex_engine_set_fill_mode", &sig_void_ptr),
         ("nex_engine_set_depth_enabled", &sig_void_ptr),
-        // Mouse scroll
-        ("nex_engine_mouse_scroll_delta", &sig_ret_ptr),
+        // Mouse scroll (return f64)
+        ("nex_engine_mouse_scroll_delta", &sig_ret_f64),
         // Audio
         ("nex_engine_audio_load", &sig_ptr_ptr),          // path_ptr → handle
         ("nex_engine_audio_play", &sig_void_ptr),          // handle
@@ -3496,9 +3649,9 @@ fn declare_runtime_imports<M: Module>(
         ("nex_engine_anim_set_speed", &sig_void_ptr2),     // handle, speed_bits
         ("nex_engine_anim_set_looping", &sig_void_ptr2),   // handle, flag
         ("nex_engine_anim_set_time", &sig_void_ptr2),      // handle, time_bits
-        ("nex_engine_anim_get_time", &sig_ptr_ptr),        // handle → time
+        ("nex_engine_anim_get_time", &sig_f64_i64),        // handle → f64 time
         ("nex_engine_anim_clip_count", &sig_ptr_ptr),      // handle → count
-        ("nex_engine_anim_clip_duration", &sig_ptr_ptr2),  // handle, clip → duration
+        ("nex_engine_anim_clip_duration", &sig_f64_i64x2), // handle, clip → f64 duration
         ("nex_engine_anim_joint_count", &sig_ptr_ptr),     // handle → count
         ("nex_engine_anim_model_free", &sig_void_ptr),     // handle
         // RenderTarget
@@ -3512,7 +3665,7 @@ fn declare_runtime_imports<M: Module>(
         // Gamepad
         ("nex_engine_gamepad_connected", &sig_ptr_ptr),    // player → 0/1
         ("nex_engine_gamepad_button", &sig_ptr_ptr2),      // player, button → 0/1
-        ("nex_engine_gamepad_axis", &sig_ptr_ptr2),        // player, axis → f64 (as bits)
+        ("nex_engine_gamepad_axis", &sig_f64_i64x2),       // player, axis → f64
         // UI Overlay
         ("nex_engine_enable_ui_overlay", &sig_void),
     ];

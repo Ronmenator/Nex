@@ -729,11 +729,40 @@ fn resolve_cross_module_classes(ir: &mut IrModule) {
         }
     }
 
-    // Pass 2: Infer register types from constructor calls and rewrite MemberAccess.
-    // Track which registers hold class instances by scanning Call instructions
-    // whose target is a known ::init function.
+    // Build function name → return class type mapping for call return type inference.
+    let mut func_return_class: HashMap<String, String> = HashMap::new();
+    for f in &ir.functions {
+        let class_name = match &f.return_type {
+            nexc_type::Type::Named(n) => Some(n.as_str()),
+            nexc_type::Type::Generic(n, _) => Some(n.as_str()),
+            _ => None,
+        };
+        if let Some(cn) = class_name {
+            if class_fields.contains_key(cn) {
+                func_return_class.insert(f.name.clone(), cn.to_string());
+            }
+        }
+    }
+
+    // Pass 2: Infer register types from constructor calls, function params/returns,
+    // and rewrite MemberAccess.
     for func in &mut ir.functions {
         let mut reg_types: HashMap<String, String> = HashMap::new();
+
+        // Seed register types from function parameter type annotations.
+        // e.g. `color: Color` → `%color` has type "Color".
+        for (param_name, param_ty) in &func.params {
+            let class_name = match param_ty {
+                nexc_type::Type::Named(n) => Some(n.as_str()),
+                nexc_type::Type::Generic(n, _) => Some(n.as_str()),
+                _ => None,
+            };
+            if let Some(cn) = class_name {
+                if class_fields.contains_key(cn) {
+                    reg_types.insert(format!("%{param_name}"), cn.to_string());
+                }
+            }
+        }
 
         // Scan all blocks to build register → class type mapping.
         for block in &func.blocks {
@@ -754,6 +783,10 @@ fn resolve_cross_module_classes(ir: &mut IrModule) {
                                 reg_types
                                     .insert(dst.clone(), class_name.to_string());
                             }
+                        }
+                        // Also infer from function return types (e.g. COLOR_GRAY() → Color).
+                        if let Some(cn) = func_return_class.get(target.as_str()) {
+                            reg_types.insert(dst.clone(), cn.clone());
                         }
                     }
                     nexc_ir::IrInstruction::Store {

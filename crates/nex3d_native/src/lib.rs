@@ -874,6 +874,16 @@ fn mat4_identity() -> Mat4 {
     ]
 }
 
+fn mat4_transpose(m: &Mat4) -> Mat4 {
+    let mut r = [0.0f32; 16];
+    for row in 0..4 {
+        for col in 0..4 {
+            r[col * 4 + row] = m[row * 4 + col];
+        }
+    }
+    r
+}
+
 fn mat4_multiply(a: &Mat4, b: &Mat4) -> Mat4 {
     let mut r = [0.0f32; 16];
     for row in 0..4 {
@@ -1809,7 +1819,9 @@ impl ApplicationHandler for EngineApp {
                         state.near_plane as f32,
                         state.far_plane as f32,
                     );
-                    let view_proj = mat4_multiply(&proj, &view);
+                    let view_proj_rm = mat4_multiply(&proj, &view);
+                    // Transpose row-major → column-major for WGSL mat4x4
+                    let view_proj = mat4_transpose(&view_proj_rm);
 
                     // -- Build GPU light array --
                     let mut gpu_lights = [GpuLight {
@@ -2091,6 +2103,7 @@ impl ApplicationHandler for EngineApp {
                     state.mouse_buttons_pressed.clear();
                     state.mouse_scroll_delta = 0.0;
                     state.skinned_draw_calls.clear();
+
                 });
             }
 
