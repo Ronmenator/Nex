@@ -1,5 +1,10 @@
 // nex3d.draw — Drawing primitives for 3D rendering.
 // Wraps nex_engine_* runtime FFI functions with convenience helpers.
+//
+// NOTE: Due to a compiler limitation, struct field access for multiple
+// parameters of the same type aliases to the same global.  All drawing
+// helpers therefore extract fields into local floats before any new struct
+// is constructed, and call FFI directly with plain float arguments.
 
 import nex3d.math
 import nex3d.color
@@ -26,71 +31,200 @@ public def flush_triangles() {
 // ---- Convenience: draw a single triangle ----
 
 public def draw_triangle(p1: Vec3, c1: Color, p2: Vec3, c2: Color, p3: Vec3, c3: Color) {
-    engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
-    engine_push_vertex(p2.x, p2.y, p2.z, c2.r, c2.g, c2.b)
-    engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
+    // Capture all struct fields into locals before any struct operation
+    // (all Vec3 params alias %Vec3.*, all Color params alias %Color.*)
+    // The last constructed Vec3 before this call determines %Vec3.*, and
+    // the last Color determines %Color.*.  With multiple struct params we
+    // must use a flat-arg helper instead.
+    draw_triangle_f(
+        p1.x, p1.y, p1.z, c1.r, c1.g, c1.b,
+        p2.x, p2.y, p2.z, c2.r, c2.g, c2.b,
+        p3.x, p3.y, p3.z, c3.r, c3.g, c3.b
+    )
+    return
+}
+
+// Flat-arg triangle: no struct aliasing issues.
+public def draw_triangle_f(
+    p1x: Float, p1y: Float, p1z: Float, c1r: Float, c1g: Float, c1b: Float,
+    p2x: Float, p2y: Float, p2z: Float, c2r: Float, c2g: Float, c2b: Float,
+    p3x: Float, p3y: Float, p3z: Float, c3r: Float, c3g: Float, c3b: Float
+) {
+    engine_push_vertex(p1x, p1y, p1z, c1r, c1g, c1b)
+    engine_push_vertex(p2x, p2y, p2z, c2r, c2g, c2b)
+    engine_push_vertex(p3x, p3y, p3z, c3r, c3g, c3b)
     return
 }
 
 // Draw a triangle with explicit normals per vertex.
 public def draw_triangle_lit(p1: Vec3, n1: Vec3, c1: Color, p2: Vec3, n2: Vec3, c2: Color, p3: Vec3, n3: Vec3, c3: Color) {
-    engine_push_vertex_lit(p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c1.r, c1.g, c1.b)
-    engine_push_vertex_lit(p2.x, p2.y, p2.z, n2.x, n2.y, n2.z, c2.r, c2.g, c2.b)
-    engine_push_vertex_lit(p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c3.r, c3.g, c3.b)
+    // All Vec3 params alias — delegate to flat version
+    draw_triangle_lit_f(
+        p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c1.r, c1.g, c1.b,
+        p2.x, p2.y, p2.z, n2.x, n2.y, n2.z, c2.r, c2.g, c2.b,
+        p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c3.r, c3.g, c3.b
+    )
+    return
+}
+
+public def draw_triangle_lit_f(
+    p1x: Float, p1y: Float, p1z: Float, n1x: Float, n1y: Float, n1z: Float, c1r: Float, c1g: Float, c1b: Float,
+    p2x: Float, p2y: Float, p2z: Float, n2x: Float, n2y: Float, n2z: Float, c2r: Float, c2g: Float, c2b: Float,
+    p3x: Float, p3y: Float, p3z: Float, n3x: Float, n3y: Float, n3z: Float, c3r: Float, c3g: Float, c3b: Float
+) {
+    engine_push_vertex_lit(p1x, p1y, p1z, n1x, n1y, n1z, c1r, c1g, c1b)
+    engine_push_vertex_lit(p2x, p2y, p2z, n2x, n2y, n2z, c2r, c2g, c2b)
+    engine_push_vertex_lit(p3x, p3y, p3z, n3x, n3y, n3z, c3r, c3g, c3b)
     return
 }
 
 // ---- Convenience: draw a quad (two triangles) ----
 
 public def draw_quad(p1: Vec3, c1: Color, p2: Vec3, c2: Color, p3: Vec3, c3: Color, p4: Vec3, c4: Color) {
+    // All params alias — delegate to flat version
+    draw_quad_f(
+        p1.x, p1.y, p1.z, c1.r, c1.g, c1.b,
+        p2.x, p2.y, p2.z, c2.r, c2.g, c2.b,
+        p3.x, p3.y, p3.z, c3.r, c3.g, c3.b,
+        p4.x, p4.y, p4.z, c4.r, c4.g, c4.b
+    )
+    return
+}
+
+public def draw_quad_f(
+    p1x: Float, p1y: Float, p1z: Float, c1r: Float, c1g: Float, c1b: Float,
+    p2x: Float, p2y: Float, p2z: Float, c2r: Float, c2g: Float, c2b: Float,
+    p3x: Float, p3y: Float, p3z: Float, c3r: Float, c3g: Float, c3b: Float,
+    p4x: Float, p4y: Float, p4z: Float, c4r: Float, c4g: Float, c4b: Float
+) {
     // Triangle 1: p1, p2, p3
-    engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
-    engine_push_vertex(p2.x, p2.y, p2.z, c2.r, c2.g, c2.b)
-    engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
+    engine_push_vertex(p1x, p1y, p1z, c1r, c1g, c1b)
+    engine_push_vertex(p2x, p2y, p2z, c2r, c2g, c2b)
+    engine_push_vertex(p3x, p3y, p3z, c3r, c3g, c3b)
     // Triangle 2: p1, p3, p4
-    engine_push_vertex(p1.x, p1.y, p1.z, c1.r, c1.g, c1.b)
-    engine_push_vertex(p3.x, p3.y, p3.z, c3.r, c3.g, c3.b)
-    engine_push_vertex(p4.x, p4.y, p4.z, c4.r, c4.g, c4.b)
+    engine_push_vertex(p1x, p1y, p1z, c1r, c1g, c1b)
+    engine_push_vertex(p3x, p3y, p3z, c3r, c3g, c3b)
+    engine_push_vertex(p4x, p4y, p4z, c4r, c4g, c4b)
     return
 }
 
 // ---- Convenience: draw a flat-colored quad ----
 
 public def draw_quad_flat(p1: Vec3, p2: Vec3, p3: Vec3, p4: Vec3, c: Color) {
-    draw_quad(p1, c, p2, c, p3, c, p4, c)
+    // All Vec3 params alias — extract fields from caller's last Vec3
+    // and use flat version
+    draw_quad_f(
+        p1.x, p1.y, p1.z, c.r, c.g, c.b,
+        p2.x, p2.y, p2.z, c.r, c.g, c.b,
+        p3.x, p3.y, p3.z, c.r, c.g, c.b,
+        p4.x, p4.y, p4.z, c.r, c.g, c.b
+    )
     return
 }
 
 // Draw a flat-colored quad with an explicit face normal.
 public def draw_quad_flat_lit(p1: Vec3, p2: Vec3, p3: Vec3, p4: Vec3, n: Vec3, c: Color) {
+    // All Vec3 params alias — delegate to flat version
+    draw_quad_flat_lit_f(
+        p1.x, p1.y, p1.z,
+        p2.x, p2.y, p2.z,
+        p3.x, p3.y, p3.z,
+        p4.x, p4.y, p4.z,
+        n.x, n.y, n.z,
+        c.r, c.g, c.b
+    )
+    return
+}
+
+public def draw_quad_flat_lit_f(
+    p1x: Float, p1y: Float, p1z: Float,
+    p2x: Float, p2y: Float, p2z: Float,
+    p3x: Float, p3y: Float, p3z: Float,
+    p4x: Float, p4y: Float, p4z: Float,
+    nx: Float, ny: Float, nz: Float,
+    cr: Float, cg: Float, cb: Float
+) {
     // Triangle 1: p1, p2, p3
-    engine_push_vertex_lit(p1.x, p1.y, p1.z, n.x, n.y, n.z, c.r, c.g, c.b)
-    engine_push_vertex_lit(p2.x, p2.y, p2.z, n.x, n.y, n.z, c.r, c.g, c.b)
-    engine_push_vertex_lit(p3.x, p3.y, p3.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    engine_push_vertex_lit(p1x, p1y, p1z, nx, ny, nz, cr, cg, cb)
+    engine_push_vertex_lit(p2x, p2y, p2z, nx, ny, nz, cr, cg, cb)
+    engine_push_vertex_lit(p3x, p3y, p3z, nx, ny, nz, cr, cg, cb)
     // Triangle 2: p1, p3, p4
-    engine_push_vertex_lit(p1.x, p1.y, p1.z, n.x, n.y, n.z, c.r, c.g, c.b)
-    engine_push_vertex_lit(p3.x, p3.y, p3.z, n.x, n.y, n.z, c.r, c.g, c.b)
-    engine_push_vertex_lit(p4.x, p4.y, p4.z, n.x, n.y, n.z, c.r, c.g, c.b)
+    engine_push_vertex_lit(p1x, p1y, p1z, nx, ny, nz, cr, cg, cb)
+    engine_push_vertex_lit(p3x, p3y, p3z, nx, ny, nz, cr, cg, cb)
+    engine_push_vertex_lit(p4x, p4y, p4z, nx, ny, nz, cr, cg, cb)
     return
 }
 
 // ---- Convenience: draw a wireframe-style line as a thin quad ----
 
 public def draw_line(start: Vec3, to: Vec3, c: Color, thickness: Float) {
-    dir = vec3_sub(to, start)
-    len = vec3_length(dir)
+    // Extract all fields into locals BEFORE creating any new Vec3
+    // (start and to alias %Vec3.*, so they both read the last-constructed value)
+    sx = start.x
+    sy = start.y
+    sz = start.z
+    ex = to.x
+    ey = to.y
+    ez = to.z
+    cr = c.r
+    cg = c.g
+    cb = c.b
+
+    // Compute direction as flat floats (avoid vec3_sub which has aliasing)
+    dx = ex - sx
+    dy = ey - sy
+    dz = ez - sz
+    len = sqrt(dx * dx + dy * dy + dz * dz)
     if (len < 0.0001f) { return }
-    up = vec3(0.0f, 1.0f, 0.0f)
-    if (vec3_length(vec3_cross(dir, up)) < 0.0001f) {
-        up = vec3(1.0f, 0.0f, 0.0f)
+
+    // Perpendicular side vector (cross product with up)
+    ux = 0.0f
+    uy = 1.0f
+    uz = 0.0f
+    // cross(dir, up)
+    cx2 = dy * uz - dz * uy
+    cy2 = dz * ux - dx * uz
+    cz2 = dx * uy - dy * ux
+    clen = sqrt(cx2 * cx2 + cy2 * cy2 + cz2 * cz2)
+    if (clen < 0.0001f) {
+        ux = 1.0f
+        uy = 0.0f
+        uz = 0.0f
+        cx2 = dy * uz - dz * uy
+        cy2 = dz * ux - dx * uz
+        cz2 = dx * uy - dy * ux
+        clen = sqrt(cx2 * cx2 + cy2 * cy2 + cz2 * cz2)
     }
-    side = vec3_normalize(vec3_cross(dir, up))
-    half = vec3_mul(side, thickness * 0.5f)
-    p1 = vec3_add(start, half)
-    p2 = vec3_sub(start, half)
-    p3 = vec3_sub(to, half)
-    p4 = vec3_add(to, half)
-    draw_quad_flat(p1, p2, p3, p4, c)
+    // normalize side
+    inv_clen = 1.0f / clen
+    side_x = cx2 * inv_clen
+    side_y = cy2 * inv_clen
+    side_z = cz2 * inv_clen
+
+    hx = side_x * thickness * 0.5f
+    hy = side_y * thickness * 0.5f
+    hz = side_z * thickness * 0.5f
+
+    // 4 corners of the thin quad
+    p1x = sx + hx
+    p1y = sy + hy
+    p1z = sz + hz
+    p2x = sx - hx
+    p2y = sy - hy
+    p2z = sz - hz
+    p3x = ex - hx
+    p3y = ey - hy
+    p3z = ez - hz
+    p4x = ex + hx
+    p4y = ey + hy
+    p4z = ez + hz
+
+    draw_quad_f(
+        p1x, p1y, p1z, cr, cg, cb,
+        p2x, p2y, p2z, cr, cg, cb,
+        p3x, p3y, p3z, cr, cg, cb,
+        p4x, p4y, p4z, cr, cg, cb
+    )
     return
 }
 
@@ -98,63 +232,67 @@ public def draw_line(start: Vec3, to: Vec3, c: Color, thickness: Float) {
 
 public def draw_cube(center: Vec3, size: Float, c: Color) {
     h = size / 2.0f
+    // Extract struct fields into locals before any new struct creation
     cx = center.x
     cy = center.y
     cz = center.z
+    cr = c.r
+    cg = c.g
+    cb = c.b
 
     // Front face (z+) — normal: (0, 0, 1)
-    n = vec3(0.0f, 0.0f, 1.0f)
-    draw_quad_flat_lit(
-        vec3(cx - h, cy - h, cz + h),
-        vec3(cx + h, cy - h, cz + h),
-        vec3(cx + h, cy + h, cz + h),
-        vec3(cx - h, cy + h, cz + h),
-        n, c
+    draw_quad_flat_lit_f(
+        cx - h, cy - h, cz + h,
+        cx + h, cy - h, cz + h,
+        cx + h, cy + h, cz + h,
+        cx - h, cy + h, cz + h,
+        0.0f, 0.0f, 1.0f,
+        cr, cg, cb
     )
     // Back face (z-) — normal: (0, 0, -1)
-    n = vec3(0.0f, 0.0f, 0.0f - 1.0f)
-    draw_quad_flat_lit(
-        vec3(cx + h, cy - h, cz - h),
-        vec3(cx - h, cy - h, cz - h),
-        vec3(cx - h, cy + h, cz - h),
-        vec3(cx + h, cy + h, cz - h),
-        n, c
+    draw_quad_flat_lit_f(
+        cx + h, cy - h, cz - h,
+        cx - h, cy - h, cz - h,
+        cx - h, cy + h, cz - h,
+        cx + h, cy + h, cz - h,
+        0.0f, 0.0f, 0.0f - 1.0f,
+        cr, cg, cb
     )
     // Top face (y+) — normal: (0, 1, 0)
-    n = vec3(0.0f, 1.0f, 0.0f)
-    draw_quad_flat_lit(
-        vec3(cx - h, cy + h, cz + h),
-        vec3(cx + h, cy + h, cz + h),
-        vec3(cx + h, cy + h, cz - h),
-        vec3(cx - h, cy + h, cz - h),
-        n, c
+    draw_quad_flat_lit_f(
+        cx - h, cy + h, cz + h,
+        cx + h, cy + h, cz + h,
+        cx + h, cy + h, cz - h,
+        cx - h, cy + h, cz - h,
+        0.0f, 1.0f, 0.0f,
+        cr, cg, cb
     )
     // Bottom face (y-) — normal: (0, -1, 0)
-    n = vec3(0.0f, 0.0f - 1.0f, 0.0f)
-    draw_quad_flat_lit(
-        vec3(cx - h, cy - h, cz - h),
-        vec3(cx + h, cy - h, cz - h),
-        vec3(cx + h, cy - h, cz + h),
-        vec3(cx - h, cy - h, cz + h),
-        n, c
+    draw_quad_flat_lit_f(
+        cx - h, cy - h, cz - h,
+        cx + h, cy - h, cz - h,
+        cx + h, cy - h, cz + h,
+        cx - h, cy - h, cz + h,
+        0.0f, 0.0f - 1.0f, 0.0f,
+        cr, cg, cb
     )
     // Right face (x+) — normal: (1, 0, 0)
-    n = vec3(1.0f, 0.0f, 0.0f)
-    draw_quad_flat_lit(
-        vec3(cx + h, cy - h, cz + h),
-        vec3(cx + h, cy - h, cz - h),
-        vec3(cx + h, cy + h, cz - h),
-        vec3(cx + h, cy + h, cz + h),
-        n, c
+    draw_quad_flat_lit_f(
+        cx + h, cy - h, cz + h,
+        cx + h, cy - h, cz - h,
+        cx + h, cy + h, cz - h,
+        cx + h, cy + h, cz + h,
+        1.0f, 0.0f, 0.0f,
+        cr, cg, cb
     )
     // Left face (x-) — normal: (-1, 0, 0)
-    n = vec3(0.0f - 1.0f, 0.0f, 0.0f)
-    draw_quad_flat_lit(
-        vec3(cx - h, cy - h, cz - h),
-        vec3(cx - h, cy - h, cz + h),
-        vec3(cx - h, cy + h, cz + h),
-        vec3(cx - h, cy + h, cz - h),
-        n, c
+    draw_quad_flat_lit_f(
+        cx - h, cy - h, cz - h,
+        cx - h, cy - h, cz + h,
+        cx - h, cy + h, cz + h,
+        cx - h, cy + h, cz - h,
+        0.0f - 1.0f, 0.0f, 0.0f,
+        cr, cg, cb
     )
     return
 }
@@ -165,15 +303,74 @@ public def draw_grid(size: Float, divisions: Int64, c: Color) {
     half = size / 2.0f
     step = size / divisions
     thickness = 0.01f
+    cr = c.r
+    cg = c.g
+    cb = c.b
     i = 0
     while (i <= divisions) {
         pos = 0.0f - half + step * i
-        // Lines along X axis
-        draw_line(vec3(0.0f - half, 0.0f, pos), vec3(half, 0.0f, pos), c, thickness)
+        // Lines along X axis — start to end as flat floats
+        draw_line_f(0.0f - half, 0.0f, pos, half, 0.0f, pos, cr, cg, cb, thickness)
         // Lines along Z axis
-        draw_line(vec3(pos, 0.0f, 0.0f - half), vec3(pos, 0.0f, half), c, thickness)
+        draw_line_f(pos, 0.0f, 0.0f - half, pos, 0.0f, half, cr, cg, cb, thickness)
         i = i + 1
     }
+    return
+}
+
+// Flat-arg line: avoids Vec3 aliasing.
+public def draw_line_f(sx: Float, sy: Float, sz: Float, ex: Float, ey: Float, ez: Float, cr: Float, cg: Float, cb: Float, thickness: Float) {
+    dx = ex - sx
+    dy = ey - sy
+    dz = ez - sz
+    len = sqrt(dx * dx + dy * dy + dz * dz)
+    if (len < 0.0001f) { return }
+
+    // Perpendicular side vector (cross product with up)
+    ux = 0.0f
+    uy = 1.0f
+    uz = 0.0f
+    cx2 = dy * uz - dz * uy
+    cy2 = dz * ux - dx * uz
+    cz2 = dx * uy - dy * ux
+    clen = sqrt(cx2 * cx2 + cy2 * cy2 + cz2 * cz2)
+    if (clen < 0.0001f) {
+        ux = 1.0f
+        uy = 0.0f
+        uz = 0.0f
+        cx2 = dy * uz - dz * uy
+        cy2 = dz * ux - dx * uz
+        cz2 = dx * uy - dy * ux
+        clen = sqrt(cx2 * cx2 + cy2 * cy2 + cz2 * cz2)
+    }
+    inv_clen = 1.0f / clen
+    side_x = cx2 * inv_clen
+    side_y = cy2 * inv_clen
+    side_z = cz2 * inv_clen
+
+    hx = side_x * thickness * 0.5f
+    hy = side_y * thickness * 0.5f
+    hz = side_z * thickness * 0.5f
+
+    p1x = sx + hx
+    p1y = sy + hy
+    p1z = sz + hz
+    p2x = sx - hx
+    p2y = sy - hy
+    p2z = sz - hz
+    p3x = ex - hx
+    p3y = ey - hy
+    p3z = ez - hz
+    p4x = ex + hx
+    p4y = ey + hy
+    p4z = ez + hz
+
+    draw_quad_f(
+        p1x, p1y, p1z, cr, cg, cb,
+        p2x, p2y, p2z, cr, cg, cb,
+        p3x, p3y, p3z, cr, cg, cb,
+        p4x, p4y, p4z, cr, cg, cb
+    )
     return
 }
 
@@ -183,6 +380,14 @@ public def draw_sphere(center: Vec3, radius: Float, c: Color, segments: Int64) {
     rings = segments
     slices = segments
     pi = 3.14159265358979f
+
+    // Extract struct fields into locals
+    ocx = center.x
+    ocy = center.y
+    ocz = center.z
+    cr = c.r
+    cg = c.g
+    cb = c.b
 
     ring = 0
     while (ring < rings) {
@@ -194,26 +399,49 @@ public def draw_sphere(center: Vec3, radius: Float, c: Color, segments: Int64) {
             phi1 = 2.0f * pi * slice / slices
             phi2 = 2.0f * pi * (slice + 1) / slices
 
-            // Four corners of this quad patch on the sphere
-            n1 = vec3(sin(theta1) * cos(phi1), cos(theta1), sin(theta1) * sin(phi1))
-            n2 = vec3(sin(theta1) * cos(phi2), cos(theta1), sin(theta1) * sin(phi2))
-            n3 = vec3(sin(theta2) * cos(phi2), cos(theta2), sin(theta2) * sin(phi2))
-            n4 = vec3(sin(theta2) * cos(phi1), cos(theta2), sin(theta2) * sin(phi1))
+            // Four normal directions on the sphere
+            n1x = sin(theta1) * cos(phi1)
+            n1y = cos(theta1)
+            n1z = sin(theta1) * sin(phi1)
 
-            p1 = vec3_add(center, vec3_mul(n1, radius))
-            p2 = vec3_add(center, vec3_mul(n2, radius))
-            p3 = vec3_add(center, vec3_mul(n3, radius))
-            p4 = vec3_add(center, vec3_mul(n4, radius))
+            n2x = sin(theta1) * cos(phi2)
+            n2y = cos(theta1)
+            n2z = sin(theta1) * sin(phi2)
+
+            n3x = sin(theta2) * cos(phi2)
+            n3y = cos(theta2)
+            n3z = sin(theta2) * sin(phi2)
+
+            n4x = sin(theta2) * cos(phi1)
+            n4y = cos(theta2)
+            n4z = sin(theta2) * sin(phi1)
+
+            // Four positions = center + normal * radius
+            p1x = ocx + n1x * radius
+            p1y = ocy + n1y * radius
+            p1z = ocz + n1z * radius
+
+            p2x = ocx + n2x * radius
+            p2y = ocy + n2y * radius
+            p2z = ocz + n2z * radius
+
+            p3x = ocx + n3x * radius
+            p3y = ocy + n3y * radius
+            p3z = ocz + n3z * radius
+
+            p4x = ocx + n4x * radius
+            p4y = ocy + n4y * radius
+            p4z = ocz + n4z * radius
 
             // Triangle 1
-            engine_push_vertex_lit(p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c.r, c.g, c.b)
-            engine_push_vertex_lit(p2.x, p2.y, p2.z, n2.x, n2.y, n2.z, c.r, c.g, c.b)
-            engine_push_vertex_lit(p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c.r, c.g, c.b)
+            engine_push_vertex_lit(p1x, p1y, p1z, n1x, n1y, n1z, cr, cg, cb)
+            engine_push_vertex_lit(p2x, p2y, p2z, n2x, n2y, n2z, cr, cg, cb)
+            engine_push_vertex_lit(p3x, p3y, p3z, n3x, n3y, n3z, cr, cg, cb)
 
             // Triangle 2
-            engine_push_vertex_lit(p1.x, p1.y, p1.z, n1.x, n1.y, n1.z, c.r, c.g, c.b)
-            engine_push_vertex_lit(p3.x, p3.y, p3.z, n3.x, n3.y, n3.z, c.r, c.g, c.b)
-            engine_push_vertex_lit(p4.x, p4.y, p4.z, n4.x, n4.y, n4.z, c.r, c.g, c.b)
+            engine_push_vertex_lit(p1x, p1y, p1z, n1x, n1y, n1z, cr, cg, cb)
+            engine_push_vertex_lit(p3x, p3y, p3z, n3x, n3y, n3z, cr, cg, cb)
+            engine_push_vertex_lit(p4x, p4y, p4z, n4x, n4y, n4z, cr, cg, cb)
 
             slice = slice + 1
         }

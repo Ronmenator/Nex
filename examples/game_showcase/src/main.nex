@@ -120,10 +120,10 @@ def update() {
     draw_cube(vec3(0.0f - 3.0f, 0.25f, 0.0f - 3.0f), 0.5f, COLOR_CYAN())
 
     // Colored triangle on the ground
-    draw_triangle(
-        vec3(0.0f - 2.0f, 0.01f, 2.0f), COLOR_RED(),
-        vec3(0.0f, 0.01f, 4.0f), COLOR_GREEN(),
-        vec3(2.0f, 0.01f, 2.0f), COLOR_BLUE()
+    draw_triangle_f(
+        0.0f - 2.0f, 0.01f, 2.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.01f, 4.0f, 0.0f, 1.0f, 0.0f,
+        2.0f, 0.01f, 2.0f, 0.0f, 0.0f, 1.0f
     )
 
     // Flush all geometry
