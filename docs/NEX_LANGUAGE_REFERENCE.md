@@ -66,6 +66,9 @@
 - **Pattern matching** via `match` expressions
 - **Enums** with named variants
 - **Async/await** for concurrency
+- **Default arguments** on function parameters
+- **Range loops** via `for (i in 0..n)`
+- **List literals** via `[1, 2, 3]`
 - **Comments**: `// line` and `/* block */`
 
 ### Hello World
@@ -517,7 +520,43 @@ for (item in collection) {
 
 Works with `List` and other iterable types.
 
-### 7.5 break and continue
+### 7.5 Range Loops
+
+The `..` operator creates a half-open integer range. Combined with `for-in`, it provides a concise counting loop:
+
+```nex
+// Iterate from 0 to 4 (exclusive upper bound)
+for (i in 0..5) {
+    println(i)       // prints 0, 1, 2, 3, 4
+}
+
+// The bounds can be any integer expression
+n = 10
+for (i in 0..n) {
+    println(i)       // prints 0 through 9
+}
+
+// Useful for index-based iteration
+items = [100, 200, 300]
+for (i in 0..items.length()) {
+    println(items.get(i))
+}
+
+// Nested range loops
+for (row in 0..3) {
+    for (col in 0..3) {
+        print(row * 3 + col)
+    }
+}
+```
+
+**Rules:**
+- `start..end` produces integers from `start` up to but **not including** `end`
+- Both `start` and `end` must be integer expressions
+- If `start >= end`, the loop body is never executed
+- Range loops are compiled to efficient integer counter loops (no list allocation)
+
+### 7.6 break and continue
 
 ```nex
 i = 0
@@ -534,7 +573,7 @@ while (i < 100) {
 }
 ```
 
-### 7.6 return
+### 7.7 return
 
 ```nex
 def add(a: Int, b: Int) -> Int {
@@ -547,7 +586,7 @@ def greet() -> Unit {
 }
 ```
 
-### 7.7 Ternary Expression
+### 7.8 Ternary Expression
 
 Nex uses Python-style ternary expressions where the value comes first:
 
@@ -569,7 +608,7 @@ label = "high" if x > 100 else "mid" if x > 50 else "low"
 - The condition must evaluate to `Bool`
 - Both branches must produce compatible types
 
-### 7.8 Pattern Matching (match)
+### 7.9 Pattern Matching (match)
 
 The `match` expression compares a value against a set of patterns:
 
@@ -738,7 +777,34 @@ def functionName(param1: Type1, param2: Type2) -> ReturnType {
 - Functions without a return type annotation default to `-> Unit`
 - All code paths should have an explicit `return` statement
 
-### 8.2 Examples
+### 8.2 Default Arguments
+
+Parameters can have default values. When a function is called with fewer arguments than declared, the missing arguments are filled with their defaults:
+
+```nex
+def greet(name: String, greeting: String = "Hello") -> String {
+    return greeting + ", " + name + "!"
+}
+
+println(greet("Alice", "Hi"))   // "Hi, Alice!"
+println(greet("Bob"))           // "Hello, Bob!"
+
+def connect(host: String, port: Int64 = 8080, timeout: Int64 = 30) {
+    println("Connecting to " + host + ":" + port)
+}
+
+connect("localhost")              // port=8080, timeout=30
+connect("localhost", 3000)        // port=3000, timeout=30
+connect("localhost", 3000, 60)    // port=3000, timeout=60
+```
+
+**Rules:**
+- Default values are specified with `= expr` after the type annotation
+- Parameters with defaults must come after parameters without defaults
+- Default expressions are evaluated at the call site each time the function is called
+- Any expression can be used as a default value (literals, variables, function calls)
+
+### 8.3 Examples
 
 ```nex
 // Function with parameters and return value
@@ -761,14 +827,14 @@ def factorial(n: Int) -> Int {
 }
 ```
 
-### 8.3 Function Visibility
+### 8.4 Function Visibility
 
 ```nex
 def internal_helper() -> Unit { }      // Module-internal (default)
 public def api_function() -> Unit { }  // Exported to other modules
 ```
 
-### 8.4 Static Functions
+### 8.5 Static Functions
 
 ```nex
 class MyClass {
@@ -778,7 +844,7 @@ class MyClass {
 }
 ```
 
-### 8.5 Function References
+### 8.6 Function References
 
 Functions are first-class values. You can pass them as callbacks:
 
@@ -791,7 +857,7 @@ def on_click() {
 engine_set_update(on_click)
 ```
 
-### 8.6 Closures & Lambdas
+### 8.7 Closures & Lambdas
 
 Nex supports anonymous functions (lambdas) with variable capture (closures):
 
@@ -825,7 +891,7 @@ transform = |x: Int| -> Int {
 - Closures capture variables from the enclosing scope by reference
 - Empty parameter list: `|| expr`
 
-### 8.7 Async Functions
+### 8.8 Async Functions
 
 Functions can be declared `async` for concurrent execution:
 
@@ -1890,7 +1956,10 @@ assert_true(condition)               // Assert true
 ### 20.1 List
 
 ```nex
-// Create list
+// Create list using List literal syntax
+items = [10, 20, 30]
+
+// Or using the constructor
 items = List()
 
 // Add items
@@ -1907,6 +1976,19 @@ items.remove(0)            // Remove at index
 // Iteration
 for (item in items) {
     println(item)
+}
+
+// List literal syntax — creates a List and adds each element
+nums = [1, 2, 3, 4, 5]
+println(nums.length())    // 5
+println(nums.get(0))      // 1
+
+// Empty list literal
+empty = []
+
+// Range-based iteration
+for (i in 0..nums.length()) {
+    println(nums.get(i))
 }
 
 // Extended operations (import std.collections)

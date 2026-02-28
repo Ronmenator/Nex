@@ -169,6 +169,16 @@ pub fn declare_types(file: &SourceFile, sink: &mut DiagnosticSink) -> TypedModul
                     },
                 );
             }
+            // Bare module-level assignments like `fps_timer = 0.0f` are parsed as
+            // Item::Statement(Assign) instead of Item::Variable.  Infer the type
+            // from the initializer literal so the codegen can correctly distinguish
+            // float/int/string/bool globals.
+            Item::Statement(Stmt::Expr(Expr::Assign { target, value, .. })) => {
+                if let Expr::Identifier { name, .. } = target.as_ref() {
+                    let ty = infer_literal_type(value);
+                    module.types.insert(name.clone(), ty);
+                }
+            }
             _ => {}
         }
     }
@@ -176,6 +186,23 @@ pub fn declare_types(file: &SourceFile, sink: &mut DiagnosticSink) -> TypedModul
         sink.push(d.clone());
     }
     module
+}
+
+/// Infer a type from an expression's outermost literal value.
+/// Returns `Type::Unknown` for non-literal or compound expressions.
+fn infer_literal_type(expr: &Expr) -> Type {
+    match expr {
+        Expr::Literal { value, .. } => match value {
+            Literal::Float(_) => Type::Float,
+            Literal::Int(_) => Type::Int64,
+            Literal::Bool(_) => Type::Bool,
+            Literal::String(_) => Type::String,
+            _ => Type::Unknown,
+        },
+        // Negative literal: `-0.5f` is Unary { op: Neg, expr: Literal::Float }
+        Expr::Unary { op: UnaryOp::Neg, expr, .. } => infer_literal_type(expr),
+        _ => Type::Unknown,
+    }
 }
 
 fn resolve_type_expr(ty: &TypeExpr) -> Type {
@@ -648,6 +675,13 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
                 }
             }
             result_ty
+        }
+        Expr::Range { .. } => Type::Unknown,
+        Expr::ArrayLiteral { elements, .. } => {
+            for el in elements {
+                infer_expr(el, scope, sink);
+            }
+            Type::Unknown
         }
         Expr::Unsupported { .. } => Type::Unknown,
     }

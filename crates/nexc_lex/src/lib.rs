@@ -43,6 +43,7 @@ pub enum TokenKind {
     LBracket,
     RBracket,
     Dot,
+    DotDot,
     Comma,
     Colon,
     DoubleColon,
@@ -400,6 +401,9 @@ impl Lexer {
                             self.pos,
                             "::".to_string(),
                         ));
+                    } else if self.matches(b"..") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::DotDot, start, self.pos, "..".to_string()));
                     } else {
                         self.pos += 1;
                         tokens.push(Token::new(TokenKind::Dot, start, self.pos, ".".to_string()));

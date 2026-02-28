@@ -724,6 +724,78 @@ pub unsafe extern "C" fn nex_torch_tensor_to_dtype_long(t: *mut Tensor) -> *mut 
 }
 
 // ---------------------------------------------------------------------------
+// Optimizer — learning rate scheduling
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_optim_set_lr(opt: *mut NexOptimizer, lr: f64) {
+    if opt.is_null() { return; }
+    (*opt).inner.set_lr(lr);
+}
+
+// ---------------------------------------------------------------------------
+// Gradient clipping
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_clip_grad_norm(module: *mut NexModule, max_norm: f64) {
+    if module.is_null() { return; }
+    let m = &*module;
+    let params: Vec<Tensor> = m.vs.trainable_variables();
+    if params.is_empty() { return; }
+    // Compute total gradient norm
+    let mut total_norm_sq = 0.0f64;
+    for p in &params {
+        let g = p.grad();
+        if g.defined() {
+            let norm: f64 = f64::try_from(&g.norm()).unwrap_or(0.0);
+            total_norm_sq += norm * norm;
+        }
+    }
+    let total_norm = total_norm_sq.sqrt();
+    let clip_coef = max_norm / (total_norm + 1e-6);
+    if clip_coef < 1.0 {
+        let _guard = tch::no_grad_guard();
+        for p in &params {
+            let mut g = p.grad();
+            if g.defined() {
+                let _ = g.f_mul_scalar_(clip_coef);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Weight initialization
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_init_normal(module: *mut NexModule, std: f64) {
+    if module.is_null() { return; }
+    let m = &*module;
+    let _guard = tch::no_grad_guard();
+    for mut p in m.vs.trainable_variables() {
+        let _ = p.init(nn::Init::Randn { mean: 0.0, stdev: std });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trigonometric tensor operations
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_sin(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).sin()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_cos(t: *mut Tensor) -> *mut Tensor {
+    if t.is_null() { return ptr::null_mut(); }
+    Box::into_raw(Box::new((*t).cos()))
+}
+
+// ---------------------------------------------------------------------------
 // Extended NN layers
 // ---------------------------------------------------------------------------
 
@@ -744,6 +816,33 @@ pub unsafe extern "C" fn nex_torch_nn_gelu(module: *mut NexModule) {
     let m = &mut *module;
     m.seq = std::mem::replace(&mut m.seq, nn::seq())
         .add_fn(|t| t.gelu("none"));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_linear_no_bias(module: *mut NexModule, in_features: i64, out_features: i64) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    let name = m.next_layer_name();
+    let path = m.vs.root() / &name;
+    let config = nn::LinearConfig { bias: false, ..Default::default() };
+    let layer = nn::linear(&path, in_features, out_features, config);
+    m.seq = std::mem::replace(&mut m.seq, nn::seq()).add(layer);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_nn_rms_norm(module: *mut NexModule, dim: i64) {
+    if module.is_null() { return; }
+    let m = &mut *module;
+    let name = m.next_layer_name();
+    let path = m.vs.root() / &name;
+    let scale = path.var("scale", &[dim], nn::Init::Const(1.0));
+    let eps = 1e-6f64;
+    m.seq = std::mem::replace(&mut m.seq, nn::seq())
+        .add_fn(move |t| {
+            let variance = t.pow_tensor_scalar(2.0).mean_dim(&[-1][..], true, Kind::Float);
+            let normed = t * (variance + eps).rsqrt();
+            normed * &scale
+        });
 }
 
 #[no_mangle]

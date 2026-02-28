@@ -105,7 +105,7 @@ StructMember      = FieldDecl Terminator
 
 Parameters        = Param { "," Param } ;
 
-Param             = Ident ":" TypeRef ;
+Param             = Ident ":" TypeRef [ "=" Expr ] ;
 
 TypeParams        = "[" Ident { "," Ident } "]" ;</code></pre>
 
@@ -131,7 +131,8 @@ IfStmt            = "if" "(" Expr ")" Block [ "else" ( IfStmt | Block ) ] ;
 
 WhileStmt         = "while" "(" Expr ")" Block ;
 
-ForStmt           = "for" "(" ForInit ";" Expr ";" ForStep ")" Block ;
+ForStmt           = "for" "(" ForInit ";" Expr ";" ForStep ")" Block
+                  | "for" "(" Ident "in" Expr ")" Block ;
 
 ForInit           = VarStmt | ExprStmt ;
 
@@ -177,7 +178,9 @@ Relational        = Additive { ( "<" | "<=" | ">" | ">=" ) Additive } ;
 
 Additive          = Multiplicative { ( "+" | "-" ) Multiplicative } ;
 
-Multiplicative    = Unary { ( "*" | "/" | "%" ) Unary } ;
+Multiplicative    = Range { ( "*" | "/" | "%" ) Range } ;
+
+Range             = Unary [ ".." Unary ] ;
 
 Unary             = ( "-" | "!" ) Unary
                   | Postfix ;
@@ -201,6 +204,7 @@ ArgList           = Expr { "," Expr } ;</code></pre>
                   | LambdaExpr
                   | AwaitExpr
                   | "(" Expr ")"
+                  | "[" [ Expr { "," Expr } [ "," ] ] "]"
                   | TypeRef "(" [ ArgList ] ")"
                   | TypeRef "[" TypeRef { "," TypeRef } "]" "(" [ ArgList ] ")" ;
 
@@ -299,7 +303,7 @@ Terminator        = ";" | &lt;ASI-inserted newline terminator&gt; ;</code></pre>
 
   <p>A newline does <strong>not</strong> terminate a statement when the previous token is:</p>
   <ul>
-    <li>Binary operator: <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code> <code>&amp;&amp;</code> <code>||</code> <code>==</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code></li>
+    <li>Binary operator: <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code> <code>..</code> <code>&amp;&amp;</code> <code>||</code> <code>==</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code></li>
     <li>Assignment operator: <code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code></li>
     <li>Delimiter: <code>.</code> <code>,</code> <code>:</code> <code>(</code> <code>[</code> <code>{</code></li>
     <li><code>::</code> <code>-&gt;</code></li>
@@ -320,8 +324,9 @@ Terminator        = ";" | &lt;ASI-inserted newline terminator&gt; ;</code></pre>
       <tr><td>6</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Left</td></tr>
       <tr><td>7</td><td><code>+</code> <code>-</code></td><td>Left</td></tr>
       <tr><td>8</td><td><code>*</code> <code>/</code> <code>%</code></td><td>Left</td></tr>
-      <tr><td>9</td><td><code>-</code> (unary) <code>!</code></td><td>Right</td></tr>
-      <tr><td>10 (highest)</td><td><code>.</code> <code>()</code> <code>[]</code> <code>::</code></td><td>Left</td></tr>
+      <tr><td>9</td><td><code>..</code> (range)</td><td>Non-assoc</td></tr>
+      <tr><td>10</td><td><code>-</code> (unary) <code>!</code></td><td>Right</td></tr>
+      <tr><td>11 (highest)</td><td><code>.</code> <code>()</code> <code>[]</code> <code>::</code></td><td>Left</td></tr>
     </tbody>
   </table>
 

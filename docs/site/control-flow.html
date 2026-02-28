@@ -65,6 +65,32 @@
     <span class="fn">println</span>(i)
 }</code></pre>
 
+  <h2>Range Loops</h2>
+
+  <p>The <code>..</code> operator creates a half-open integer range. Combined with <code>for-in</code>, it provides a concise counting loop:</p>
+
+  <pre><code><span class="cmt">// Iterate from 0 to 4 (exclusive upper bound)</span>
+<span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span><span class="op">..</span><span class="num">5</span>) {
+    <span class="fn">println</span>(i)       <span class="cmt">// prints 0, 1, 2, 3, 4</span>
+}
+
+<span class="cmt">// The bounds can be any integer expression</span>
+n <span class="op">=</span> <span class="num">10</span>
+<span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span><span class="op">..</span>n) {
+    <span class="fn">println</span>(i)
+}
+
+<span class="cmt">// Useful for index-based iteration</span>
+items <span class="op">=</span> [<span class="num">100</span>, <span class="num">200</span>, <span class="num">300</span>]
+<span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span><span class="op">..</span><span class="fn">items.length</span>()) {
+    <span class="fn">println</span>(<span class="fn">items.get</span>(i))
+}</code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Note</div>
+    <p><code>start..end</code> produces integers from <code>start</code> up to but <strong>not including</strong> <code>end</code>. If <code>start >= end</code>, the loop body is never executed. Range loops compile to efficient integer counter loops with no list allocation.</p>
+  </div>
+
   <h2>Break and Continue</h2>
 
   <p><code>break</code> exits the innermost loop. <code>continue</code> skips to the next iteration:</p>

@@ -237,6 +237,16 @@ public def clamp(t: Int64, min_val: Float, max_val: Float) -> Int64 {
     return tensor_clamp(t, min_val, max_val)
 }
 
+// Element-wise sine.
+public def sin(t: Int64) -> Int64 {
+    return tensor_sin(t)
+}
+
+// Element-wise cosine.
+public def cos(t: Int64) -> Int64 {
+    return tensor_cos(t)
+}
+
 // Applies softmax along the given dimension (tensor-level, not nn module).
 public def softmax(t: Int64, dim: Int64) -> Int64 {
     return tensor_softmax(t, dim)

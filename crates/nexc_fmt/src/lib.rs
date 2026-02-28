@@ -455,6 +455,13 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
             s.push('}');
             s
         }
+        nexc_ast::Expr::Range { start, end, .. } => {
+            format!("{}..{}", format_expr(start), format_expr(end))
+        }
+        nexc_ast::Expr::ArrayLiteral { elements, .. } => {
+            let elems: Vec<String> = elements.iter().map(format_expr).collect();
+            format!("[{}]", elems.join(", "))
+        }
         nexc_ast::Expr::Block(_) => "{ ... }".into(),
         nexc_ast::Expr::Unsupported { raw, .. } => raw.clone(),
     }

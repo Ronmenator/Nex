@@ -852,11 +852,13 @@ impl LowerCtx {
                         ParamDecl {
                             name: "widget_id".into(),
                             type_hint: None,
+                            default_value: None,
                             span: S,
                         },
                         ParamDecl {
                             name: "event_kind".into(),
                             type_hint: None,
+                            default_value: None,
                             span: S,
                         },
                     ],

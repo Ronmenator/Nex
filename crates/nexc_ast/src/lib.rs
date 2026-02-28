@@ -90,6 +90,7 @@ pub struct VarDecl {
 pub struct ParamDecl {
     pub name: Name,
     pub type_hint: Option<TypeExpr>,
+    pub default_value: Option<Expr>,
     pub span: Span,
 }
 
@@ -364,6 +365,15 @@ pub enum Expr {
     Match {
         scrutinee: Box<Expr>,
         arms: Vec<MatchArm>,
+        span: Span,
+    },
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        span: Span,
+    },
+    ArrayLiteral {
+        elements: Vec<Expr>,
         span: Span,
     },
     Block(Block),

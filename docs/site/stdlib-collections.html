@@ -36,9 +36,15 @@
   </div>
   <p>Creates an empty list. The element type is inferred from the first <code>add</code> call or from the type annotation.</p>
 
-  <pre><code><span class="kw">import</span> std.collections
+  <pre><code><span class="cmt">// List literal syntax — creates a list with initial elements</span>
+nums <span class="op">=</span> [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]
+<span class="fn">println</span>(<span class="fn">nums.length</span>())  <span class="cmt">// 3</span>
+<span class="fn">println</span>(<span class="fn">nums.get</span>(<span class="num">0</span>))   <span class="cmt">// 10</span>
 
-<span class="cmt">// Create an empty list of integers</span>
+<span class="cmt">// Empty list literal</span>
+empty <span class="op">=</span> []
+
+<span class="cmt">// Or using the constructor</span>
 nums <span class="op">=</span> <span class="typ">List</span>[<span class="typ">Int</span>]()
 <span class="fn">nums.add</span>(<span class="num">10</span>)
 <span class="fn">nums.add</span>(<span class="num">20</span>)

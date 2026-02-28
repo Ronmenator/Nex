@@ -623,6 +623,7 @@ impl Parser {
                 params.push(ParamDecl {
                     name,
                     type_hint,
+                    default_value: None,
                     span: param_span,
                 });
                 if self.consume_if(&TokenKind::Comma) {
@@ -1234,6 +1235,7 @@ impl Parser {
                 Some(TokenKind::ShlEq) => Some((1, 1, PrattInfix::Assign(AssignOp::ShlAssign))),
                 Some(TokenKind::ShrEq) => Some((1, 1, PrattInfix::Assign(AssignOp::ShrAssign))),
                 Some(TokenKind::If) => Some((2, 1, PrattInfix::Ternary)),
+                Some(TokenKind::DotDot) => Some((3, 4, PrattInfix::Range)),
                 Some(TokenKind::OrOr) => Some((2, 3, PrattInfix::Binary(BinaryOp::Or))),
                 Some(TokenKind::AndAnd) => Some((4, 5, PrattInfix::Binary(BinaryOp::And))),
                 Some(TokenKind::Pipe) => Some((5, 6, PrattInfix::Binary(BinaryOp::BitOr))),
@@ -1403,6 +1405,16 @@ impl Parser {
                         qualifier,
                     };
                 }
+                PrattInfix::Range => {
+                    self.advance(); // consume '..'
+                    let rhs = self.parse_expression_bp(r_bp);
+                    let span = span_between(&lhs, &rhs);
+                    lhs = Expr::Range {
+                        start: Box::new(lhs),
+                        end: Box::new(rhs),
+                        span,
+                    };
+                }
             }
         }
 
@@ -1562,6 +1574,32 @@ impl Parser {
             Some(TokenKind::InterpolatedString) => {
                 let token = self.advance();
                 self.parse_interpolated_string(&token)
+            }
+            Some(TokenKind::LBracket) => {
+                let start_span = self.current_span();
+                self.advance(); // consume '['
+                let mut elements = Vec::new();
+                if !self.consume_if(&TokenKind::RBracket) {
+                    while !self.is_eof() {
+                        elements.push(self.parse_expression());
+                        if self.consume_if(&TokenKind::Comma) {
+                            // Allow trailing comma before ]
+                            if matches!(self.peek_kind(), Some(TokenKind::RBracket)) {
+                                self.advance();
+                                break;
+                            }
+                            continue;
+                        }
+                        if !self.consume_if(&TokenKind::RBracket) {
+                            self.push_error("expected ',' or ']' in array literal");
+                        }
+                        break;
+                    }
+                }
+                Expr::ArrayLiteral {
+                    elements,
+                    span: Span::new(start_span.lo, self.current_span().hi),
+                }
             }
             Some(TokenKind::Match) => {
                 self.parse_match_expr()
@@ -2062,9 +2100,15 @@ impl Parser {
             } else {
                 None
             };
+            let default_value = if self.consume_if(&TokenKind::Eq) {
+                Some(self.parse_expression())
+            } else {
+                None
+            };
             params.push(ParamDecl {
                 name,
                 type_hint,
+                default_value,
                 span,
             });
             if self.consume_if(&TokenKind::Comma) {
@@ -2406,6 +2450,7 @@ enum PrattInfix {
     GenericArgs,
     Member,
     QualifiedMember,
+    Range,
 }
 
 fn expr_span(expr: &Expr) -> Span {
@@ -2422,6 +2467,8 @@ fn expr_span(expr: &Expr) -> Span {
         | Expr::StringInterp { span, .. }
         | Expr::Ternary { span, .. }
         | Expr::Match { span, .. }
+        | Expr::Range { span, .. }
+        | Expr::ArrayLiteral { span, .. }
         | Expr::Unsupported { span, .. } => *span,
         Expr::Block(Block { span, .. }) => *span,
     }

@@ -33,6 +33,12 @@ public def zero_grad(optimizer: Int64) {
     return
 }
 
+// Sets the learning rate of an optimizer (for LR scheduling).
+public def set_lr(optimizer: Int64, lr: Float) {
+    optim_set_lr(optimizer, lr)
+    return
+}
+
 // Frees an optimizer.
 public def free_optimizer(optimizer: Int64) {
     optim_free(optimizer)

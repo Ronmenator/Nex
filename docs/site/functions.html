@@ -34,6 +34,34 @@
   <pre><code>result <span class="op">=</span> <span class="fn">add</span>(<span class="num">3</span>, <span class="num">5</span>)  <span class="cmt">// result = 8</span>
 <span class="fn">println</span>(result)</code></pre>
 
+  <h2>Default Arguments</h2>
+
+  <p>Parameters can have default values, specified with <code>=</code> after the type annotation. When calling the function with fewer arguments, the missing ones are filled from their defaults:</p>
+
+  <pre><code><span class="kw">def</span> <span class="fn">greet</span>(name: <span class="typ">String</span>, greeting: <span class="typ">String</span> <span class="op">=</span> <span class="str">"Hello"</span>) <span class="op">-></span> <span class="typ">String</span> {
+    <span class="kw">return</span> greeting <span class="op">+</span> <span class="str">", "</span> <span class="op">+</span> name <span class="op">+</span> <span class="str">"!"</span>
+}
+
+<span class="fn">println</span>(<span class="fn">greet</span>(<span class="str">"Alice"</span>, <span class="str">"Hi"</span>))   <span class="cmt">// "Hi, Alice!"</span>
+<span class="fn">println</span>(<span class="fn">greet</span>(<span class="str">"Bob"</span>))            <span class="cmt">// "Hello, Bob!"</span></code></pre>
+
+  <pre><code><span class="kw">def</span> <span class="fn">connect</span>(host: <span class="typ">String</span>, port: <span class="typ">Int64</span> <span class="op">=</span> <span class="num">8080</span>, timeout: <span class="typ">Int64</span> <span class="op">=</span> <span class="num">30</span>) {
+    <span class="fn">println</span>(<span class="str">"Connecting to "</span> <span class="op">+</span> host <span class="op">+</span> <span class="str">":"</span> <span class="op">+</span> port)
+}
+
+<span class="fn">connect</span>(<span class="str">"localhost"</span>)              <span class="cmt">// port=8080, timeout=30</span>
+<span class="fn">connect</span>(<span class="str">"localhost"</span>, <span class="num">3000</span>)        <span class="cmt">// port=3000, timeout=30</span>
+<span class="fn">connect</span>(<span class="str">"localhost"</span>, <span class="num">3000</span>, <span class="num">60</span>)    <span class="cmt">// port=3000, timeout=60</span></code></pre>
+
+  <div class="callout info">
+    <div class="callout-title">Rules</div>
+    <ul>
+      <li>Default values are specified with <code>= expr</code> after the type annotation</li>
+      <li>Parameters with defaults must come after parameters without defaults</li>
+      <li>Any expression can be used as a default value</li>
+    </ul>
+  </div>
+
   <h2>Unit Return Type</h2>
 
   <p>Functions that don't return a value use <code>Unit</code>:</p>
@@ -79,7 +107,7 @@ callback <span class="op">=</span> is_greater</code></pre>
 
   <div class="callout info">
     <div class="callout-title">Note</div>
-    <p>v1 supports function references only. Closures and lambdas are planned for v2.</p>
+    <p>Nex supports function references and closures/lambdas with variable capture. See the <a href="closures.html">Closures</a> page for full details.</p>
   </div>
 
   <h2>The <code>main</code> Function</h2>

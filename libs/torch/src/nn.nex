@@ -69,6 +69,30 @@ public def gelu(module: Int64) {
     return
 }
 
+// Adds a fully-connected (linear) layer without bias to the module.
+public def linear_no_bias(module: Int64, in_features: Int64, out_features: Int64) {
+    nn_linear_no_bias(module, in_features, out_features)
+    return
+}
+
+// Adds an RMSNorm layer (Root Mean Square normalization).
+public def rms_norm(module: Int64, dim: Int64) {
+    nn_rms_norm(module, dim)
+    return
+}
+
+// Clips gradient norms across all parameters to prevent exploding gradients.
+public def clip_grad_norm(module: Int64, max_norm: Float) {
+    nn_clip_grad_norm(module, max_norm)
+    return
+}
+
+// Initializes all parameters with normal distribution (mean=0, std=std).
+public def init_normal(module: Int64, std: Float) {
+    nn_init_normal(module, std)
+    return
+}
+
 // Adds an embedding layer (maps integer indices to dense vectors).
 // Input tensors are cast to int64 internally.
 public def embedding(module: Int64, num_embeddings: Int64, embedding_dim: Int64) {

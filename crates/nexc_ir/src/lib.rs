@@ -137,6 +137,8 @@ struct IrLowering {
     loop_stack: Vec<(String, String)>,
     /// function_name → return type name (for user-defined function return type tracking)
     function_returns: HashMap<String, String>,
+    /// function_name → ordered list of default values (None = no default, Some = default expr)
+    function_defaults: HashMap<String, Vec<Option<nexc_ast::Expr>>>,
 }
 
 impl IrLowering {
@@ -163,6 +165,7 @@ impl IrLowering {
             current_scope_vars: HashSet::new(),
             loop_stack: Vec::new(),
             function_returns: HashMap::new(),
+            function_defaults: HashMap::new(),
         }
     }
 
@@ -548,6 +551,7 @@ impl IrLowering {
                 // is the same type — enables chaining like (a - b).abs()
                 self.resolve_expr_type(lhs)
             }
+            nexc_ast::Expr::ArrayLiteral { .. } => Some("List".into()),
             _ => None,
         }
     }
@@ -680,6 +684,82 @@ impl IrLowering {
             }
             Stmt::For(for_stmt) => {
                 if let Some((var_name, iterable)) = &for_stmt.for_each {
+                    // Check if iterable is a Range expression (for i in 0..n)
+                    let is_range = matches!(iterable.as_ref(), nexc_ast::Expr::Range { .. });
+
+                    if is_range {
+                        // Desugar: for (i in start..end) { body }
+                        // →  var i = start
+                        //    var __end = end
+                        //    while (i < __end) {
+                        //        body
+                        //        i = i + 1
+                        //    }
+                        let (start_expr, end_expr) = if let nexc_ast::Expr::Range { start, end, .. } = iterable.as_ref() {
+                            (start, end)
+                        } else {
+                            unreachable!()
+                        };
+
+                        let var_reg = format!("%{var_name}");
+                        let end_reg = self.fresh_temp();
+                        let start_val = self.lower_expr(start_expr);
+                        let end_val = self.lower_expr(end_expr);
+                        self.emit(IrInstruction::Store {
+                            dst: var_reg.clone(),
+                            src: start_val,
+                        });
+                        self.emit(IrInstruction::Store {
+                            dst: end_reg.clone(),
+                            src: end_val,
+                        });
+
+                        let header = self.fresh_label();
+                        let body_label = self.fresh_label();
+                        let exit_label = self.fresh_label();
+
+                        self.emit(IrInstruction::Jump {
+                            target: header.clone(),
+                        });
+                        let pre_label = self.fresh_label();
+                        self.seal_block(&pre_label);
+
+                        // Condition: i < __end
+                        let cond_dst = self.fresh_temp();
+                        self.emit(IrInstruction::BinOp {
+                            dst: cond_dst.clone(),
+                            op: "lt".into(),
+                            lhs: IrValue::Register(var_reg.clone()),
+                            rhs: IrValue::Register(end_reg.clone()),
+                        });
+                        self.emit(IrInstruction::Branch {
+                            cond: IrValue::Register(cond_dst),
+                            then_label: body_label.clone(),
+                            else_label: exit_label.clone(),
+                        });
+                        self.seal_block(&header);
+
+                        self.loop_stack.push((header.clone(), exit_label.clone()));
+                        self.lower_stmt(&for_stmt.body);
+                        self.loop_stack.pop();
+
+                        // Step: i = i + 1
+                        let next_val = self.fresh_temp();
+                        self.emit(IrInstruction::BinOp {
+                            dst: next_val.clone(),
+                            op: "add".into(),
+                            lhs: IrValue::Register(var_reg.clone()),
+                            rhs: IrValue::IntConst(1),
+                        });
+                        self.emit(IrInstruction::Store {
+                            dst: var_reg,
+                            src: IrValue::Register(next_val),
+                        });
+                        self.emit(IrInstruction::Jump { target: header });
+                        self.seal_block(&body_label);
+
+                        self.pending_label = Some(exit_label);
+                    } else {
                     // Desugar: for (x in items) { body }
                     // →  var __iter = items
                     //    var __i = 0
@@ -766,6 +846,7 @@ impl IrLowering {
                     self.seal_block(&body_label);
 
                     self.pending_label = Some(exit_label);
+                    }
                 } else {
                     // Traditional C-style for loop
                     if let Some(init) = &for_stmt.init {
@@ -1240,8 +1321,32 @@ impl IrLowering {
                 }
 
                 // Default call lowering.
-                let ir_args: Vec<IrValue> =
+                let mut ir_args: Vec<IrValue> =
                     args.iter().map(|a| self.lower_expr(a)).collect();
+
+                // Resolve function name for default argument lookup
+                let func_name = match callee.as_ref() {
+                    Expr::Identifier { name, .. } => Some(name.clone()),
+                    Expr::MemberAccess { name, .. } => Some(name.clone()),
+                    _ => None,
+                };
+
+                // Fill in default arguments if fewer args were provided
+                if let Some(ref fn_name) = func_name {
+                    if let Some(defaults) = self.function_defaults.get(fn_name).cloned() {
+                        let provided = ir_args.len();
+                        let expected = defaults.len();
+                        if provided < expected {
+                            for i in provided..expected {
+                                if let Some(Some(default_expr)) = defaults.get(i) {
+                                    let default_expr = default_expr.clone();
+                                    let val = self.lower_expr(&default_expr);
+                                    ir_args.push(val);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 let dst = self.fresh_temp();
                 let target = match callee.as_ref() {
@@ -1720,6 +1825,31 @@ impl IrLowering {
                 self.pending_label = Some(merge_label);
                 IrValue::Register(result_reg)
             }
+            Expr::Range { start, end, .. } => {
+                // Range as a standalone expression (not in for-each) — lower start/end
+                // and return the start value (ranges are primarily used in for-each)
+                let _start_val = self.lower_expr(start);
+                let _end_val = self.lower_expr(end);
+                _start_val
+            }
+            Expr::ArrayLiteral { elements, .. } => {
+                // Create a new list and add each element
+                let list_reg = self.fresh_temp();
+                self.emit(IrInstruction::Call {
+                    dst: Some(list_reg.clone()),
+                    target: "nex_list_new".into(),
+                    args: vec![],
+                });
+                for elem in elements {
+                    let val = self.lower_expr(elem);
+                    self.emit(IrInstruction::Call {
+                        dst: None,
+                        target: "nex_list_add".into(),
+                        args: vec![IrValue::Register(list_reg.clone()), val],
+                    });
+                }
+                IrValue::Register(list_reg)
+            }
             Expr::Unsupported { raw, .. } => {
                 self.emit(IrInstruction::EmitDiag {
                     message: format!("unsupported expression: {raw}"),
@@ -2098,6 +2228,15 @@ fn collect_free_vars_expr(
         Expr::Await { expr: e, .. } => {
             collect_free_vars_expr(e, bound, free, seen);
         }
+        Expr::Range { start, end, .. } => {
+            collect_free_vars_expr(start, bound, free, seen);
+            collect_free_vars_expr(end, bound, free, seen);
+        }
+        Expr::ArrayLiteral { elements, .. } => {
+            for el in elements {
+                collect_free_vars_expr(el, bound, free, seen);
+            }
+        }
         Expr::Block(block) => {
             collect_free_vars_block(block, bound, free, seen);
         }
@@ -2282,6 +2421,12 @@ pub fn lower_typed_module_with_prefix(
                         }
                         _ => {}
                     }
+                }
+                // Collect default parameter values
+                if f.params.iter().any(|p| p.default_value.is_some()) {
+                    let defaults: Vec<Option<nexc_ast::Expr>> =
+                        f.params.iter().map(|p| p.default_value.clone()).collect();
+                    lowering.function_defaults.insert(f.name.clone(), defaults);
                 }
             }
             nexc_ast::Item::Enum(e) => {

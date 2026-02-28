@@ -4,7 +4,7 @@ use std::os::windows::ffi::OsStrExt;
 
 use cranelift_codegen::ir::types;
 use cranelift_codegen::ir::{
-    AbiParam, Function, FuncRef, InstBuilder, MemFlags, Signature, UserFuncName,
+    AbiParam, Endianness, Function, FuncRef, InstBuilder, MemFlags, Signature, UserFuncName,
 };
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_codegen::Context;
@@ -776,6 +776,7 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_optim_step",
     "nex_torch_optim_zero_grad",
     "nex_torch_optim_free",
+    "nex_torch_optim_set_lr",
     "nex_torch_model_save",
     "nex_torch_model_load",
     "nex_torch_jit_load",
@@ -820,6 +821,12 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_nn_layer_norm",
     "nex_torch_nn_gelu",
     "nex_torch_nn_embedding",
+    "nex_torch_nn_linear_no_bias",
+    "nex_torch_nn_rms_norm",
+    "nex_torch_nn_clip_grad_norm",
+    "nex_torch_nn_init_normal",
+    "nex_torch_tensor_sin",
+    "nex_torch_tensor_cos",
     // crypto
     "nex_crypto_sha256",
     "nex_crypto_sha512",
@@ -1440,7 +1447,7 @@ fn emit_instruction<M: Module>(
             // Int values are converted via fcvt_from_sint (real integer → f64).
             let to_f64 = |builder: &mut FunctionBuilder, v: cranelift_codegen::ir::Value, rt: RegType| -> cranelift_codegen::ir::Value {
                 if rt == RegType::Float {
-                    builder.ins().bitcast(types::F64, MemFlags::new(), v)
+                    builder.ins().bitcast(types::F64, bitcast_memflags(), v)
                 } else {
                     builder.ins().fcvt_from_sint(types::F64, v)
                 }
@@ -1455,28 +1462,28 @@ fn emit_instruction<M: Module>(
                     let lf = to_f64(builder, l, lhs_type);
                     let rf = to_f64(builder, r, rhs_type);
                     let res = builder.ins().fadd(lf, rf);
-                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                    builder.ins().bitcast(types::I64, bitcast_memflags(), res)
                 }
                 "add" => builder.ins().iadd(l, r),
                 "sub" if is_float => {
                     let lf = to_f64(builder, l, lhs_type);
                     let rf = to_f64(builder, r, rhs_type);
                     let res = builder.ins().fsub(lf, rf);
-                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                    builder.ins().bitcast(types::I64, bitcast_memflags(), res)
                 }
                 "sub" => builder.ins().isub(l, r),
                 "mul" if is_float => {
                     let lf = to_f64(builder, l, lhs_type);
                     let rf = to_f64(builder, r, rhs_type);
                     let res = builder.ins().fmul(lf, rf);
-                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                    builder.ins().bitcast(types::I64, bitcast_memflags(), res)
                 }
                 "mul" => builder.ins().imul(l, r),
                 "div" if is_float => {
                     let lf = to_f64(builder, l, lhs_type);
                     let rf = to_f64(builder, r, rhs_type);
                     let res = builder.ins().fdiv(lf, rf);
-                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                    builder.ins().bitcast(types::I64, bitcast_memflags(), res)
                 }
                 "div" => builder.ins().sdiv(l, r),
                 "mod" if is_float => {
@@ -1487,7 +1494,7 @@ fn emit_instruction<M: Module>(
                     let floored = builder.ins().floor(quot);
                     let prod = builder.ins().fmul(floored, rf);
                     let res = builder.ins().fsub(lf, prod);
-                    builder.ins().bitcast(types::I64, MemFlags::new(), res)
+                    builder.ins().bitcast(types::I64, bitcast_memflags(), res)
                 }
                 "mod" => builder.ins().srem(l, r),
                 "eq" if lhs_type == RegType::String || rhs_type == RegType::String => {
@@ -2023,6 +2030,14 @@ fn call_runtime2<M: Module>(
     }
 }
 
+/// Create MemFlags with explicit little-endian for bitcast instructions.
+/// Cranelift requires endianness on bitcast to guarantee proper GPR<->XMM
+/// register transfers; without it the backend may elide the data movement,
+/// leaving float bit-patterns in GPR registers instead of XMM registers.
+fn bitcast_memflags() -> MemFlags {
+    MemFlags::new().with_endianness(Endianness::Little)
+}
+
 /// Bitcast call arguments from I64 to F64 where the function signature expects
 /// F64. This is needed because the Nex IR represents all values as I64 bit
 /// patterns, but the C ABI on Windows x64 passes floats in xmm registers.
@@ -2045,7 +2060,7 @@ fn coerce_call_args(
                 let expected = param_types[i];
                 let actual = builder.func.dfg.value_type(v);
                 if expected == types::F64 && actual == types::I64 {
-                    builder.ins().bitcast(types::F64, MemFlags::new(), v)
+                    builder.ins().bitcast(types::F64, bitcast_memflags(), v)
                 } else if expected == types::I32 && actual == types::I64 {
                     builder.ins().ireduce(types::I32, v)
                 } else {
@@ -2070,7 +2085,7 @@ fn coerce_return_value(
     let ret = results[0];
     let ret_ty = builder.func.dfg.value_type(ret);
     if ret_ty == types::F64 {
-        builder.ins().bitcast(types::I64, MemFlags::new(), ret)
+        builder.ins().bitcast(types::I64, bitcast_memflags(), ret)
     } else if ret_ty == types::I32 {
         builder.ins().sextend(types::I64, ret)
     } else {
@@ -2637,6 +2652,7 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "optim_step" => Some("nex_torch_optim_step"),
         "optim_zero_grad" => Some("nex_torch_optim_zero_grad"),
         "optim_free" => Some("nex_torch_optim_free"),
+        "optim_set_lr" => Some("nex_torch_optim_set_lr"),
         // Model I/O
         "model_save" => Some("nex_torch_model_save"),
         "model_load" => Some("nex_torch_model_load"),
@@ -2686,6 +2702,13 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "nn_layer_norm" => Some("nex_torch_nn_layer_norm"),
         "nn_gelu" => Some("nex_torch_nn_gelu"),
         "nn_embedding" => Some("nex_torch_nn_embedding"),
+        "nn_linear_no_bias" => Some("nex_torch_nn_linear_no_bias"),
+        "nn_rms_norm" => Some("nex_torch_nn_rms_norm"),
+        "nn_clip_grad_norm" => Some("nex_torch_nn_clip_grad_norm"),
+        "nn_init_normal" => Some("nex_torch_nn_init_normal"),
+        // Trigonometric
+        "tensor_sin" => Some("nex_torch_tensor_sin"),
+        "tensor_cos" => Some("nex_torch_tensor_cos"),
         // Utility
         "torch_manual_seed" => Some("nex_torch_manual_seed"),
         "torch_version" => Some("nex_torch_version"),
@@ -3735,6 +3758,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_optim_step", &sig_void_ptr),
         ("nex_torch_optim_zero_grad", &sig_void_ptr),
         ("nex_torch_optim_free", &sig_void_ptr),
+        ("nex_torch_optim_set_lr", &sig_void_i64_f64),
         // Model I/O
         ("nex_torch_model_save", &sig_void_ptr2),
         ("nex_torch_model_load", &sig_void_ptr2),
@@ -3784,6 +3808,13 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_nn_layer_norm", &sig_void_ptr2),
         ("nex_torch_nn_gelu", &sig_void_ptr),
         ("nex_torch_nn_embedding", &sig_void_ptr3),
+        ("nex_torch_nn_linear_no_bias", &sig_void_ptr3),
+        ("nex_torch_nn_rms_norm", &sig_void_ptr2),
+        ("nex_torch_nn_clip_grad_norm", &sig_void_i64_f64),
+        ("nex_torch_nn_init_normal", &sig_void_i64_f64),
+        // Trigonometric
+        ("nex_torch_tensor_sin", &sig_ptr_ptr),
+        ("nex_torch_tensor_cos", &sig_ptr_ptr),
         // Utility
         ("nex_torch_manual_seed", &sig_void_ptr),
         ("nex_torch_version", &sig_ret_ptr),

@@ -38,7 +38,7 @@ FunctionSig       = [ "public" ] "def" Ident "(" [ Parameters ] ")" [ "->" TypeR
 FunctionDecl      = [ "public" ] "def" Ident "(" [ Parameters ] ")" [ "->" TypeRef ] Block ;
 
 Parameters        = Param { "," Param } ;
-Param             = Ident ":" TypeRef ;
+Param             = Ident ":" TypeRef [ "=" Expr ] ;
 
 Block             = "{" { Statement } "}" ;
 
@@ -60,7 +60,9 @@ IfStmt            = "if" "(" Expr ")" Block [ "else" Block ] ;
 
 WhileStmt         = "while" "(" Expr ")" Block ;
 
-ForStmt           = "for" "(" ForInit ";" [ Expr ] ";" [ Expr ] ")" Block ;
+ForStmt           = "for" "(" ForInit ";" [ Expr ] ";" [ Expr ] ")" Block
+                  | "for" "(" Ident "in" Expr ")" Block
+                  ;
 ForInit           = VarStmtNoTerminator | Expr ;
 
 TryStmt           = "try" Block { CatchClause } [ FinallyClause ] ;
@@ -93,7 +95,8 @@ LogicalAnd        = Equality { "&&" Equality } ;
 Equality          = Relational { ( "==" | "!=" ) Relational } ;
 Relational        = Additive   { ( "<" | ">" | "<=" | ">=" ) Additive } ;
 Additive          = Multiplicative { ( "+" | "-" ) Multiplicative } ;
-Multiplicative    = Unary { ( "*" | "/" | "%" ) Unary } ;
+Multiplicative    = Range { ( "*" | "/" | "%" ) Range } ;
+Range             = Unary [ ".." Unary ] ;
 
 Unary             = ( "!" | "-" ) Unary
                   | Postfix
@@ -112,6 +115,7 @@ Primary           = Literal
                   | Ident
                   | "self"
                   | "(" Expr ")"
+                  | "[" [ Expr { "," Expr } [ "," ] ] "]"
                   | Block
                   ;
 

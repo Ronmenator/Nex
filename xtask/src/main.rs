@@ -436,6 +436,8 @@ fn stage_libs(libs_src: &Path, libs_dst: &Path) {
         fs::create_dir_all(&dst_lib).expect("failed to create lib staging dir");
 
         // Copy top-level files (.dll, project.toml)
+        // Only include Nex-built native DLLs (nex_* / nex3d_*) — skip third-party
+        // redistributable DLLs (e.g. libtorch CUDA libs) that users install separately.
         for file in fs::read_dir(&src_lib).into_iter().flatten().flatten() {
             let path = file.path();
             if !path.is_file() {
@@ -443,11 +445,16 @@ fn stage_libs(libs_src: &Path, libs_dst: &Path) {
             }
             let name = file.file_name();
             let name_str = name.to_string_lossy();
-            if name_str.ends_with(".dll")
+            let is_native_lib = name_str.ends_with(".dll")
                 || name_str.ends_with(".so")
-                || name_str.ends_with(".dylib")
-                || name_str == "project.toml"
-            {
+                || name_str.ends_with(".dylib");
+            if is_native_lib {
+                // Only include DLLs built by Nex (nex_*, nex3d_*) — skip vendor libs
+                if !name_str.starts_with("nex_") && !name_str.starts_with("nex3d_") {
+                    continue;
+                }
+            }
+            if is_native_lib || name_str == "project.toml" {
                 fs::copy(&path, dst_lib.join(&name)).ok();
             }
         }
