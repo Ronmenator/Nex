@@ -69,7 +69,15 @@ if ($innerDirs.Count -eq 1) {
     $sourceDir = $extractDir
 }
 
-# 5. Install - create ~/.nex and copy contents
+# 5. Kill running nex-lsp.exe (VS Code keeps it locked)
+$lspProcs = Get-Process -Name "nex-lsp" -ErrorAction SilentlyContinue
+if ($lspProcs) {
+    Write-Host "  Stopping nex-lsp.exe ($($lspProcs.Count) process(es))..." -ForegroundColor Yellow
+    $lspProcs | Stop-Process -Force
+    Start-Sleep -Milliseconds 500
+}
+
+# 6. Install - create ~/.nex and copy contents
 if (Test-Path $nexHome) {
     # Back up existing bin if present
     $existingBin = Join-Path $nexHome "bin"
@@ -96,7 +104,7 @@ foreach ($subdir in @("bin", "libs", "config")) {
     }
 }
 
-# 6. Add to PATH
+# 7. Add to PATH
 $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($currentPath -split ";" | Where-Object { $_ -eq $nexBin }) {
     Write-Host "  PATH already contains $nexBin" -ForegroundColor DarkGray
@@ -106,10 +114,10 @@ if ($currentPath -split ";" | Where-Object { $_ -eq $nexBin }) {
     Write-Host "  Added $nexBin to PATH" -ForegroundColor Green
 }
 
-# 7. Clean up temp files
+# 8. Clean up temp files
 Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
 
-# 8. Verify
+# 9. Verify
 Write-Host ""
 $nexExe = Join-Path $nexBin "nex.exe"
 if (Test-Path $nexExe) {
