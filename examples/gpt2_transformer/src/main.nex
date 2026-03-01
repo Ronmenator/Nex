@@ -1,360 +1,416 @@
-// GPT-2 with Multi-Query Attention — Nex + libtorch
+// GPT-2 Small (124M) — Nex + libtorch
 //
-// Architecture (Pre-LayerNorm GPT-2 with MQA):
-//   Token Embedding + Position Embedding
-//   → N × [ LN → MQA(4 heads, shared K/V) + Residual → LN → FFN(GELU) + Residual ]
-//   → Final LN → LM Head
+// Architecture (Pre-LayerNorm GPT-2):
+//   Token Embedding + Position Embedding + Embedding RMSNorm
+//   -> N x [ RMSNorm -> Q/K/V LinearNoBias -> SDPA -> O LinearNoBias + Residual
+//            -> RMSNorm -> FFN(LinearNoBias, GELU, LinearNoBias) + Residual ]
+//   -> Final RMSNorm -> LM Head (LinearNoBias)
+//
+// Module system handles leaf layers (tok_emb, pos_emb, emb_norm, ln_f, lm_head)
+// with automatic device management and optimizer setup.
+// Transformer blocks use Lists (need 12 separate instances).
 //
 // Usage:
-//   nex run examples/gpt2_transformer [--epochs N] [--lr F] [--seed N] [--save PATH]
+//   nex run examples/gpt2_transformer
+//
+// Requires: data/train.txt in the working directory
 
 import torch.tensor
 import torch.nn
-import torch.loss
 import torch.optim
-import torch.model
 
-// ===== Config =====
+// ============================================================================
+// FFI arithmetic workarounds
+// ============================================================================
 
-struct GPTConfig {
-    n_embd: Int
-    n_head: Int
-    n_layer: Int
-    vocab_size: Int
-    block_size: Int
-    d_head: Int
-    d_ff: Int
-}
+// Cranelift misidentifies register types for torch DLL returns used in
+// arithmetic. Wrapping in a trivial function forces a function boundary
+// that resets type tracking.
+def wrap_int(v: Int) -> Int { return v }
+def wrap_float(v: Float) -> Float { return v }
 
-// ===== Builder helpers =====
+// ============================================================================
+// GPT module — 5 leaf layers (singleton, auto to_device/setup_optimizer)
+// ============================================================================
 
-def build_proj(d_in: Int, d_out: Int) -> Module {
-    var m: Module = nn_sequential_new()
-    nn_linear(m, d_in, d_out)
-    return m
-}
+module GPT(vocab: Int, n_embd: Int, seq_len: Int) {
+    [Optim("adamw", "lr=6e-4", "beta1=0.9", "beta2=0.95", "wd=0.1")]
+    tok_emb:  Embedding(vocab, n_embd)
+    [Optim("adamw", "lr=6e-4", "beta1=0.9", "beta2=0.95", "wd=0.1")]
+    pos_emb:  Embedding(seq_len, n_embd)
+    [Optim("adamw", "lr=6e-4", "beta1=0.9", "beta2=0.95", "wd=0.1")]
+    emb_norm: RMSNorm(n_embd)
+    [Optim("adamw", "lr=6e-4", "beta1=0.9", "beta2=0.95", "wd=0.1")]
+    ln_f:     RMSNorm(n_embd)
+    [Optim("adamw", "lr=6e-4", "beta1=0.9", "beta2=0.95", "wd=0.1")]
+    lm_head:  LinearNoBias(n_embd, vocab)
 
-def build_ffn(d_model: Int, d_ff: Int) -> Module {
-    var m: Module = nn_sequential_new()
-    nn_linear(m, d_model, d_ff)
-    nn_gelu(m)
-    nn_linear(m, d_ff, d_model)
-    nn_dropout(m, 0.1)
-    return m
-}
+    def forward(blocks: List, tokens: Int, pos: Int,
+                B: Int, T: Int, H: Int, D: Int, n_layer: Int) -> Int {
+        var tok = self.tok_emb(tokens)
+        var pe  = self.pos_emb(pos)
+        var x   = tensor_add(tok, pe)
+        tensor_free(tok)
+        tensor_free(pe)
+        var xn = self.emb_norm(x)
+        tensor_free(x)
+        x = xn
 
-def build_ln(dim: Int) -> Module {
-    var m: Module = nn_sequential_new()
-    nn_layer_norm(m, dim)
-    return m
-}
-
-def build_embedding(num_emb: Int, emb_dim: Int) -> Module {
-    var m: Module = nn_sequential_new()
-    nn_embedding(m, num_emb, emb_dim)
-    return m
-}
-
-// ===== Attention helpers =====
-
-def attn_head(q: Tensor, k: Tensor, v: Tensor, causal_mask: Tensor) -> Tensor {
-    var kt: Tensor = k.transpose(0, 1)
-    var scores: Tensor = q.matmul(kt).div_scalar(4.0)
-    scores = scores.masked_fill(causal_mask, -100000.0)
-    var weights: Tensor = scores.softmax(1)
-    return weights.matmul(v)
-}
-
-def mqa_forward(
-    q_proj: Module, k_proj: Module, v_proj: Module, o_proj: Module,
-    x: Tensor, causal_mask: Tensor
-) -> Tensor {
-    var q_all: Tensor = q_proj.forward(x)
-    var k: Tensor = k_proj.forward(x)
-    var v: Tensor = v_proj.forward(x)
-
-    var q0: Tensor = q_all.narrow(1, 0, 16)
-    var q1: Tensor = q_all.narrow(1, 16, 16)
-    var q2: Tensor = q_all.narrow(1, 32, 16)
-    var q3: Tensor = q_all.narrow(1, 48, 16)
-
-    var h0: Tensor = attn_head(q0, k, v, causal_mask)
-    var h1: Tensor = attn_head(q1, k, v, causal_mask)
-    var h2: Tensor = attn_head(q2, k, v, causal_mask)
-    var h3: Tensor = attn_head(q3, k, v, causal_mask)
-
-    var ctx: Tensor = h0.cat(h1, 1).cat(h2, 1).cat(h3, 1)
-    return o_proj.forward(ctx)
-}
-
-def block_forward(
-    ln1: Module, q_proj: Module, k_proj: Module, v_proj: Module,
-    o_proj: Module, ln2: Module, ffn: Module,
-    x: Tensor, causal_mask: Tensor
-) -> Tensor {
-    var normed: Tensor = ln1.forward(x)
-    var attn_out: Tensor = mqa_forward(q_proj, k_proj, v_proj, o_proj, normed, causal_mask)
-    x = x + attn_out
-
-    normed = ln2.forward(x)
-    var ff_out: Tensor = ffn.forward(normed)
-    x = x + ff_out
-    return x
-}
-
-// ===== GPT Model =====
-
-class GPT {
-    tok_emb: Module
-    pos_emb: Module
-    modules: List
-    ln_f: Module
-    lm_head: Module
-    n_layers: Int
-
-    def init(config: GPTConfig) {
-        self.tok_emb = build_embedding(config.vocab_size, config.n_embd)
-        self.pos_emb = build_embedding(config.block_size, config.n_embd)
-        self.modules = List()
-        self.n_layers = config.n_layer
-
-        var i = 0
-        while (i < config.n_layer) {
-            self.modules.add(build_ln(config.n_embd))
-            self.modules.add(build_proj(config.n_embd, config.n_embd))
-            self.modules.add(build_proj(config.n_embd, config.d_head))
-            self.modules.add(build_proj(config.n_embd, config.d_head))
-            self.modules.add(build_proj(config.n_embd, config.n_embd))
-            self.modules.add(build_ln(config.n_embd))
-            self.modules.add(build_ffn(config.n_embd, config.d_ff))
-            i = i + 1
-        }
-
-        self.ln_f = build_ln(config.n_embd)
-        self.lm_head = build_proj(config.n_embd, config.vocab_size)
-    }
-
-    def to_device(device: String) {
-        self.tok_emb.to_device(device)
-        self.pos_emb.to_device(device)
-        var i = 0
-        while (i < self.modules.length()) {
-            var m: Module = self.modules.get(i)
-            m.to_device(device)
-            i = i + 1
-        }
-        self.ln_f.to_device(device)
-        self.lm_head.to_device(device)
-    }
-
-    def parameters() -> List {
-        var params = List()
-        params.add(self.tok_emb)
-        params.add(self.pos_emb)
-        var i = 0
-        while (i < self.modules.length()) {
-            params.add(self.modules.get(i))
-            i = i + 1
-        }
-        params.add(self.ln_f)
-        params.add(self.lm_head)
-        return params
-    }
-
-    def forward(x: Tensor, causal_mask: Tensor) -> Tensor {
-        var h: Tensor = self.tok_emb.forward(x) + self.pos_emb.forward(x)
         var bi = 0
-        while (bi < self.n_layers) {
-            var base = bi * 7
-            h = block_forward(
-                self.modules.get(base), self.modules.get(base + 1),
-                self.modules.get(base + 2), self.modules.get(base + 3),
-                self.modules.get(base + 4), self.modules.get(base + 5),
-                self.modules.get(base + 6), h, causal_mask)
+        while (bi < n_layer) {
+            var x_new = block_forward(list_get(blocks, bi), x, B, T, H, D)
+            tensor_free(x)
+            x = x_new
             bi = bi + 1
         }
-        h = self.ln_f.forward(h)
-        return self.lm_head.forward(h)
+
+        var xf = self.ln_f(x)
+        tensor_free(x)
+        var logits = self.lm_head(xf)
+        tensor_free(xf)
+        return logits
     }
 
-    def free() {
-        nn_free(self.tok_emb)
-        nn_free(self.pos_emb)
-        var i = 0
-        while (i < self.modules.length()) {
-            nn_free(self.modules.get(i))
-            i = i + 1
-        }
-        nn_free(self.ln_f)
-        nn_free(self.lm_head)
+    def leaf_modules() -> List {
+        var mods = list_new()
+        list_push(mods, self.tok_emb)
+        list_push(mods, self.pos_emb)
+        list_push(mods, self.emb_norm)
+        list_push(mods, self.ln_f)
+        list_push(mods, self.lm_head)
+        return mods
     }
 }
 
-// ===== Entry point =====
+// ============================================================================
+// Transformer block — 7 modules per block (12 instances via Lists)
+// ============================================================================
 
-def main() {
-    println("=== GPT-2 with Multi-Query Attention (Nex) ===")
-    println("")
+def make_block(n_embd: Int, mlp_hidden: Int) -> List {
+    var parts = list_new()
 
-    // Hyperparameters
-    n_epochs = 20
-    lr = 0.001
-    seed = 42
-    save_path = "gpt2_mqa.pt"
+    var ln1 = nn_sequential_new()
+    nn_rms_norm(ln1, n_embd)
+    list_push(parts, ln1)
 
-    // CLI argument parsing
-    argc = env_args_count()
-    i = 1
-    while (i < argc) {
-        arg = env_args_get(i)
-        if (arg == "--epochs") {
-            i = i + 1
-            n_epochs = parse_int(env_args_get(i))
-        }
-        if (arg == "--lr") {
-            i = i + 1
-            lr = parse_float(env_args_get(i))
-        }
-        if (arg == "--seed") {
-            i = i + 1
-            seed = parse_int(env_args_get(i))
-        }
-        if (arg == "--save") {
-            i = i + 1
-            save_path = env_args_get(i)
-        }
+    var qp = nn_sequential_new()
+    nn_linear_no_bias(qp, n_embd, n_embd)
+    list_push(parts, qp)
+
+    var kp = nn_sequential_new()
+    nn_linear_no_bias(kp, n_embd, n_embd)
+    list_push(parts, kp)
+
+    var vp = nn_sequential_new()
+    nn_linear_no_bias(vp, n_embd, n_embd)
+    list_push(parts, vp)
+
+    var op = nn_sequential_new()
+    nn_linear_no_bias(op, n_embd, n_embd)
+    list_push(parts, op)
+
+    var ln2 = nn_sequential_new()
+    nn_rms_norm(ln2, n_embd)
+    list_push(parts, ln2)
+
+    var mlp = nn_sequential_new()
+    nn_linear_no_bias(mlp, n_embd, mlp_hidden)
+    nn_gelu(mlp)
+    nn_linear_no_bias(mlp, mlp_hidden, n_embd)
+    list_push(parts, mlp)
+
+    return parts
+}
+
+def make_blocks(n_layer: Int, n_embd: Int, mlp_hidden: Int) -> List {
+    var blocks = list_new()
+    var i = 0
+    while (i < n_layer) {
+        list_push(blocks, make_block(n_embd, mlp_hidden))
         i = i + 1
     }
+    return blocks
+}
 
-    torch_manual_seed(seed)
+def block_forward(block: List, x: Int, B: Int, T: Int, H: Int, D: Int) -> Int {
+    var xn = nn_forward(list_get(block, 0), x)
 
-    device = "cpu"
-    if (cuda_is_available() == 1) {
-        device = "cuda"
+    var q_lin = nn_forward(list_get(block, 1), xn)
+    var q_v4  = tensor_view4(q_lin, B, T, H, D)
+    tensor_free(q_lin)
+    var q = tensor_transpose(q_v4, 1, 2)
+    tensor_free(q_v4)
+
+    var k_lin = nn_forward(list_get(block, 2), xn)
+    var k_v4  = tensor_view4(k_lin, B, T, H, D)
+    tensor_free(k_lin)
+    var k = tensor_transpose(k_v4, 1, 2)
+    tensor_free(k_v4)
+
+    var v_lin = nn_forward(list_get(block, 3), xn)
+    var v_v4  = tensor_view4(v_lin, B, T, H, D)
+    tensor_free(v_lin)
+    var v = tensor_transpose(v_v4, 1, 2)
+    tensor_free(v_v4)
+
+    tensor_free(xn)
+
+    var attn_raw = tensor_sdpa(q, k, v, 1)
+    tensor_free(q)
+    tensor_free(k)
+    tensor_free(v)
+    var attn_t = tensor_transpose(attn_raw, 1, 2)
+    tensor_free(attn_raw)
+    var attn_c = tensor_contiguous(attn_t)
+    tensor_free(attn_t)
+    var attn = tensor_view3(attn_c, B, T, H * D)
+    tensor_free(attn_c)
+
+    var out_proj = nn_forward(list_get(block, 4), attn)
+    tensor_free(attn)
+    var x1 = tensor_add(x, out_proj)
+    tensor_free(out_proj)
+
+    var ln2_out = nn_forward(list_get(block, 5), x1)
+    var mlp_out = nn_forward(list_get(block, 6), ln2_out)
+    tensor_free(ln2_out)
+    var x2 = tensor_add(x1, mlp_out)
+    tensor_free(mlp_out)
+    tensor_free(x1)
+    return x2
+}
+
+// ============================================================================
+// Block helpers
+// ============================================================================
+
+def blocks_to_cuda(blocks: List) {
+    var bi = 0
+    while (bi < list_len(blocks)) {
+        var block = list_get(blocks, bi)
+        var j = 0
+        while (j < list_len(block)) {
+            nn_to_device(list_get(block, j), "cuda")
+            j = j + 1
+        }
+        bi = bi + 1
+    }
+}
+
+def make_block_optims(blocks: List, lr: Float) -> List {
+    var opts = list_new()
+    var bi = 0
+    while (bi < list_len(blocks)) {
+        var block = list_get(blocks, bi)
+        var j = 0
+        while (j < list_len(block)) {
+            list_push(opts, optim_adamw(list_get(block, j), lr, 0.9, 0.95, 0.1))
+            j = j + 1
+        }
+        bi = bi + 1
+    }
+    return opts
+}
+
+def collect_block_mods(blocks: List) -> List {
+    var mods = list_new()
+    var bi = 0
+    while (bi < list_len(blocks)) {
+        var block = list_get(blocks, bi)
+        var j = 0
+        while (j < list_len(block)) {
+            list_push(mods, list_get(block, j))
+            j = j + 1
+        }
+        bi = bi + 1
+    }
+    return mods
+}
+
+// ============================================================================
+// Training helpers
+// ============================================================================
+
+def set_lr_all(opts: List, lr: Float) {
+    var i = 0
+    while (i < list_len(opts)) {
+        optim_set_lr(list_get(opts, i), lr)
+        i = i + 1
+    }
+}
+
+def step_all(opts: List) {
+    var i = 0
+    while (i < list_len(opts)) {
+        optim_step_and_zero(list_get(opts, i))
+        i = i + 1
+    }
+}
+
+def clip_all(mods: List) {
+    var i = 0
+    while (i < list_len(mods)) {
+        nn_clip_grad_norm(list_get(mods, i), 1.0)
+        i = i + 1
+    }
+}
+
+// ============================================================================
+// Data loading
+// ============================================================================
+
+def load_data() -> Int {
+    var text = file_read_all("data/train.txt")
+    println("  " + str_length(text) + " bytes")
+    return tensor_from_string_bytes(text)
+}
+
+def get_batch(data: Int, batch_size: Int, seq_len: Int) -> Int {
+    var n = wrap_int(tensor_shape_dim(data, 0)) - seq_len - 2
+    var rows = list_new()
+    var i = 0
+    while (i < batch_size) {
+        list_push(rows, tensor_narrow(data, 0, random_range(0, n), seq_len + 1))
+        i = i + 1
+    }
+    return tensor_stack(rows, 0)
+}
+
+// ============================================================================
+// Train step
+// ============================================================================
+
+// Returns 0 (Int return required to avoid void-function codegen issue).
+def do_step(blocks: List, data: Int, pos: Int, opts: List, all_mods: List,
+            B: Int, T: Int, H: Int, D: Int, n_layer: Int, step: Int, do_log: Int) -> Int {
+    var batch   = get_batch(data, B, T)
+    batch       = tensor_to_device(batch, "cuda")
+    var inputs  = tensor_narrow(batch, 1, 0, T)
+    var targets = tensor_narrow(batch, 1, 1, T)
+
+    var logits      = GPT.forward(blocks, inputs, pos, B, T, H, D, n_layer)
+    var flat_logits  = tensor_flatten(logits, 0, 1)
+    var flat_targets = tensor_to_dtype_long(tensor_flatten(targets, 0, 1))
+    var loss = loss_cross_entropy(flat_logits, flat_targets)
+    tensor_backward(loss)
+
+    if (do_log == 1) {
+        println("  step=" + step + "  loss=")
+        tensor_print(loss)
     }
 
-    // Config: n_embd=64, n_head=4, n_layer=4, vocab=32, block=32, d_head=16, d_ff=256
-    var config = GPTConfig(64, 4, 4, 32, 32, 16, 256)
+    clip_all(all_mods)
+    step_all(opts)
 
-    println("Config:")
-    print("  n_embd     = ")
-    println(config.n_embd)
-    print("  vocab_size = ")
-    println(config.vocab_size)
-    print("  n_layer    = ")
-    println(config.n_layer)
-    print("  n_head     = ")
-    println(config.n_head)
-    print("  d_head     = ")
-    println(config.d_head)
-    print("  d_ff       = ")
-    println(config.d_ff)
-    print("  epochs     = ")
-    println(n_epochs)
-    print("  lr         = ")
-    println(lr)
-    print("  device     = ")
-    println(device)
-    println("")
+    tensor_free(loss)
+    tensor_free(flat_logits)
+    tensor_free(flat_targets)
+    tensor_free(logits)
+    tensor_free(inputs)
+    tensor_free(targets)
+    tensor_free(batch)
+    return 0
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+
+def main() {
+    println("=== Nex GPT-2 Small (124M) ===")
+
+    // Hyperparameters
+    var vocab     = 256
+    var n_embd    = 768
+    var n_head    = 12
+    var head_dim  = 64
+    var n_layer   = 12
+    var seq_len   = 1024
+    var mlp_hidden = 3072
+    var batch_size = 4
+    var max_lr    = 6e-4
+    var min_lr    = 6e-5
+    var total_steps = 50
+    var warmup    = 200
+    var log_every = 10
+
+    // Load training data
+    println("Loading data...")
+    var data = load_data()
 
     // Build model
     println("Building model...")
-    var model = GPT(config)
-    model.to_device(device)
+    GPT(vocab, n_embd, seq_len)
+    var blocks = make_blocks(n_layer, n_embd, mlp_hidden)
+    println("  " + (5 + n_layer * 7) + " modules")
 
-    // Create optimizers (one per module)
-    var params = model.parameters()
-    var optims = List()
-    var pi = 0
-    while (pi < params.length()) {
-        optims.add(optim_adam(params.get(pi), lr))
-        pi = pi + 1
+    // Move to GPU
+    println("Moving to CUDA...")
+    GPT.to_device("cuda")
+    blocks_to_cuda(blocks)
+
+    var pos = tensor_to_device(
+        tensor_to_dtype_long(tensor_arange(0.0, seq_len * 1.0, 1.0)), "cuda")
+
+    // Create AdamW optimizers
+    println("Creating optimizers...")
+    var gpt_opts   = GPT.setup_optimizer()
+    var block_opts = make_block_optims(blocks, max_lr)
+
+    var opts = list_new()
+    var oi = 0
+    while (oi < list_len(gpt_opts)) {
+        list_push(opts, list_get(gpt_opts, oi))
+        oi = oi + 1
     }
-    println("  Adam optimizers initialized")
+    oi = 0
+    while (oi < list_len(block_opts)) {
+        list_push(opts, list_get(block_opts, oi))
+        oi = oi + 1
+    }
+    println("  " + list_len(opts) + " AdamW optimizers")
 
-    // Causal mask
-    var ones_sq: Tensor = tensor_ones_like(tensor_eye(config.block_size))
-    var upper_tri: Tensor = ones_sq.triu(1)
-    var causal_mask: Tensor = upper_tri.gt_scalar(0.5).to_device(device)
-
-    // Training data
-    var input_ids: Tensor = tensor_arange(0.0, 32.0, 1.0).to_device(device)
-    var target: Tensor = tensor_to_dtype_long(tensor_arange(0.0, 32.0, 1.0)).to_device(device)
-
-    println("")
-    println("Training...")
-    println("")
+    // Collect all module handles for gradient clipping
+    var all_mods   = GPT.leaf_modules()
+    var block_mods = collect_block_mods(blocks)
+    var mi = 0
+    while (mi < list_len(block_mods)) {
+        list_push(all_mods, list_get(block_mods, mi))
+        mi = mi + 1
+    }
 
     // Training loop
-    epoch = 0
-    while (epoch < n_epochs) {
-        var logits: Tensor = model.forward(input_ids, causal_mask)
-        var loss: Tensor = logits.cross_entropy(target)
-        var loss_val = loss.item()
+    println("Training...")
+    var step = 0
+    var t0   = wrap_int(now_millis())
 
-        print("  epoch ")
-        print(epoch)
-        print("  loss = ")
-        println(loss_val)
-
-        loss.backward()
-
-        for (opt in optims) {
-            optim_step(opt)
-            optim_zero_grad(opt)
+    while (step < total_steps) {
+        // Cosine LR schedule with warmup
+        var lr = max_lr
+        if (step >= warmup) {
+            var progress = wrap_float((step - warmup) * 1.0 / (total_steps - warmup) * 1.0)
+            var pi = 3.141592653589793
+            lr = wrap_float(min_lr + (max_lr - min_lr) * 0.5 * (1.0 + wrap_float(cos(pi * progress))))
         }
+        if (step < warmup) {
+            lr = wrap_float(max_lr * (step * 1.0 / warmup * 1.0))
+        }
+        set_lr_all(opts, lr)
 
-        epoch = epoch + 1
+        var do_log = 0
+        if (step % log_every == 0) { do_log = 1 }
+
+        do_step(blocks, data, pos, opts, all_mods,
+                batch_size, seq_len, n_head, head_dim, n_layer, step, do_log)
+
+        if (step % log_every == 0) {
+            var t1 = wrap_int(now_millis())
+            var ms = wrap_float((t1 - t0) * 1.0 / log_every * 1.0)
+            if (step == 0) { ms = wrap_float((t1 - t0) * 1.0) }
+            println("    lr=" + lr + "  ms/step=" + ms)
+            t0 = t1
+        }
+        step = step + 1
     }
-
-    println("")
-    println("Training complete!")
-
-    // Inference
-    println("")
-    println("Running inference...")
-    torch_no_grad(1)
-
-    var test_in: Tensor = tensor_arange(0.0, 32.0, 1.0).to_device(device)
-    var out: Tensor = model.forward(test_in, causal_mask)
-    var preds: Tensor = out.argmax(1)
-
-    print("  Output shape: [")
-    print(out.shape_dim(0))
-    print(", ")
-    print(out.shape_dim(1))
-    println("]")
-
-    println("  Predictions (argmax, should be 0..31):")
-    print("  ")
-    preds.print()
-
-    var preds_f: Tensor = preds.to_float()
-    var target_f: Tensor = target.to_float()
-    var diff: Tensor = (preds_f - target_f).abs()
-    var correct: Tensor = diff.lt_scalar(0.5).to_float()
-    var accuracy = correct.mean().item()
-    print("  Accuracy: ")
-    println(accuracy)
-
-    torch_no_grad(0)
-
-    // Save model
-    model_save(model.lm_head, save_path)
-    print("  Saved LM head weights to ")
-    println(save_path)
-
-    // Cleanup
-    model.free()
-    for (opt in optims) {
-        optim_free(opt)
-    }
-    tensor_free(input_ids)
-    tensor_free(target)
-    tensor_free(causal_mask)
-    tensor_free(test_in)
-
-    println("")
-    println("Done.")
-    return
+    println("Done!")
 }

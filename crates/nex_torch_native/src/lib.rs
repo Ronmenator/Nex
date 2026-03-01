@@ -89,6 +89,14 @@ pub unsafe extern "C" fn nex_torch_tensor_eye(n: i64) -> *mut Tensor {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_from_string_bytes(s: *const c_char) -> *mut Tensor {
+    if s.is_null() { return ptr::null_mut(); }
+    let src = std::ffi::CStr::from_ptr(s).to_bytes();
+    let bytes: Vec<i64> = src.iter().map(|&b| b as i64).collect();
+    Box::into_raw(Box::new(Tensor::from_slice(&bytes)))
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn nex_torch_tensor_free(t: *mut Tensor) {
     if !t.is_null() { drop(Box::from_raw(t)); }
 }
@@ -208,6 +216,12 @@ pub unsafe extern "C" fn nex_torch_tensor_get_float(t: *mut Tensor, index: i64) 
 pub unsafe extern "C" fn nex_torch_tensor_item_float(t: *mut Tensor) -> f64 {
     if t.is_null() { return 0.0; }
     f64::try_from(&*t).unwrap_or(0.0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_item_int(t: *mut Tensor) -> i64 {
+    if t.is_null() { return 0; }
+    i64::try_from(&*t).unwrap_or(0)
 }
 
 #[no_mangle]
@@ -389,7 +403,10 @@ pub unsafe extern "C" fn nex_torch_nn_to_device(module: *mut NexModule, device_s
     if module.is_null() { return; }
     let m = &mut *module;
     let device = parse_device(cstr_to_str(device_str));
-    m.vs.set_device(device);
+    // Catch panics from poisoned VarStore locks
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        m.vs.set_device(device);
+    }));
 }
 
 #[no_mangle]
@@ -920,10 +937,13 @@ pub unsafe extern "C" fn nex_torch_nn_clip_grad_norm(module: *mut NexModule, max
 pub unsafe extern "C" fn nex_torch_nn_init_normal(module: *mut NexModule, std: f64) {
     if module.is_null() { return; }
     let m = &*module;
-    let _guard = tch::no_grad_guard();
-    for mut p in m.vs.trainable_variables() {
-        let _ = p.init(nn::Init::Randn { mean: 0.0, stdev: std });
-    }
+    // Catch panics from SymNodeImpl/dispatch issues in libtorch 2.10
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _guard = tch::no_grad_guard();
+        for mut p in m.vs.trainable_variables() {
+            let _ = p.f_normal_(0.0, std);
+        }
+    }));
 }
 
 // ---------------------------------------------------------------------------

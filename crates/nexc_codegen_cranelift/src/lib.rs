@@ -727,6 +727,7 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_tensor_from_float_data",
     "nex_torch_tensor_arange",
     "nex_torch_tensor_eye",
+    "nex_torch_tensor_from_string_bytes",
     "nex_torch_tensor_free",
     "nex_torch_tensor_add",
     "nex_torch_tensor_sub",
@@ -746,6 +747,7 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_tensor_shape_dim",
     "nex_torch_tensor_get_float",
     "nex_torch_tensor_item_float",
+    "nex_torch_tensor_item_int",
     "nex_torch_tensor_ndim",
     "nex_torch_tensor_numel",
     "nex_torch_cuda_is_available",
@@ -976,14 +978,19 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
     {
         return Some(RegType::String);
     }
-    // Math / torch functions that return f64.
+    // Math / torch / nex3d functions that return f64.
     match name {
         "abs_float" | "min_float" | "max_float" | "clamp_float"
         | "floor" | "ceil" | "round" | "sqrt" | "pow"
         | "sin" | "cos" | "tan" | "log" | "log2" | "log10" | "exp"
         | "math_random"
         | "parse_float"
-        | "tensor_item_float" | "tensor_get_float" => return Some(RegType::Float),
+        | "tensor_item_float" | "tensor_get_float"
+        // nex3d engine float returns
+        | "delta_time" | "elapsed_time"
+        | "mouse_x" | "mouse_y" | "mouse_delta_x" | "mouse_delta_y" | "scroll_delta"
+        | "anim_get_time" | "anim_clip_duration"
+        | "font_measure_text" | "gamepad_axis" => return Some(RegType::Float),
         _ => {}
     }
     // String stdlib functions that return strings
@@ -1301,7 +1308,7 @@ fn translate_function<M: Module>(
     }
 
     // Build register type map for print dispatch.
-    let reg_types = build_reg_type_map(ir_func, all_ir_funcs, module_types, global_data);
+    let mut reg_types = build_reg_type_map(ir_func, all_ir_funcs, module_types, global_data);
 
     // Translate each IrBlock.
     let has_return_type = !matches!(ir_func.return_type, Type::Unit);
@@ -1327,7 +1334,7 @@ fn translate_function<M: Module>(
                 func_ids,
                 strings,
                 has_return_type,
-                &reg_types,
+                &mut reg_types,
                 global_data,
             );
         }
@@ -1421,7 +1428,7 @@ fn emit_instruction<M: Module>(
     func_ids: &HashMap<String, FuncId>,
     strings: &StringPool,
     has_return_type: bool,
-    reg_types: &HashMap<String, RegType>,
+    reg_types: &mut HashMap<String, RegType>,
     global_data: &HashMap<String, cranelift_module::DataId>,
 ) -> bool {
     match inst {
@@ -1438,7 +1445,12 @@ fn emit_instruction<M: Module>(
         }
         IrInstruction::Return(Some(val)) => {
             let v = resolve_value(builder, module, val, vars, strings, func_ids, global_data);
-            builder.ins().return_(&[v]);
+            if has_return_type {
+                builder.ins().return_(&[v]);
+            } else {
+                // Void function — discard value, emit empty return.
+                builder.ins().return_(&[]);
+            }
             true
         }
 
@@ -1449,12 +1461,30 @@ fn emit_instruction<M: Module>(
 
         IrInstruction::Store { dst, src } => {
             let v = resolve_value(builder, module, src, vars, strings, func_ids, global_data);
+            // Propagate reg_type from source to destination so dynamically
+            // updated types (e.g. from a Call that returns F64) flow through
+            // assignments.
+            let src_ty = match src {
+                IrValue::FloatConst(_) => Some(RegType::Float),
+                IrValue::StringConst(_) => Some(RegType::String),
+                IrValue::IntConst(_) => Some(RegType::Int),
+                IrValue::BoolConst(_) => Some(RegType::Bool),
+                IrValue::Register(r) => reg_types.get(r).copied(),
+                IrValue::NullConst => None,
+            };
+            if let Some(ty) = src_ty {
+                reg_types.insert(dst.clone(), ty);
+            }
             set_var(builder, module, dst, v, vars, global_data);
             false
         }
 
         IrInstruction::Load { dst, src } => {
             let v = resolve_value(builder, module, &IrValue::Register(src.clone()), vars, strings, func_ids, global_data);
+            // Propagate reg_type from source global/variable.
+            if let Some(&ty) = reg_types.get(src) {
+                reg_types.insert(dst.clone(), ty);
+            }
             set_var(builder, module, dst, v, vars, global_data);
             false
         }
@@ -1597,13 +1627,27 @@ fn emit_instruction<M: Module>(
                 "shr" => builder.ins().sshr(l, r),
                 _ => builder.ins().iadd(l, r),
             };
+            // Propagate result type so downstream instructions (Store, Call,
+            // etc.) see the correct RegType even when the static pre-pass
+            // was conservative.
+            if is_float {
+                reg_types.insert(dst.clone(), RegType::Float);
+            } else if lhs_type == RegType::String || rhs_type == RegType::String {
+                reg_types.insert(dst.clone(), RegType::String);
+            }
             set_var(builder, module, dst, result, vars, global_data);
             false
         }
 
         IrInstruction::UnaryOp { dst, op, operand } => {
             let v = resolve_value(builder, module, operand, vars, strings, func_ids, global_data);
+            let operand_type = irvalue_reg_type(operand, reg_types);
             let result = match op.as_str() {
+                "neg" if operand_type == RegType::Float => {
+                    let fv = builder.ins().bitcast(types::F64, bitcast_memflags(), v);
+                    let res = builder.ins().fneg(fv);
+                    builder.ins().bitcast(types::I64, bitcast_memflags(), res)
+                }
                 "neg" => builder.ins().ineg(v),
                 "not" => {
                     let one = builder.ins().iconst(types::I64, 1);
@@ -1612,6 +1656,12 @@ fn emit_instruction<M: Module>(
                 "bitnot" => builder.ins().bnot(v),
                 _ => v,
             };
+            // Propagate operand type through unary ops.
+            if operand_type == RegType::Float {
+                reg_types.insert(dst.clone(), RegType::Float);
+            } else if operand_type == RegType::String {
+                reg_types.insert(dst.clone(), RegType::String);
+            }
             set_var(builder, module, dst, result, vars, global_data);
             false
         }
@@ -1701,6 +1751,12 @@ fn emit_instruction<M: Module>(
                     let call = builder.ins().call(func_ref, &coerced);
                     if let Some(d) = dst {
                         let rv = coerce_return_value(builder, call);
+                        // Dynamically update reg_types from the actual Cranelift
+                        // signature.  This catches cases the static pre-pass missed
+                        // (e.g. cross-module name collisions, unrecognised FFI names).
+                        if let Some(rt) = sig_return_reg_type(builder, func_ref) {
+                            reg_types.insert(d.clone(), rt);
+                        }
                         set_var(builder, module, d, rv, vars, global_data);
                     }
                 }
@@ -1745,6 +1801,10 @@ fn emit_instruction<M: Module>(
                 let call = builder.ins().call(func_ref, &coerced);
                 if let Some(d) = dst {
                     let rv = coerce_return_value(builder, call);
+                    // Dynamically update reg_types from the actual signature.
+                    if let Some(rt) = sig_return_reg_type(builder, func_ref) {
+                        reg_types.insert(d.clone(), rt);
+                    }
                     set_var(builder, module, d, rv, vars, global_data);
                 }
             } else {
@@ -2116,6 +2176,19 @@ fn coerce_return_value(
     }
 }
 
+/// Infer RegType from a function's Cranelift signature return type.
+/// Returns `Some(RegType::Float)` when the signature returns F64,
+/// `None` otherwise (callers keep whatever the static pre-pass decided).
+fn sig_return_reg_type(builder: &FunctionBuilder, func_ref: FuncRef) -> Option<RegType> {
+    let sig = builder.func.dfg.ext_funcs[func_ref].signature;
+    let returns = &builder.func.dfg.signatures[sig].returns;
+    if !returns.is_empty() && returns[0].value_type == types::F64 {
+        Some(RegType::Float)
+    } else {
+        None
+    }
+}
+
 /// Map a print/println call to the correct typed runtime function.
 fn pick_print_runtime<'a>(
     func_name: &str,
@@ -2206,7 +2279,15 @@ fn stdlib_function_name(name: &str) -> Option<&'static str> {
         "now_nanos" => Some("nex_time_now_nanos"),
         "sleep_millis" => Some("nex_time_sleep_millis"),
         "elapsed_millis" => Some("nex_time_elapsed_millis"),
-        // std.collections
+        // std.collections — core List ops
+        "list_new" => Some("nex_list_new"),
+        "list_push" | "list_add" => Some("nex_list_add"),
+        "list_get" => Some("nex_list_get"),
+        "list_set" => Some("nex_list_set"),
+        "list_len" | "list_length" => Some("nex_list_length"),
+        "list_remove" => Some("nex_list_remove"),
+        "list_free" => Some("nex_list_free"),
+        // std.collections — extended List ops
         "list_sort_int" => Some("nex_list_sort_int"),
         "list_reverse" => Some("nex_list_reverse"),
         "list_clear" => Some("nex_list_clear"),
@@ -2619,6 +2700,7 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "tensor_from_float_data" => Some("nex_torch_tensor_from_float_data"),
         "tensor_arange" => Some("nex_torch_tensor_arange"),
         "tensor_eye" => Some("nex_torch_tensor_eye"),
+        "tensor_from_string_bytes" => Some("nex_torch_tensor_from_string_bytes"),
         "tensor_free" => Some("nex_torch_tensor_free"),
         // Tensor operations
         "tensor_add" => Some("nex_torch_tensor_add"),
@@ -2640,6 +2722,7 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         // Tensor data access
         "tensor_get_float" => Some("nex_torch_tensor_get_float"),
         "tensor_item_float" => Some("nex_torch_tensor_item_float"),
+        "tensor_item_int" => Some("nex_torch_tensor_item_int"),
         "tensor_ndim" => Some("nex_torch_tensor_ndim"),
         "tensor_numel" => Some("nex_torch_tensor_numel"),
         // Device management
@@ -3757,6 +3840,7 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_tensor_from_float_data", &sig_ptr_ptr3),
         ("nex_torch_tensor_arange", &sig_f64x3_ret_i64),
         ("nex_torch_tensor_eye", &sig_ptr_ptr),
+        ("nex_torch_tensor_from_string_bytes", &sig_ptr_ptr),
         ("nex_torch_tensor_free", &sig_void_ptr),
         // Tensor operations
         ("nex_torch_tensor_add", &sig_ptr_ptr2),
@@ -3778,6 +3862,7 @@ fn declare_runtime_imports<M: Module>(
         // Tensor data access
         ("nex_torch_tensor_get_float", &sig_i64x2_ret_f64),
         ("nex_torch_tensor_item_float", &sig_i64_ret_f64),
+        ("nex_torch_tensor_item_int", &sig_ptr_ptr),
         ("nex_torch_tensor_ndim", &sig_ptr_ptr),
         ("nex_torch_tensor_numel", &sig_ptr_ptr),
         // Device management

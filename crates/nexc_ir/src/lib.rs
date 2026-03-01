@@ -185,9 +185,11 @@ impl IrLowering {
     }
 
     /// Returns the free function name for a freeable type, or None.
+    /// NOTE: Tensor is intentionally excluded — libtorch manages tensor lifetime
+    /// via internal reference counting (autograd graph holds refs to intermediates).
+    /// Auto-freeing tensors at scope end corrupts the computation graph.
     fn free_fn_for_type(ty: &str) -> Option<&'static str> {
         match ty {
-            "Tensor" => Some("tensor_free"),
             "Module" => Some("nn_free"),
             "Optimizer" => Some("optim_free"),
             _ => None,
@@ -579,6 +581,9 @@ impl IrLowering {
                     // Infer return types for well-known free functions.
                     // tensor_* → Tensor, nn_* (except nn_free) → Module
                     if name.starts_with("tensor_") {
+                        return Some("Tensor".into());
+                    }
+                    if name == "nn_forward" {
                         return Some("Tensor".into());
                     }
                     if name.starts_with("nn_") && name != "nn_free" {
@@ -1516,6 +1521,14 @@ impl IrLowering {
                         // Fallback: check List FFI methods
                         if recv_type == "List" {
                             if let Some(ffi) = list_method_to_ffi(method_name) {
+                                // Mark items added to lists as escaped (prevents auto-free)
+                                if method_name == "add" || method_name == "push" || method_name == "set" {
+                                    for arg in args.iter() {
+                                        if let Expr::Identifier { name: arg_name, .. } = arg {
+                                            self.escaped_vars.insert(arg_name.clone());
+                                        }
+                                    }
+                                }
                                 let recv_val = self.lower_expr(receiver);
                                 let mut ir_args = vec![recv_val];
                                 ir_args.extend(args.iter().map(|a| self.lower_expr(a)));
@@ -1645,6 +1658,17 @@ impl IrLowering {
                     }
                     _ => "unknown_callee".into(),
                 };
+                // Mark variables as escaped when stored into containers (list_push/list_add).
+                // This prevents the auto-free system from freeing them at scope end.
+                if let Expr::Identifier { name: fn_name, .. } = callee.as_ref() {
+                    if matches!(fn_name.as_str(), "list_push" | "list_add") {
+                        // The second argument (index 1) is the item being stored
+                        if let Some(Expr::Identifier { name: arg_name, .. }) = args.get(1) {
+                            self.escaped_vars.insert(arg_name.clone());
+                        }
+                    }
+                }
+
                 self.emit(IrInstruction::Call {
                     dst: Some(dst.clone()),
                     target,
@@ -2206,6 +2230,7 @@ fn seed_builtin_dispatch(lowering: &mut IrLowering) {
     methods.insert(("Tensor".into(), "detach".into()), ("tensor_detach".into(), true));
     // Data access
     methods.insert(("Tensor".into(), "item".into()), ("tensor_item_float".into(), true));
+    methods.insert(("Tensor".into(), "item_int".into()), ("tensor_item_int".into(), true));
     methods.insert(("Tensor".into(), "to_string".into()), ("tensor_to_string".into(), true));
     methods.insert(("Tensor".into(), "print".into()), ("tensor_print".into(), false));
     // Device / dtype

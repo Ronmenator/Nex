@@ -169,7 +169,7 @@ fn deploy(args: &[String]) {
     let profile = if release { "release" } else { "debug" };
     println!("building  ({profile})...");
     let mut cmd = Command::new("cargo");
-    cmd.args(["build"])
+    cmd.args(["build", "--workspace", "--exclude", "xtask"])
         .current_dir(&root);
     if release {
         cmd.arg("--release");
@@ -178,11 +178,29 @@ fn deploy(args: &[String]) {
     // Auto-detect libtorch if LIBTORCH is not already set.
     // Check common locations and system environment variables (setx values
     // aren't visible in the current session, so read from the registry).
-    if env::var("LIBTORCH").is_err() {
+    let has_libtorch = env::var("LIBTORCH").is_ok();
+    if !has_libtorch {
         if let Some(libtorch_path) = detect_libtorch() {
             println!("detected  LIBTORCH={}", libtorch_path.display());
             cmd.env("LIBTORCH", &libtorch_path);
         }
+    }
+    // Ensure CXX11 ABI flag is set for torch-sys build.
+    if env::var("LIBTORCH_CXX11_ABI").is_err() {
+        cmd.env("LIBTORCH_CXX11_ABI", "0");
+    }
+    // torch-sys requires Python torch to determine ABI — check if available.
+    // If not, skip nex_torch_native to avoid blocking the entire build.
+    let python_torch_ok = Command::new("python")
+        .args(["-c", "import torch"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !python_torch_ok {
+        println!("skipping  nex_torch_native (Python torch not found for ABI detection)");
+        cmd.args(["--exclude", "nex_torch_native"]);
     }
 
     let status = cmd.status().expect("failed to run cargo build");
