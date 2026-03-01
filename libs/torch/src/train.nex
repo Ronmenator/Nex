@@ -22,3 +22,35 @@ public def train_step_ce(model: Int64, optimizer: Int64, input: Int64, target: I
     optim_step(optimizer)
     return loss
 }
+
+// Performs a single training step: backward, optional gradient clipping,
+// optimizer step + zero_grad for all optimizers.
+public def train_step(loss: Int64, optims: List, clip_norm: Float) {
+    tensor_backward(loss)
+    if (clip_norm > 0.0) {
+        var i = 0
+        while (i < optims.len()) {
+            nn_scale_gradients(optims.get(i), clip_norm)
+            i = i + 1
+        }
+    }
+    var j = 0
+    while (j < optims.len()) {
+        optim_step_and_zero(optims.get(j))
+        j = j + 1
+    }
+    return
+}
+
+// Gradient accumulation step: scales gradients by 1/accum_steps then steps.
+public def train_step_accumulated(loss: Int64, optims: List, accum_steps: Int) {
+    tensor_backward(loss)
+    var scale = 1.0 / (accum_steps * 1.0)
+    var i = 0
+    while (i < optims.len()) {
+        nn_scale_gradients(optims.get(i), scale)
+        optim_step_and_zero(optims.get(i))
+        i = i + 1
+    }
+    return
+}

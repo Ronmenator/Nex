@@ -4,6 +4,10 @@ $env:LIBTORCH = "F:\libtorch"
 $env:LIBTORCH_CXX11_ABI = "0"
 Remove-Item Env:LIBTORCH_USE_PYTORCH -ErrorAction SilentlyContinue
 
+Write-Host "=== cargo build --release ===" -ForegroundColor Cyan
+cargo build --release
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "=== cargo xtask deploy ===" -ForegroundColor Cyan
 cargo xtask deploy
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

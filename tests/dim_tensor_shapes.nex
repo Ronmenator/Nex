@@ -1,0 +1,42 @@
+// Phase 5a: Typed tensor shapes (warnings only)
+// Tests dim declarations and Tensor[Dim1, Dim2, ...] type annotations.
+
+import torch.tensor
+
+// Abstract dimensions (size unknown at compile time)
+dim Batch
+dim Seq
+
+// Concrete dimensions (size known at compile time)
+dim Embd = 768
+dim Heads = 12
+dim HeadDim = 64
+
+// Function with typed tensor parameters and return
+def embed(x: Tensor[Batch, Seq]) -> Tensor[Batch, Seq, Embd] {
+    return x
+}
+
+// Tensor with mixed dimension types: named, literal, wildcard, dynamic
+def mixed(x: Tensor[Batch, 768, _, ?]) -> Tensor[Batch, 768] {
+    return x
+}
+
+// Matmul shape checking: inner dims should match
+def attention(q: Tensor[Batch, Seq, HeadDim], k: Tensor[Batch, HeadDim, Seq]) -> Tensor[Batch, Seq, Seq] {
+    return q.matmul(k)
+}
+
+// Untyped Tensor still works (backward compat)
+def legacy(x: Tensor) -> Tensor {
+    return x
+}
+
+// Mixed typed and untyped
+def gradual(x: Tensor[Batch, Embd], y: Tensor) -> Tensor {
+    return x
+}
+
+def main() {
+    println("dim + Tensor shape annotations working!")
+}

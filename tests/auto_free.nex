@@ -1,0 +1,71 @@
+// Phase 6: Memory Management — Auto-Free Tests
+// Tests scope-based automatic cleanup for Tensor, Module, and Optimizer.
+
+import torch.tensor
+import torch.nn
+import torch.optim
+
+// 1. Local tensor auto-freed at scope exit (no manual tensor_free needed)
+def create_and_drop() {
+    var x: Tensor = tensor_zeros(10, 10)
+    var y: Tensor = tensor_ones(10, 10)
+    // x and y are auto-freed here at scope exit
+}
+
+// 2. Returned tensor is NOT freed (escape analysis)
+def create_and_return() -> Tensor {
+    var x: Tensor = tensor_zeros(5, 5)
+    var y: Tensor = tensor_ones(5, 5)
+    // y is auto-freed, x is NOT freed because it's returned
+    return x
+}
+
+// 3. Re-assignment frees old value
+def reassign_tensor() {
+    var x: Tensor = tensor_zeros(10, 10)
+    x = tensor_ones(10, 10)   // old x (zeros) is freed before storing new
+    x = tensor_zeros(5, 5)    // old x (ones) is freed before storing new
+    // final x is auto-freed at scope exit
+}
+
+// 4. Using block with tensor — type-aware cleanup
+def using_tensor() {
+    using (t = tensor_zeros(3, 3)) {
+        // t is available here
+        t.print()
+    }
+    // t is freed via tensor_free (not generic dispose)
+}
+
+// 5. Loop with local tensor + break
+def loop_with_break() {
+    var i = 0
+    while (i < 10) {
+        var temp: Tensor = tensor_zeros(1, 1)
+        if (i == 5) {
+            break  // temp is freed before break
+        }
+        // temp is freed at loop iteration end
+        i = i + 1
+    }
+}
+
+// 6. Field assignment marks variable as escaped
+class Model {
+    weight: Tensor
+
+    def init() {
+        var w: Tensor = tensor_zeros(10, 10)
+        self.weight = w  // w escapes — NOT freed at scope exit
+    }
+}
+
+def main() {
+    create_and_drop()
+    var result: Tensor = create_and_return()
+    reassign_tensor()
+    using_tensor()
+    loop_with_break()
+    println("Auto-free tests complete!")
+    tensor_free(result)  // manual free still works for backward compat
+}

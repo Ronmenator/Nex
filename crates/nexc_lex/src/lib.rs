@@ -70,6 +70,7 @@ pub enum TokenKind {
     Bang,
     Amp,
     Pipe,
+    PipeForward,
     Caret,
     Tilde,
     Shl,
@@ -94,6 +95,8 @@ pub enum TokenKind {
     Operator,
     Class,
     Struct,
+    Module,
+    Dim,
     Interface,
     Enum,
     Async,
@@ -188,6 +191,7 @@ fn is_continuation_operator(kind: &TokenKind) -> bool {
             | TokenKind::SlashEq
             | TokenKind::Dot
             | TokenKind::Pipe
+            | TokenKind::PipeForward
             | TokenKind::Amp
             | TokenKind::Caret
     )
@@ -508,6 +512,9 @@ impl Lexer {
                             self.pos,
                             "||".to_string(),
                         ));
+                    } else if self.matches(b"|>") {
+                        self.pos += 2;
+                        tokens.push(Token::new(TokenKind::PipeForward, start, self.pos, "|>".to_string()));
                     } else if self.matches(b"|=") {
                         self.pos += 2;
                         tokens.push(Token::new(TokenKind::PipeEq, start, self.pos, "|=".to_string()));
@@ -1014,6 +1021,8 @@ fn token_kind_for_identifier(name: &str) -> TokenKind {
         "operator" => TokenKind::Operator,
         "class" => TokenKind::Class,
         "struct" => TokenKind::Struct,
+        "module" => TokenKind::Module,
+        "dim" => TokenKind::Dim,
         "interface" => TokenKind::Interface,
         "enum" => TokenKind::Enum,
         "async" => TokenKind::Async,

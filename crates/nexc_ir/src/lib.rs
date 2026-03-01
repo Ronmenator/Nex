@@ -139,6 +139,16 @@ struct IrLowering {
     function_returns: HashMap<String, String>,
     /// function_name → ordered list of default values (None = no default, Some = default expr)
     function_defaults: HashMap<String, Vec<Option<nexc_ast::Expr>>>,
+    /// Names of `module` declarations (as opposed to classes)
+    known_modules: HashSet<String>,
+    /// (module_name, field_name) → field index within the module's field list
+    module_field_indices: HashMap<(String, String), usize>,
+    /// Stack of scopes. Each scope tracks (var_name, type_name) for freeable locals.
+    scope_stack: Vec<Vec<(String, String)>>,
+    /// Variables that have escaped (returned or stored into fields) — skip freeing.
+    escaped_vars: HashSet<String>,
+    /// Scope depth at each loop entry — for break/continue cleanup.
+    loop_scope_depths: Vec<usize>,
 }
 
 impl IrLowering {
@@ -166,6 +176,68 @@ impl IrLowering {
             loop_stack: Vec::new(),
             function_returns: HashMap::new(),
             function_defaults: HashMap::new(),
+            known_modules: HashSet::new(),
+            module_field_indices: HashMap::new(),
+            scope_stack: Vec::new(),
+            escaped_vars: HashSet::new(),
+            loop_scope_depths: Vec::new(),
+        }
+    }
+
+    /// Returns the free function name for a freeable type, or None.
+    fn free_fn_for_type(ty: &str) -> Option<&'static str> {
+        match ty {
+            "Tensor" => Some("tensor_free"),
+            "Module" => Some("nn_free"),
+            "Optimizer" => Some("optim_free"),
+            _ => None,
+        }
+    }
+
+    /// Emit free calls for all non-escaped freeable locals in the top scope.
+    fn emit_scope_cleanup(&mut self, exclude: Option<&str>) {
+        if let Some(scope) = self.scope_stack.last().cloned() {
+            for (var_name, type_name) in scope.iter().rev() {
+                if exclude == Some(var_name.as_str()) { continue; }
+                if self.escaped_vars.contains(var_name) { continue; }
+                if self.known_modules.contains(&*type_name) {
+                    self.emit(IrInstruction::Call {
+                        dst: None,
+                        target: format!("{}::free", type_name),
+                        args: vec![],
+                    });
+                } else if let Some(free_fn) = Self::free_fn_for_type(type_name) {
+                    self.emit(IrInstruction::Call {
+                        dst: None,
+                        target: free_fn.into(),
+                        args: vec![IrValue::Register(format!("%{}", var_name))],
+                    });
+                }
+            }
+        }
+    }
+
+    /// Emit free calls for ALL scopes (top to bottom). Used before `return`.
+    fn emit_all_scope_cleanup(&mut self, exclude: Option<&str>) {
+        let all_scopes: Vec<Vec<(String, String)>> = self.scope_stack.clone();
+        for scope in all_scopes.iter().rev() {
+            for (var_name, type_name) in scope.iter().rev() {
+                if exclude == Some(var_name.as_str()) { continue; }
+                if self.escaped_vars.contains(var_name) { continue; }
+                if self.known_modules.contains(&*type_name) {
+                    self.emit(IrInstruction::Call {
+                        dst: None,
+                        target: format!("{}::free", type_name),
+                        args: vec![],
+                    });
+                } else if let Some(free_fn) = Self::free_fn_for_type(type_name) {
+                    self.emit(IrInstruction::Call {
+                        dst: None,
+                        target: free_fn.into(),
+                        args: vec![IrValue::Register(format!("%{}", var_name))],
+                    });
+                }
+            }
         }
     }
 
@@ -213,6 +285,7 @@ impl IrLowering {
 
         // Seed scope vars with function parameter names (for closure capture analysis)
         self.current_scope_vars.clear();
+        self.escaped_vars.clear();
         for p in &func.params {
             self.current_scope_vars.insert(p.name.clone());
         }
@@ -226,6 +299,9 @@ impl IrLowering {
                     }
                     nexc_ast::TypeExprKind::Generic(base, _) => {
                         self.var_types.insert(p.name.clone(), base.clone());
+                    }
+                    nexc_ast::TypeExprKind::TensorShape(_) => {
+                        self.var_types.insert(p.name.clone(), "Tensor".into());
                     }
                     _ => {}
                 }
@@ -251,6 +327,8 @@ impl IrLowering {
             .map(|t| type_expr_to_type(t))
             .unwrap_or(Type::Unit);
 
+        self.scope_stack.push(Vec::new());
+
         if let Some(body) = &func.body {
             if let nexc_ast::Expr::Block(block) = body {
                 self.lower_block(block);
@@ -265,10 +343,13 @@ impl IrLowering {
         // (causing break to loop back instead of exiting, etc.).
         if !self.current_block.is_empty() || self.blocks.is_empty() || self.pending_label.is_some() {
             if !self.block_terminated() {
+                self.emit_scope_cleanup(None);
                 self.emit(IrInstruction::Return(None));
             }
             self.seal_block("entry");
         }
+
+        self.scope_stack.pop();
 
         IrFunction {
             name: func.name.clone(),
@@ -576,10 +657,19 @@ impl IrLowering {
                 self.lower_expr(expr);
             }
             Stmt::Return(Some(expr), _) => {
+                let returned_var = match expr {
+                    nexc_ast::Expr::Identifier { name, .. } => Some(name.clone()),
+                    _ => None,
+                };
+                if let Some(ref var_name) = returned_var {
+                    self.escaped_vars.insert(var_name.clone());
+                }
                 let val = self.lower_expr(expr);
+                self.emit_all_scope_cleanup(returned_var.as_deref());
                 self.emit(IrInstruction::Return(Some(val)));
             }
             Stmt::Return(None, _) => {
+                self.emit_all_scope_cleanup(None);
                 self.emit(IrInstruction::Return(None));
             }
             Stmt::VarDecl(var) => {
@@ -598,6 +688,9 @@ impl IrLowering {
                         nexc_ast::TypeExprKind::Generic(base, _) => {
                             self.var_types.insert(var.name.clone(), base.clone());
                         }
+                        nexc_ast::TypeExprKind::TensorShape(_) => {
+                            self.var_types.insert(var.name.clone(), "Tensor".into());
+                        }
                         _ => {}
                     }
                 } else if let Some(init) = &var.initializer {
@@ -612,6 +705,16 @@ impl IrLowering {
                         dst: format!("%{}", var.name),
                         src: val,
                     });
+                }
+                // Track in scope stack for auto-free
+                if let Some(type_name) = self.var_types.get(&var.name).cloned() {
+                    let is_freeable = Self::free_fn_for_type(&type_name).is_some()
+                        || self.known_modules.contains(&type_name);
+                    if is_freeable {
+                        if let Some(scope) = self.scope_stack.last_mut() {
+                            scope.push((var.name.clone(), type_name));
+                        }
+                    }
                 }
             }
             Stmt::If(if_stmt) => {
@@ -674,9 +777,16 @@ impl IrLowering {
                 });
                 self.seal_block(&header);
 
+                self.scope_stack.push(Vec::new());
+                self.loop_scope_depths.push(self.scope_stack.len());
                 self.loop_stack.push((header.clone(), exit_label.clone()));
                 self.lower_stmt(&while_stmt.body);
                 self.loop_stack.pop();
+                self.loop_scope_depths.pop();
+                if !self.block_terminated() {
+                    self.emit_scope_cleanup(None);
+                }
+                self.scope_stack.pop();
                 self.emit(IrInstruction::Jump { target: header });
                 self.seal_block(&body_label);
 
@@ -739,9 +849,16 @@ impl IrLowering {
                         });
                         self.seal_block(&header);
 
+                        self.scope_stack.push(Vec::new());
+                        self.loop_scope_depths.push(self.scope_stack.len());
                         self.loop_stack.push((header.clone(), exit_label.clone()));
                         self.lower_stmt(&for_stmt.body);
                         self.loop_stack.pop();
+                        self.loop_scope_depths.pop();
+                        if !self.block_terminated() {
+                            self.emit_scope_cleanup(None);
+                        }
+                        self.scope_stack.pop();
 
                         // Step: i = i + 1
                         let next_val = self.fresh_temp();
@@ -826,9 +943,16 @@ impl IrLowering {
                         src: IrValue::Register(elem_dst),
                     });
 
+                    self.scope_stack.push(Vec::new());
+                    self.loop_scope_depths.push(self.scope_stack.len());
                     self.loop_stack.push((header.clone(), exit_label.clone()));
                     self.lower_stmt(&for_stmt.body);
                     self.loop_stack.pop();
+                    self.loop_scope_depths.pop();
+                    if !self.block_terminated() {
+                        self.emit_scope_cleanup(None);
+                    }
+                    self.scope_stack.pop();
 
                     // Step: __i = __i + 1
                     let next_idx = self.fresh_temp();
@@ -876,9 +1000,16 @@ impl IrLowering {
                     }
                     self.seal_block(&header);
 
+                    self.scope_stack.push(Vec::new());
+                    self.loop_scope_depths.push(self.scope_stack.len());
                     self.loop_stack.push((header.clone(), exit_label.clone()));
                     self.lower_stmt(&for_stmt.body);
                     self.loop_stack.pop();
+                    self.loop_scope_depths.pop();
+                    if !self.block_terminated() {
+                        self.emit_scope_cleanup(None);
+                    }
+                    self.scope_stack.pop();
                     if let Some(step) = &for_stmt.step {
                         self.lower_expr(step);
                     }
@@ -938,31 +1069,88 @@ impl IrLowering {
                 self.pending_label = Some(merge_label);
             }
             Stmt::Using(using) => {
+                let expr_type = self.resolve_expr_type(&using.expr);
                 let res = self.lower_expr(&using.expr);
                 let dst = format!("%{}", using.variable_name);
                 self.emit(IrInstruction::Store { dst, src: res });
+                if let Some(ref ty) = expr_type {
+                    self.var_types.insert(using.variable_name.clone(), ty.clone());
+                }
                 self.lower_block(&using.body);
+                let free_target = match expr_type.as_deref() {
+                    Some("Tensor") => "tensor_free",
+                    Some("Module") => "nn_free",
+                    Some("Optimizer") => "optim_free",
+                    _ => "dispose",
+                };
                 self.emit(IrInstruction::Call {
                     dst: None,
-                    target: "dispose".into(),
+                    target: free_target.into(),
                     args: vec![IrValue::Register(format!("%{}", using.variable_name))],
                 });
             }
             Stmt::Block(block) => {
+                self.scope_stack.push(Vec::new());
                 self.lower_block(block);
+                if !self.block_terminated() {
+                    self.emit_scope_cleanup(None);
+                }
+                self.scope_stack.pop();
             }
             Stmt::Break(_) => {
-                if let Some((_header, exit_label)) = self.loop_stack.last() {
-                    self.emit(IrInstruction::Jump {
-                        target: exit_label.clone(),
-                    });
+                if let Some((_header, exit_label)) = self.loop_stack.last().cloned() {
+                    // Emit cleanup for scopes from current down to loop entry
+                    if let Some(&loop_depth) = self.loop_scope_depths.last() {
+                        let scopes_snapshot: Vec<_> = self.scope_stack[loop_depth..].to_vec();
+                        for scope in scopes_snapshot.iter().rev() {
+                            for (var_name, type_name) in scope.iter().rev() {
+                                if !self.escaped_vars.contains(var_name) {
+                                    if self.known_modules.contains(&*type_name) {
+                                        self.emit(IrInstruction::Call {
+                                            dst: None,
+                                            target: format!("{}::free", type_name),
+                                            args: vec![],
+                                        });
+                                    } else if let Some(free_fn) = Self::free_fn_for_type(type_name) {
+                                        self.emit(IrInstruction::Call {
+                                            dst: None,
+                                            target: free_fn.into(),
+                                            args: vec![IrValue::Register(format!("%{}", var_name))],
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.emit(IrInstruction::Jump { target: exit_label });
                 }
             }
             Stmt::Continue(_) => {
-                if let Some((header_label, _exit)) = self.loop_stack.last() {
-                    self.emit(IrInstruction::Jump {
-                        target: header_label.clone(),
-                    });
+                if let Some((header_label, _exit)) = self.loop_stack.last().cloned() {
+                    // Emit cleanup for scopes from current down to loop entry
+                    if let Some(&loop_depth) = self.loop_scope_depths.last() {
+                        let scopes_snapshot: Vec<_> = self.scope_stack[loop_depth..].to_vec();
+                        for scope in scopes_snapshot.iter().rev() {
+                            for (var_name, type_name) in scope.iter().rev() {
+                                if !self.escaped_vars.contains(var_name) {
+                                    if self.known_modules.contains(&*type_name) {
+                                        self.emit(IrInstruction::Call {
+                                            dst: None,
+                                            target: format!("{}::free", type_name),
+                                            args: vec![],
+                                        });
+                                    } else if let Some(free_fn) = Self::free_fn_for_type(type_name) {
+                                        self.emit(IrInstruction::Call {
+                                            dst: None,
+                                            target: free_fn.into(),
+                                            args: vec![IrValue::Register(format!("%{}", var_name))],
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.emit(IrInstruction::Jump { target: header_label });
                 }
             }
         }
@@ -1102,9 +1290,31 @@ impl IrLowering {
                         self.var_types.insert(name.clone(), class_name);
                     }
                 }
+                // Mark source variable as escaped if assigning to a class/module field
+                if let Expr::MemberAccess { receiver, .. } = target.as_ref() {
+                    if let Expr::Identifier { name: recv_name, .. } = receiver.as_ref() {
+                        if recv_name == "self" {
+                            if let Expr::Identifier { name: src_name, .. } = value.as_ref() {
+                                self.escaped_vars.insert(src_name.clone());
+                            }
+                        }
+                    }
+                }
                 let val = self.lower_expr(value);
                 match target.as_ref() {
                     Expr::Identifier { name, .. } => {
+                        // Free old value if re-assigning a freeable local
+                        if self.current_scope_vars.contains(name) && !self.escaped_vars.contains(name) {
+                            if let Some(type_name) = self.var_types.get(name).cloned() {
+                                if let Some(free_fn) = Self::free_fn_for_type(&type_name) {
+                                    self.emit(IrInstruction::Call {
+                                        dst: None,
+                                        target: free_fn.into(),
+                                        args: vec![IrValue::Register(format!("%{}", name))],
+                                    });
+                                }
+                            }
+                        }
                         // If inside a class method and assigning to a class field,
                         // store to the class global instead of a local register.
                         let dst = if !self.current_scope_vars.contains(name) {
@@ -1216,6 +1426,56 @@ impl IrLowering {
                     if let Expr::Identifier { name: recv_name, .. } = receiver.as_ref() {
                         if recv_name == "Reflect" {
                             return self.lower_reflect_call(method_name, args);
+                        }
+                    }
+                }
+
+                // Module field call desugaring: self.field(args) → nn_forward / SubModule::forward
+                if let Expr::MemberAccess {
+                    receiver,
+                    name: method_name,
+                    ..
+                } = callee.as_ref()
+                {
+                    if let Some(ref class_name) = self.current_class {
+                        if self.known_modules.contains(class_name) {
+                            let key = (class_name.clone(), method_name.clone());
+                            if let Some(field_type) = self.class_fields.get(&key).cloned() {
+                                // This is a module field call: self.field(args)
+                                let is_builtin = matches!(field_type.as_str(),
+                                    "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                                    "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                                    "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                                );
+                                let gname = format!("%{}.{}", class_name, method_name);
+                                let load_tmp = self.fresh_temp();
+                                self.emit(IrInstruction::Load {
+                                    dst: load_tmp.clone(),
+                                    src: gname,
+                                });
+                                let ir_args: Vec<IrValue> = args.iter()
+                                    .map(|a| self.lower_expr(a))
+                                    .collect();
+                                let dst = self.fresh_temp();
+                                if is_builtin {
+                                    // nn_forward(module_ptr, input)
+                                    let mut ffi_args = vec![IrValue::Register(load_tmp)];
+                                    ffi_args.extend(ir_args);
+                                    self.emit(IrInstruction::Call {
+                                        dst: Some(dst.clone()),
+                                        target: "nn_forward".into(),
+                                        args: ffi_args,
+                                    });
+                                } else {
+                                    // User-defined sub-module: SubModule::forward(args)
+                                    self.emit(IrInstruction::Call {
+                                        dst: Some(dst.clone()),
+                                        target: format!("{}::forward", field_type),
+                                        args: ir_args,
+                                    });
+                                }
+                                return IrValue::Register(dst);
+                            }
                         }
                     }
                 }
@@ -1850,6 +2110,37 @@ impl IrLowering {
                 }
                 IrValue::Register(list_reg)
             }
+            Expr::Pipe { lhs, rhs, span } => {
+                // Desugar pipe operator into a function call:
+                //   expr |> func         → func(expr)
+                //   expr |> func(args)   → func(expr, args)
+                //   expr |> |x| body     → (|x| body)(expr)
+                //   expr |> self.field   → self.field(expr)  (module forward)
+                match rhs.as_ref() {
+                    // expr |> func(extra_args) → func(expr, extra_args)
+                    Expr::Call { callee, type_args, args, span: call_span } => {
+                        let mut new_args = vec![*lhs.clone()];
+                        new_args.extend(args.clone());
+                        let desugared = Expr::Call {
+                            callee: callee.clone(),
+                            type_args: type_args.clone(),
+                            args: new_args,
+                            span: *call_span,
+                        };
+                        self.lower_expr(&desugared)
+                    }
+                    // expr |> func  OR  expr |> self.field  OR  expr |> |x| body
+                    _ => {
+                        let desugared = Expr::Call {
+                            callee: rhs.clone(),
+                            type_args: vec![],
+                            args: vec![*lhs.clone()],
+                            span: *span,
+                        };
+                        self.lower_expr(&desugared)
+                    }
+                }
+            }
             Expr::Unsupported { raw, .. } => {
                 self.emit(IrInstruction::EmitDiag {
                     message: format!("unsupported expression: {raw}"),
@@ -1956,6 +2247,7 @@ fn seed_builtin_dispatch(lowering: &mut IrLowering) {
     // Utilities
     methods.insert(("Tensor".into(), "outer".into()), ("tensor_outer".into(), true));
     methods.insert(("Tensor".into(), "repeat".into()), ("tensor_repeat".into(), true));
+    methods.insert(("Tensor".into(), "chunk".into()), ("tensor_chunk".into(), true));
     methods.insert(("Tensor".into(), "ndim".into()), ("tensor_ndim".into(), true));
     methods.insert(("Tensor".into(), "numel".into()), ("tensor_numel".into(), true));
     methods.insert(("Tensor".into(), "get_float".into()), ("tensor_get_float".into(), true));
@@ -1978,6 +2270,8 @@ fn seed_builtin_dispatch(lowering: &mut IrLowering) {
     ] {
         returns.insert(("Tensor".into(), m.to_string()), "Tensor".into());
     }
+    // chunk returns a List, not a Tensor
+    returns.insert(("Tensor".into(), "chunk".into()), "List".into());
 
     // ── Module (nn sequential) methods ──────────────────────────────────
     methods.insert(("Module".into(), "forward".into()), ("nn_forward".into(), true));
@@ -2276,6 +2570,10 @@ fn collect_free_vars_expr(
                 collect_free_vars_expr(el, bound, free, seen);
             }
         }
+        Expr::Pipe { lhs, rhs, .. } => {
+            collect_free_vars_expr(lhs, bound, free, seen);
+            collect_free_vars_expr(rhs, bound, free, seen);
+        }
         Expr::Block(block) => {
             collect_free_vars_block(block, bound, free, seen);
         }
@@ -2368,6 +2666,7 @@ fn type_expr_display(te: &nexc_ast::TypeExpr) -> String {
     match &te.kind {
         nexc_ast::TypeExprKind::Named(n) => n.clone(),
         nexc_ast::TypeExprKind::Generic(base, _) => base.clone(),
+        nexc_ast::TypeExprKind::TensorShape(_) => "Tensor".into(),
         nexc_ast::TypeExprKind::Var => "Var".into(),
         nexc_ast::TypeExprKind::Unit => "Unit".into(),
         nexc_ast::TypeExprKind::Nullable(inner) => format!("{}?", type_expr_display(inner)),
@@ -2390,6 +2689,10 @@ fn type_expr_to_type(te: &nexc_ast::TypeExpr) -> Type {
             // Type erasure: at IR level, Generic("List", [Int]) → Named("List")
             let _ = args;
             Type::Named(base.clone())
+        }
+        nexc_ast::TypeExprKind::TensorShape(_) => {
+            // Shape erasure: at IR level, Tensor[Batch, 768] → Named("Tensor")
+            Type::Named("Tensor".into())
         }
         nexc_ast::TypeExprKind::Var => Type::Var,
         nexc_ast::TypeExprKind::Unit => Type::Unit,
@@ -2445,6 +2748,16 @@ pub fn lower_typed_module_with_prefix(
     for item in &typed.file.items {
         match item {
             nexc_ast::Item::Class(c) => lowering.known_classes.push(c.name.clone()),
+            nexc_ast::Item::Module(m) => {
+                lowering.known_classes.push(m.name.clone());
+                lowering.known_modules.insert(m.name.clone());
+                for (idx, field) in m.fields.iter().enumerate() {
+                    lowering.module_field_indices.insert(
+                        (m.name.clone(), field.name.clone()),
+                        idx,
+                    );
+                }
+            }
             nexc_ast::Item::Struct(s) => lowering.known_classes.push(s.name.clone()),
             nexc_ast::Item::Function(f) if f.is_async => {
                 lowering.async_functions.push(f.name.clone());
@@ -2457,6 +2770,9 @@ pub fn lower_typed_module_with_prefix(
                         }
                         nexc_ast::TypeExprKind::Generic(base, _) => {
                             lowering.function_returns.insert(f.name.clone(), base.clone());
+                        }
+                        nexc_ast::TypeExprKind::TensorShape(_) => {
+                            lowering.function_returns.insert(f.name.clone(), "Tensor".into());
                         }
                         _ => {}
                     }
@@ -2507,6 +2823,12 @@ pub fn lower_typed_module_with_prefix(
                                     base.clone(),
                                 );
                             }
+                            nexc_ast::TypeExprKind::TensorShape(_) => {
+                                lowering.class_method_returns.insert(
+                                    (c.name.clone(), method.name.clone()),
+                                    "Tensor".into(),
+                                );
+                            }
                             _ => {}
                         }
                     }
@@ -2526,9 +2848,50 @@ pub fn lower_typed_module_with_prefix(
                                     base.clone(),
                                 );
                             }
+                            nexc_ast::TypeExprKind::TensorShape(_) => {
+                                lowering.class_fields.insert(
+                                    (c.name.clone(), field.name.clone()),
+                                    "Tensor".into(),
+                                );
+                            }
                             _ => {}
                         }
                     }
+                }
+            }
+            nexc_ast::Item::Module(m) => {
+                // Register method return types
+                for method in &m.methods {
+                    if let Some(ret_ty) = &method.return_type {
+                        match &ret_ty.kind {
+                            nexc_ast::TypeExprKind::Named(ret_name) => {
+                                lowering.class_method_returns.insert(
+                                    (m.name.clone(), method.name.clone()),
+                                    ret_name.clone(),
+                                );
+                            }
+                            nexc_ast::TypeExprKind::Generic(base, _) => {
+                                lowering.class_method_returns.insert(
+                                    (m.name.clone(), method.name.clone()),
+                                    base.clone(),
+                                );
+                            }
+                            nexc_ast::TypeExprKind::TensorShape(_) => {
+                                lowering.class_method_returns.insert(
+                                    (m.name.clone(), method.name.clone()),
+                                    "Tensor".into(),
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                // Register field types using layer_type name
+                for field in &m.fields {
+                    lowering.class_fields.insert(
+                        (m.name.clone(), field.name.clone()),
+                        field.layer_type.clone(),
+                    );
                 }
             }
             nexc_ast::Item::Struct(s) => {
@@ -2554,6 +2917,12 @@ pub fn lower_typed_module_with_prefix(
                                     base.clone(),
                                 );
                             }
+                            nexc_ast::TypeExprKind::TensorShape(_) => {
+                                lowering.class_method_returns.insert(
+                                    (s.name.clone(), method.name.clone()),
+                                    "Tensor".into(),
+                                );
+                            }
                             _ => {}
                         }
                     }
@@ -2571,6 +2940,12 @@ pub fn lower_typed_module_with_prefix(
                                 lowering.class_fields.insert(
                                     (s.name.clone(), field.name.clone()),
                                     base.clone(),
+                                );
+                            }
+                            nexc_ast::TypeExprKind::TensorShape(_) => {
+                                lowering.class_fields.insert(
+                                    (s.name.clone(), field.name.clone()),
+                                    "Tensor".into(),
                                 );
                             }
                             _ => {}
@@ -2626,6 +3001,15 @@ pub fn lower_typed_module_with_prefix(
                             dst: gname,
                             src: val,
                         });
+                    }
+                }
+            }
+            nexc_ast::Item::Module(m) => {
+                // Register globals for module fields
+                for field in &m.fields {
+                    let gname = format!("%{}.{}", m.name, field.name);
+                    if !globals.contains(&gname) {
+                        globals.push(gname.clone());
                     }
                 }
             }
@@ -2906,6 +3290,349 @@ pub fn lower_typed_module_with_prefix(
                     });
                 }
             }
+            nexc_ast::Item::Module(m) => {
+                // Lower user-defined methods with current_class set
+                lowering.current_class = Some(m.name.clone());
+                for method in &m.methods {
+                    let mut ir_fn = lowering.lower_function(method);
+                    ir_fn.name = prefix_name(format!("{}::{}", m.name, ir_fn.name));
+                    ir_fn.file = Some(file_path.clone());
+                    functions.push(ir_fn);
+                }
+
+                // Synthesize init function: ModuleName::init(params...) -> void
+                // Initializes each field via nn_sequential_new + nn_layer_type calls,
+                // storing results in globals %ModuleName.fieldName.
+                let params: Vec<(String, Type)> = m.params.iter().map(|p| {
+                    let ty = p.type_hint.as_ref()
+                        .map(|t| type_expr_to_type(t))
+                        .unwrap_or(Type::Unknown);
+                    (p.name.clone(), ty)
+                }).collect();
+                let mut init_body = Vec::new();
+
+                for field in &m.fields {
+                    let gname = format!("%{}.{}", m.name, field.name);
+                    let is_builtin_layer = matches!(field.layer_type.as_str(),
+                        "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                        "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                        "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                    );
+
+                    if field.count.is_some() {
+                        // Array field: blocks: SubModule[N](args)
+                        // Create a list, loop N times, init each sub-module, add to list
+                        let list_tmp = format!("%__mod_list_{}", field.name);
+                        init_body.push(IrInstruction::Call {
+                            dst: Some(list_tmp.clone()),
+                            target: "nex_list_new".into(),
+                            args: vec![],
+                        });
+                        // For now, array fields store the list pointer in the global.
+                        // The loop to populate it will be generated when we have
+                        // runtime-known counts. For compile-time constant counts,
+                        // unroll here.
+                        init_body.push(IrInstruction::Store {
+                            dst: gname,
+                            src: IrValue::Register(list_tmp),
+                        });
+                    } else if is_builtin_layer {
+                        // Built-in layer: nn_sequential_new() + nn_<layer>(module, args...)
+                        let seq_tmp = format!("%__mod_seq_{}", field.name);
+                        init_body.push(IrInstruction::Call {
+                            dst: Some(seq_tmp.clone()),
+                            target: "nn_sequential_new".into(),
+                            args: vec![],
+                        });
+                        // Map layer type to FFI init function
+                        let ffi_name = match field.layer_type.as_str() {
+                            "Linear" => "nn_linear",
+                            "LinearNoBias" => "nn_linear_no_bias",
+                            "Embedding" => "nn_embedding",
+                            "RMSNorm" => "nn_rms_norm",
+                            "LayerNorm" => "nn_layer_norm",
+                            "Dropout" => "nn_dropout",
+                            "ReLU" => "nn_relu",
+                            "GELU" => "nn_gelu",
+                            "Conv2d" => "nn_conv2d",
+                            "BatchNorm" => "nn_batch_norm",
+                            "Sigmoid" => "nn_sigmoid",
+                            "Tanh" => "nn_tanh",
+                            "Softmax" => "nn_softmax",
+                            _ => unreachable!(),
+                        };
+                        let mut ffi_args = vec![IrValue::Register(seq_tmp.clone())];
+                        for arg in &field.layer_args {
+                            ffi_args.push(lowering.lower_expr(arg));
+                        }
+                        init_body.push(IrInstruction::Call {
+                            dst: None,
+                            target: ffi_name.into(),
+                            args: ffi_args,
+                        });
+                        init_body.push(IrInstruction::Store {
+                            dst: gname,
+                            src: IrValue::Register(seq_tmp),
+                        });
+                    } else {
+                        // User-defined module: call SubModule::init(args)
+                        let sub_tmp = format!("%__mod_sub_{}", field.name);
+                        let sub_args: Vec<IrValue> = field.layer_args.iter()
+                            .map(|a| lowering.lower_expr(a))
+                            .collect();
+                        init_body.push(IrInstruction::Call {
+                            dst: Some(sub_tmp.clone()),
+                            target: format!("{}::init", field.layer_type),
+                            args: sub_args,
+                        });
+                        init_body.push(IrInstruction::Store {
+                            dst: gname,
+                            src: IrValue::Register(sub_tmp),
+                        });
+                    }
+                }
+                init_body.push(IrInstruction::Return(None));
+
+                functions.push(IrFunction {
+                    name: prefix_name(format!("{}::init", m.name)),
+                    params,
+                    return_type: Type::Unit,
+                    blocks: vec![IrBlock {
+                        label: "entry".into(),
+                        instructions: init_body,
+                    }],
+                    span: Some(m.span),
+                    file: Some(file_path.clone()),
+                });
+
+                // Auto-generate to_device method
+                let mut td_body = Vec::new();
+                for field in &m.fields {
+                    let gname = format!("%{}.{}", m.name, field.name);
+                    let load_tmp = format!("%__td_load_{}", field.name);
+                    td_body.push(IrInstruction::Load {
+                        dst: load_tmp.clone(),
+                        src: gname,
+                    });
+                    let is_builtin = matches!(field.layer_type.as_str(),
+                        "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                        "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                        "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                    );
+                    if is_builtin && field.count.is_none() {
+                        td_body.push(IrInstruction::Call {
+                            dst: None,
+                            target: "nn_to_device".into(),
+                            args: vec![
+                                IrValue::Register(load_tmp),
+                                IrValue::Register("%device".into()),
+                            ],
+                        });
+                    } else if !is_builtin && field.count.is_none() {
+                        // User-defined sub-module: call SubModule::to_device
+                        td_body.push(IrInstruction::Call {
+                            dst: None,
+                            target: format!("{}::to_device", field.layer_type),
+                            args: vec![
+                                IrValue::Register("%device".into()),
+                            ],
+                        });
+                    }
+                    // TODO: handle array fields
+                }
+                td_body.push(IrInstruction::Return(None));
+                functions.push(IrFunction {
+                    name: prefix_name(format!("{}::to_device", m.name)),
+                    params: vec![("device".into(), Type::String)],
+                    return_type: Type::Unit,
+                    blocks: vec![IrBlock {
+                        label: "entry".into(),
+                        instructions: td_body,
+                    }],
+                    span: Some(m.span),
+                    file: Some(file_path.clone()),
+                });
+
+                // Auto-generate free method
+                let mut free_body = Vec::new();
+                for field in &m.fields {
+                    let gname = format!("%{}.{}", m.name, field.name);
+                    let load_tmp = format!("%__free_load_{}", field.name);
+                    free_body.push(IrInstruction::Load {
+                        dst: load_tmp.clone(),
+                        src: gname,
+                    });
+                    let is_builtin = matches!(field.layer_type.as_str(),
+                        "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                        "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                        "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                    );
+                    if is_builtin && field.count.is_none() {
+                        free_body.push(IrInstruction::Call {
+                            dst: None,
+                            target: "nn_free".into(),
+                            args: vec![IrValue::Register(load_tmp)],
+                        });
+                    }
+                }
+                free_body.push(IrInstruction::Return(None));
+                functions.push(IrFunction {
+                    name: prefix_name(format!("{}::free", m.name)),
+                    params: vec![],
+                    return_type: Type::Unit,
+                    blocks: vec![IrBlock {
+                        label: "entry".into(),
+                        instructions: free_body,
+                    }],
+                    span: Some(m.span),
+                    file: Some(file_path.clone()),
+                });
+
+                // Auto-generate init_weights method
+                let mut iw_body = Vec::new();
+                for field in &m.fields {
+                    let gname = format!("%{}.{}", m.name, field.name);
+                    let load_tmp = format!("%__iw_load_{}", field.name);
+                    iw_body.push(IrInstruction::Load {
+                        dst: load_tmp.clone(),
+                        src: gname,
+                    });
+                    let is_builtin = matches!(field.layer_type.as_str(),
+                        "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                        "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                        "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                    );
+                    if is_builtin && field.count.is_none() {
+                        iw_body.push(IrInstruction::Call {
+                            dst: None,
+                            target: "nn_init_normal".into(),
+                            args: vec![
+                                IrValue::Register(load_tmp),
+                                IrValue::Register("%std".into()),
+                            ],
+                        });
+                    }
+                }
+                iw_body.push(IrInstruction::Return(None));
+                functions.push(IrFunction {
+                    name: prefix_name(format!("{}::init_weights", m.name)),
+                    params: vec![("std".into(), Type::Float)],
+                    return_type: Type::Unit,
+                    blocks: vec![IrBlock {
+                        label: "entry".into(),
+                        instructions: iw_body,
+                    }],
+                    span: Some(m.span),
+                    file: Some(file_path.clone()),
+                });
+
+                // Auto-generate setup_optimizer method from [Optim] attributes.
+                // Scans module fields for [Optim("type", "key=val", ...)] attrs
+                // and creates one optimizer per annotated field, returning a List.
+                let has_optim_attrs = m.fields.iter().any(|f|
+                    f.attributes.iter().any(|a| a.name == "Optim")
+                );
+                if has_optim_attrs {
+                    let mut so_body = Vec::new();
+                    // Create the result list
+                    so_body.push(IrInstruction::Call {
+                        dst: Some("%__optim_list".into()),
+                        target: "nex_list_new".into(),
+                        args: vec![],
+                    });
+                    for field in &m.fields {
+                        let optim_attr = field.attributes.iter().find(|a| a.name == "Optim");
+                        if let Some(attr) = optim_attr {
+                            if attr.args.is_empty() { continue; }
+                            let optim_type = attr.args[0].to_lowercase();
+                            let gname = format!("%{}.{}", m.name, field.name);
+                            let load_tmp = format!("%__so_load_{}", field.name);
+                            so_body.push(IrInstruction::Load {
+                                dst: load_tmp.clone(),
+                                src: gname,
+                            });
+
+                            // Parse key=value pairs from attribute args
+                            let mut lr = 0.001_f64;
+                            let mut beta1 = 0.9_f64;
+                            let mut beta2 = 0.999_f64;
+                            let mut wd = 0.0_f64;
+                            for kv in &attr.args[1..] {
+                                if let Some((key, val)) = kv.split_once('=') {
+                                    let val_f: f64 = val.parse().unwrap_or(0.0);
+                                    match key.trim() {
+                                        "lr" => lr = val_f,
+                                        "beta1" => beta1 = val_f,
+                                        "beta2" => beta2 = val_f,
+                                        "wd" | "weight_decay" => wd = val_f,
+                                        _ => {}
+                                    }
+                                }
+                            }
+
+                            let opt_tmp = format!("%__so_opt_{}", field.name);
+                            match optim_type.as_str() {
+                                "adamw" => {
+                                    so_body.push(IrInstruction::Call {
+                                        dst: Some(opt_tmp.clone()),
+                                        target: "optim_adamw".into(),
+                                        args: vec![
+                                            IrValue::Register(load_tmp),
+                                            IrValue::FloatConst(lr),
+                                            IrValue::FloatConst(beta1),
+                                            IrValue::FloatConst(beta2),
+                                            IrValue::FloatConst(wd),
+                                        ],
+                                    });
+                                }
+                                "adam" => {
+                                    so_body.push(IrInstruction::Call {
+                                        dst: Some(opt_tmp.clone()),
+                                        target: "optim_adam".into(),
+                                        args: vec![
+                                            IrValue::Register(load_tmp),
+                                            IrValue::FloatConst(lr),
+                                        ],
+                                    });
+                                }
+                                "sgd" | _ => {
+                                    so_body.push(IrInstruction::Call {
+                                        dst: Some(opt_tmp.clone()),
+                                        target: "optim_sgd".into(),
+                                        args: vec![
+                                            IrValue::Register(load_tmp),
+                                            IrValue::FloatConst(lr),
+                                        ],
+                                    });
+                                }
+                            }
+                            // Add optimizer to list
+                            so_body.push(IrInstruction::Call {
+                                dst: None,
+                                target: "nex_list_add".into(),
+                                args: vec![
+                                    IrValue::Register("%__optim_list".into()),
+                                    IrValue::Register(opt_tmp),
+                                ],
+                            });
+                        }
+                    }
+                    so_body.push(IrInstruction::Return(Some(
+                        IrValue::Register("%__optim_list".into()),
+                    )));
+                    functions.push(IrFunction {
+                        name: prefix_name(format!("{}::setup_optimizer", m.name)),
+                        params: vec![],
+                        return_type: Type::Named("List".into()),
+                        blocks: vec![IrBlock {
+                            label: "entry".into(),
+                            instructions: so_body,
+                        }],
+                        span: Some(m.span),
+                        file: Some(file_path.clone()),
+                    });
+                }
+            }
             nexc_ast::Item::Struct(s) => {
                 lowering.current_class = Some(s.name.clone());
                 for method in &s.methods {
@@ -3020,6 +3747,15 @@ pub fn lower_typed_module_with_prefix(
                     }
                 }
             }
+            nexc_ast::Item::Module(m) => {
+                for field in &m.fields {
+                    // Module fields are typed by their layer_type name
+                    types.insert(
+                        format!("{}.{}", m.name, field.name),
+                        Type::Named(field.layer_type.clone()),
+                    );
+                }
+            }
             nexc_ast::Item::Struct(s) => {
                 for field in &s.fields {
                     if let Some(ty_expr) = &field.ty {
@@ -3108,6 +3844,7 @@ mod tests {
             },
             types: HashMap::new(),
             functions: HashMap::new(),
+            dim_decls: HashMap::new(),
             diagnostics: Vec::new(),
         };
 

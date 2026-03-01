@@ -185,6 +185,12 @@ fn collect_used_in_type_expr(ty: &TypeExpr, used: &mut HashSet<String>) {
             used.insert(base.clone());
             for a in args { collect_used_in_type_expr(a, used); }
         }
+        TypeExprKind::TensorShape(dims) => {
+            used.insert("Tensor".into());
+            for d in dims {
+                if let DimExpr::Named(n) = d { used.insert(n.clone()); }
+            }
+        }
         TypeExprKind::Nullable(inner) => collect_used_in_type_expr(inner, used),
         TypeExprKind::Function(params, ret) => {
             for p in params { collect_used_in_type_expr(p, used); }

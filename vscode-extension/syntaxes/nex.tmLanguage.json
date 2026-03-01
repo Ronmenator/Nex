@@ -98,7 +98,7 @@
       "patterns": [
         {
           "name": "keyword.control.nex",
-          "match": "\\b(?:if|else|while|for|try|catch|finally|throw|return|break|continue|using|match|async|await|enum)\\b"
+          "match": "\\b(?:if|else|while|for|in|try|catch|finally|throw|return|break|continue|using|match|async|await|enum)\\b"
         },
         {
           "name": "keyword.declaration.nex",
@@ -260,7 +260,7 @@
       "patterns": [
         {
           "name": "keyword.operator.nex",
-          "match": "(::|->|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|=|<|>|\\+|-|\\*|/|%|&|\\||\\^|!|\\?|\\.|,|:)"
+          "match": "(::|->|\\.\\.|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|=|<|>|\\+|-|\\*|/|%|&|\\||\\^|!|\\?|\\.|,|:)"
         }
       ]
     }

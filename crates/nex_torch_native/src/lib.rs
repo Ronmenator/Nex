@@ -1007,6 +1007,42 @@ pub unsafe extern "C" fn nex_torch_nn_embedding(module: *mut NexModule, num_embe
 }
 
 // ---------------------------------------------------------------------------
+// List ↔ Tensor bridging
+// ---------------------------------------------------------------------------
+
+/// Stack a list of tensors along a new dimension.
+/// `list_ptr` is a raw `*mut Vec<i64>` (Nex List) where each element is a `*mut Tensor`.
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_stack(list_ptr: i64, dim: i64) -> *mut Tensor {
+    if list_ptr == 0 { return ptr::null_mut(); }
+    let list = list_ptr as *mut Vec<i64>;
+    if list.is_null() { return ptr::null_mut(); }
+    let elems = &*list;
+    if elems.is_empty() { return ptr::null_mut(); }
+    let tensors: Vec<Tensor> = elems.iter()
+        .filter_map(|&p| {
+            let t = p as *mut Tensor;
+            if t.is_null() { None } else { Some((*t).shallow_clone()) }
+        })
+        .collect();
+    if tensors.is_empty() { return ptr::null_mut(); }
+    let refs: Vec<&Tensor> = tensors.iter().collect();
+    Box::into_raw(Box::new(Tensor::stack(&refs, dim)))
+}
+
+/// Split a tensor into `chunks` pieces along `dim`, returning a Nex List of tensors.
+/// Returns a raw `*mut Vec<i64>` (Nex List) cast to i64.
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_chunk(t: *mut Tensor, chunks: i64, dim: i64) -> i64 {
+    if t.is_null() { return 0; }
+    let parts = (*t).chunk(chunks, dim);
+    let list: Vec<i64> = parts.into_iter()
+        .map(|part| Box::into_raw(Box::new(part)) as i64)
+        .collect();
+    Box::into_raw(Box::new(list)) as i64
+}
+
+// ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
 

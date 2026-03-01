@@ -839,6 +839,8 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_torch_tensor_to_half",
     "nex_torch_tensor_outer",
     "nex_torch_tensor_repeat",
+    "nex_torch_tensor_stack",
+    "nex_torch_tensor_chunk",
     "nex_torch_optim_adamw",
     "nex_torch_optim_step_and_zero",
     "nex_torch_nn_set_training",
@@ -2740,6 +2742,8 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         // Tensor utilities
         "tensor_outer" => Some("nex_torch_tensor_outer"),
         "tensor_repeat" => Some("nex_torch_tensor_repeat"),
+        "tensor_stack" => Some("nex_torch_tensor_stack"),
+        "tensor_chunk" => Some("nex_torch_tensor_chunk"),
         // Optimizer (additional)
         "optim_adamw" => Some("nex_torch_optim_adamw"),
         "optim_step_and_zero" => Some("nex_torch_optim_step_and_zero"),
@@ -3878,6 +3882,8 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_tensor_sdpa", &sig_ptr_ptr4),       // (q, k, v, is_causal) -> tensor
         ("nex_torch_tensor_outer", &sig_ptr_ptr2),      // (a, b) -> tensor
         ("nex_torch_tensor_repeat", &sig_ptr_ptr3),     // (t, d0, d1) -> tensor
+        ("nex_torch_tensor_stack", &sig_ptr_ptr2),      // (list, dim) -> tensor
+        ("nex_torch_tensor_chunk", &sig_ptr_ptr3),      // (t, chunks, dim) -> list
         // Phase 1 additions — optimizer & module
         ("nex_torch_optim_adamw", &sig_i64_f64x4_ret_i64), // (module, lr, beta1, beta2, wd) -> opt
         ("nex_torch_optim_step_and_zero", &sig_void_ptr),

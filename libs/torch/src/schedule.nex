@@ -1,0 +1,46 @@
+// torch.schedule — Learning rate schedule functions.
+
+// Cosine annealing with linear warmup.
+// Returns the learning rate for the given step.
+public def lr_cosine(step: Int, warmup: Int, total: Int, max_lr: Float, min_lr: Float) -> Float {
+    if (step < warmup) {
+        return max_lr * (step * 1.0) / (warmup * 1.0)
+    }
+    var progress = (step - warmup) * 1.0 / ((total - warmup) * 1.0)
+    if (progress > 1.0) { progress = 1.0 }
+    var decay = (1.0 + cos(progress * 3.14159265358979)) / 2.0
+    return min_lr + (max_lr - min_lr) * decay
+}
+
+// Trapezoidal schedule: linear warmup, constant, linear warmdown.
+public def lr_trapezoidal(step: Int, total: Int, warmup_ratio: Float,
+                          warmdown_ratio: Float, max_lr: Float, final_frac: Float) -> Float {
+    var warmup = warmup_ratio * total * 1.0
+    var warmdown = warmdown_ratio * total * 1.0
+    if (step * 1.0 < warmup) {
+        return max_lr * (step + 1) * 1.0 / warmup
+    }
+    if (step * 1.0 <= total * 1.0 - warmdown) {
+        return max_lr
+    }
+    var progress = (total - step) * 1.0 / warmdown
+    return max_lr * (progress + (1.0 - progress) * final_frac)
+}
+
+// Linear warmup then constant.
+public def lr_warmup(step: Int, warmup: Int, max_lr: Float) -> Float {
+    if (step < warmup) {
+        return max_lr * (step * 1.0) / (warmup * 1.0)
+    }
+    return max_lr
+}
+
+// Sets the learning rate on a list of optimizers.
+public def set_lr_all(optims: List, lr: Float) {
+    var i = 0
+    while (i < optims.len()) {
+        optim_set_lr(optims.get(i), lr)
+        i = i + 1
+    }
+    return
+}

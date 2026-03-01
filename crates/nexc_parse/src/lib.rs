@@ -61,6 +61,9 @@ impl Parser {
                             Some(TokenKind::Class) => {
                                 file.items.push(Item::Class(self.parse_class_with_attrs(is_public, is_partial, attrs)));
                             }
+                            Some(TokenKind::Module) => {
+                                file.items.push(Item::Module(self.parse_module_with_attrs(is_public, attrs)));
+                            }
                             Some(TokenKind::Struct) => {
                                 file.items.push(Item::Struct(self.parse_struct_with_attrs(is_public, attrs)));
                             }
@@ -91,6 +94,9 @@ impl Parser {
                 Some(TokenKind::Class) => {
                     file.items.push(Item::Class(self.parse_class(false, false)));
                 }
+                Some(TokenKind::Module) => {
+                    file.items.push(Item::Module(self.parse_module(false)));
+                }
                 Some(TokenKind::Struct) => {
                     file.items.push(Item::Struct(self.parse_struct(false)));
                 }
@@ -99,6 +105,9 @@ impl Parser {
                 }
                 Some(TokenKind::Interface) => {
                     file.items.push(Item::Interface(self.parse_interface(false)));
+                }
+                Some(TokenKind::Dim) => {
+                    file.items.push(Item::Dim(self.parse_dim()));
                 }
                 Some(TokenKind::Async) => {
                     self.advance(); // consume `async`
@@ -128,6 +137,9 @@ impl Parser {
                         Some(TokenKind::Class) => {
                             file.items.push(Item::Class(self.parse_class(true, partial)));
                         }
+                        Some(TokenKind::Module) => {
+                            file.items.push(Item::Module(self.parse_module(true)));
+                        }
                         Some(TokenKind::Struct) => {
                             file.items.push(Item::Struct(self.parse_struct(true)));
                         }
@@ -136,6 +148,9 @@ impl Parser {
                         }
                         Some(TokenKind::Interface) => {
                             file.items.push(Item::Interface(self.parse_interface(true)));
+                        }
+                        Some(TokenKind::Dim) => {
+                            file.items.push(Item::Dim(self.parse_dim()));
                         }
                         Some(TokenKind::Async) => {
                             self.advance(); // consume `async`
@@ -536,6 +551,158 @@ impl Parser {
             attributes,
             span,
         }
+    }
+
+    fn parse_module(&mut self, is_public: bool) -> ModuleDecl {
+        self.parse_module_with_attrs(is_public, Vec::new())
+    }
+
+    fn parse_module_with_attrs(&mut self, is_public: bool, attributes: Vec<Attribute>) -> ModuleDecl {
+        let span = self.current_span();
+        self.advance(); // consume `module`
+        let name = self.consume_identifier().unwrap_or_else(|| {
+            self.push_error("expected module name");
+            "Module".to_string()
+        });
+
+        // Parse constructor parameters: module Name(param: Type, ...)
+        let params = if self.consume_if(&TokenKind::LParen) {
+            let params = self.parse_parameters();
+            let _ = self.consume_if(&TokenKind::RParen);
+            params
+        } else {
+            Vec::new()
+        };
+
+        if !self.consume_if(&TokenKind::LBrace) {
+            self.push_error("expected '{' after module declaration");
+            self.recover_to_item_boundary();
+            return ModuleDecl {
+                name,
+                visibility: if is_public { Visibility::Public } else { Visibility::Internal },
+                params,
+                fields: Vec::new(),
+                methods: Vec::new(),
+                attributes,
+                span,
+            };
+        }
+
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+
+        while !self.is_eof() {
+            self.skip_terminators();
+            if self.consume_if(&TokenKind::RBrace) {
+                break;
+            }
+
+            // Parse optional attributes [Optim("adamw", ...)]
+            let attrs = self.parse_attributes();
+            self.skip_terminators();
+
+            // Check for method (def, virtual, override, static)
+            if matches!(
+                self.peek_kind(),
+                Some(TokenKind::Def)
+                    | Some(TokenKind::Virtual)
+                    | Some(TokenKind::Override)
+                    | Some(TokenKind::Static)
+            ) {
+                let mut func = self.parse_function(false, false);
+                func.attributes = attrs;
+                methods.push(func);
+                continue;
+            }
+
+            // Parse module field: name: LayerType[count](args)
+            if self.is_identifier_start() {
+                let field_span = self.current_span();
+                let field_name = self.consume_identifier().unwrap();
+
+                if !self.consume_if(&TokenKind::Colon) {
+                    self.push_error("expected ':' after module field name");
+                    self.recover_to_block_boundary();
+                    continue;
+                }
+
+                let layer_type = self.consume_identifier().unwrap_or_else(|| {
+                    self.push_error("expected layer type name");
+                    "Unknown".to_string()
+                });
+
+                // Optional array count: LayerType[count]
+                let count = if self.consume_if(&TokenKind::LBracket) {
+                    let expr = self.parse_expression();
+                    if !self.consume_if(&TokenKind::RBracket) {
+                        self.push_error("expected ']' after array count");
+                    }
+                    Some(expr)
+                } else {
+                    None
+                };
+
+                // Layer constructor args: LayerType(arg1, arg2, ...)
+                let layer_args = if self.consume_if(&TokenKind::LParen) {
+                    let args = self.parse_expr_list(TokenKind::RParen);
+                    let _ = self.consume_if(&TokenKind::RParen);
+                    args
+                } else {
+                    Vec::new()
+                };
+
+                // Accept comma or newline/semicolon as separator
+                if !self.consume_if(&TokenKind::Comma) {
+                    self.consume_stmt_terminator();
+                }
+
+                fields.push(ModuleFieldDecl {
+                    name: field_name,
+                    layer_type,
+                    layer_args,
+                    count,
+                    attributes: attrs,
+                    span: field_span,
+                });
+                continue;
+            }
+
+            self.push_error("unexpected token in module body");
+            self.recover_to_block_boundary();
+        }
+
+        ModuleDecl {
+            name,
+            visibility: if is_public { Visibility::Public } else { Visibility::Internal },
+            params,
+            fields,
+            methods,
+            attributes,
+            span,
+        }
+    }
+
+    fn parse_dim(&mut self) -> DimDecl {
+        let span = self.current_span();
+        self.advance(); // consume `dim`
+        let name = self.consume_identifier().unwrap_or_else(|| {
+            self.push_error("expected dimension name");
+            "UnknownDim".to_string()
+        });
+        let value = if self.consume_if(&TokenKind::Eq) {
+            if matches!(self.peek_kind(), Some(TokenKind::IntLiteral)) {
+                let text = self.tokens[self.pos].lexeme.clone();
+                self.advance();
+                Some(self.parse_int_literal(&text))
+            } else {
+                self.push_error("expected integer literal after '=' in dim declaration");
+                None
+            }
+        } else {
+            None
+        };
+        self.consume_stmt_terminator();
+        DimDecl { name, value, span }
     }
 
     fn parse_enum(&mut self, is_public: bool) -> EnumDecl {
@@ -1235,6 +1402,7 @@ impl Parser {
                 Some(TokenKind::ShlEq) => Some((1, 1, PrattInfix::Assign(AssignOp::ShlAssign))),
                 Some(TokenKind::ShrEq) => Some((1, 1, PrattInfix::Assign(AssignOp::ShrAssign))),
                 Some(TokenKind::If) => Some((2, 1, PrattInfix::Ternary)),
+                Some(TokenKind::PipeForward) => Some((3, 4, PrattInfix::Pipe)),
                 Some(TokenKind::DotDot) => Some((3, 4, PrattInfix::Range)),
                 Some(TokenKind::OrOr) => Some((2, 3, PrattInfix::Binary(BinaryOp::Or))),
                 Some(TokenKind::AndAnd) => Some((4, 5, PrattInfix::Binary(BinaryOp::And))),
@@ -1308,6 +1476,16 @@ impl Parser {
                         then_expr: Box::new(lhs),
                         condition: Box::new(condition),
                         else_expr: Box::new(else_expr),
+                        span,
+                    };
+                }
+                PrattInfix::Pipe => {
+                    self.advance(); // consume |>
+                    let rhs = self.parse_expression_bp(r_bp);
+                    let span = span_between(&lhs, &rhs);
+                    lhs = Expr::Pipe {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
                         span,
                     };
                 }
@@ -1940,6 +2118,37 @@ impl Parser {
             }
         }
 
+        // Tensor[dims] — parse dimension expressions instead of type arguments
+        if name == "Tensor" && matches!(self.peek_kind(), Some(TokenKind::LBracket)) {
+            self.advance(); // consume '['
+            let mut dims = Vec::new();
+            if !self.consume_if(&TokenKind::RBracket) {
+                while !self.is_eof() {
+                    let dim = self.parse_dim_expr();
+                    dims.push(dim);
+                    if self.consume_if(&TokenKind::Comma) {
+                        continue;
+                    }
+                    if self.consume_if(&TokenKind::RBracket) {
+                        break;
+                    }
+                    self.push_error("expected ',' or ']' in tensor shape");
+                    break;
+                }
+            }
+            let base = TypeExpr {
+                span: start,
+                kind: TypeExprKind::TensorShape(dims),
+            };
+            if self.consume_if(&TokenKind::Question) {
+                return Some(TypeExpr {
+                    span: start,
+                    kind: TypeExprKind::Nullable(Box::new(base)),
+                });
+            }
+            return Some(base);
+        }
+
         // Generic type arguments: List[Int] or List<Int>
         let (open_bracket, close_kind, close_err) =
             if matches!(self.peek_kind(), Some(TokenKind::LBracket)) {
@@ -1994,6 +2203,35 @@ impl Parser {
             })
         } else {
             Some(base)
+        }
+    }
+
+    fn parse_dim_expr(&mut self) -> DimExpr {
+        match self.peek_kind() {
+            Some(TokenKind::IntLiteral) => {
+                let text = self.tokens[self.pos].lexeme.clone();
+                self.advance();
+                DimExpr::Literal(self.parse_int_literal(&text))
+            }
+            Some(TokenKind::Question) => {
+                self.advance();
+                DimExpr::Dynamic
+            }
+            Some(TokenKind::Identifier) => {
+                let name = self.tokens[self.pos].lexeme.clone();
+                if name == "_" {
+                    self.advance();
+                    DimExpr::Inferred
+                } else {
+                    self.advance();
+                    DimExpr::Named(name)
+                }
+            }
+            _ => {
+                self.push_error("expected dimension: identifier, integer, '_', or '?'");
+                self.advance();
+                DimExpr::Dynamic
+            }
         }
     }
 
@@ -2446,6 +2684,7 @@ enum PrattInfix {
     Assign(AssignOp),
     Binary(BinaryOp),
     Ternary,
+    Pipe,
     Call,
     GenericArgs,
     Member,
@@ -2469,6 +2708,7 @@ fn expr_span(expr: &Expr) -> Span {
         | Expr::Match { span, .. }
         | Expr::Range { span, .. }
         | Expr::ArrayLiteral { span, .. }
+        | Expr::Pipe { span, .. }
         | Expr::Unsupported { span, .. } => *span,
         Expr::Block(Block { span, .. }) => *span,
     }
@@ -2522,6 +2762,15 @@ fn render_type_expr(ty: &TypeExpr) -> String {
         TypeExprKind::Generic(base, args) => {
             let params = args.iter().map(render_type_expr).collect::<Vec<_>>().join(", ");
             format!("{base}<{params}>")
+        }
+        TypeExprKind::TensorShape(dims) => {
+            let ds: Vec<String> = dims.iter().map(|d| match d {
+                DimExpr::Named(n) => n.clone(),
+                DimExpr::Literal(v) => v.to_string(),
+                DimExpr::Inferred => "_".into(),
+                DimExpr::Dynamic => "?".into(),
+            }).collect();
+            format!("Tensor[{}]", ds.join(", "))
         }
         TypeExprKind::Var => "Var".to_string(),
         TypeExprKind::Unit => "Unit".to_string(),
@@ -2663,6 +2912,22 @@ mod tests {
                     e.variants.len()
                 )
             }
+            Item::Module(m) => {
+                format!(
+                    "Module {} vis={} fields={} methods={}",
+                    m.name,
+                    vis_name(matches!(m.visibility, Visibility::Public)),
+                    m.fields.len(),
+                    m.methods.len()
+                )
+            }
+            Item::Dim(d) => {
+                if let Some(val) = d.value {
+                    format!("Dim {} = {}", d.name, val)
+                } else {
+                    format!("Dim {}", d.name)
+                }
+            }
         }
     }
 
@@ -2744,6 +3009,9 @@ mod tests {
             Expr::StringInterp { parts, .. } => format!("StringInterp({})", parts.len()),
             Expr::Ternary { .. } => "Ternary".to_string(),
             Expr::Match { arms, .. } => format!("Match({})", arms.len()),
+            Expr::Pipe { lhs, rhs, .. } => format!("{} |> {}", summarize_expr(lhs), summarize_expr(rhs)),
+            Expr::Range { .. } => "Range".to_string(),
+            Expr::ArrayLiteral { elements, .. } => format!("Array({})", elements.len()),
             Expr::Unsupported { raw, .. } => format!("Unsupported({raw})"),
         }
     }
@@ -2775,6 +3043,11 @@ mod tests {
             BinaryOp::Mul => "*",
             BinaryOp::Div => "/",
             BinaryOp::Mod => "%",
+            BinaryOp::BitOr => "|",
+            BinaryOp::BitXor => "^",
+            BinaryOp::BitAnd => "&",
+            BinaryOp::Shl => "<<",
+            BinaryOp::Shr => ">>",
         }
     }
 
@@ -2782,6 +3055,7 @@ mod tests {
         match op {
             UnaryOp::Not => "!",
             UnaryOp::Neg => "-",
+            UnaryOp::BitNot => "~",
         }
     }
 
@@ -2806,6 +3080,15 @@ mod tests {
             TypeExprKind::Generic(base, args) => {
                 let params = args.iter().map(ty_to_string).collect::<Vec<_>>().join(", ");
                 format!("{base}<{params}>")
+            }
+            TypeExprKind::TensorShape(dims) => {
+                let ds: Vec<String> = dims.iter().map(|d| match d {
+                    DimExpr::Named(n) => n.clone(),
+                    DimExpr::Literal(v) => v.to_string(),
+                    DimExpr::Inferred => "_".into(),
+                    DimExpr::Dynamic => "?".into(),
+                }).collect();
+                format!("Tensor[{}]", ds.join(", "))
             }
             TypeExprKind::Var => "Var".to_string(),
             TypeExprKind::Unit => "Unit".to_string(),
@@ -3459,5 +3742,88 @@ def good() -> Unit { return }
         };
         assert_eq!(summarize_stmt(&bad_body[0]), "Using");
         assert_eq!(summarize_stmt(&bad_body[1]), "Return Literal(Int(2))");
+    }
+
+    #[test]
+    fn parse_dim_declarations() {
+        let source = r#"
+dim Batch
+dim Seq
+dim Embd = 768
+"#;
+        let (file, diagnostics) = parse_snapshot(source, true);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let snapshot = summarize_items(&file);
+        let expected = ["Dim Batch", "Dim Seq", "Dim Embd = 768"].join("\n");
+        assert_eq!(snapshot, expected);
+    }
+
+    #[test]
+    fn parse_tensor_shape_type() {
+        let source = r#"
+dim Batch
+dim Embd = 768
+
+def forward(x: Tensor[Batch, Embd]) -> Tensor[Batch, Embd] {
+    return x
+}
+"#;
+        let (file, diagnostics) = parse_snapshot(source, true);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let snapshot = summarize_items(&file);
+        assert!(snapshot.contains("Dim Batch"));
+        assert!(snapshot.contains("Dim Embd = 768"));
+        assert!(snapshot.contains("Function forward"));
+        assert!(snapshot.contains("return=Tensor[Batch, Embd]"));
+
+        // Check param type
+        let func = match &file.items[2] {
+            Item::Function(f) => f,
+            item => panic!("expected function, got {item:?}"),
+        };
+        let param_ty = func.params[0].type_hint.as_ref().unwrap();
+        match &param_ty.kind {
+            TypeExprKind::TensorShape(dims) => {
+                assert_eq!(dims.len(), 2);
+                assert_eq!(dims[0], DimExpr::Named("Batch".into()));
+                assert_eq!(dims[1], DimExpr::Named("Embd".into()));
+            }
+            other => panic!("expected TensorShape, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_tensor_shape_with_literals_and_wildcards() {
+        let source = r#"
+def reshape(x: Tensor[?, 768, _]) -> Tensor[?] {
+    return x
+}
+"#;
+        let (file, diagnostics) = parse_snapshot(source, true);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+        let func = match &file.items[0] {
+            Item::Function(f) => f,
+            item => panic!("expected function, got {item:?}"),
+        };
+        let param_ty = func.params[0].type_hint.as_ref().unwrap();
+        match &param_ty.kind {
+            TypeExprKind::TensorShape(dims) => {
+                assert_eq!(dims.len(), 3);
+                assert_eq!(dims[0], DimExpr::Dynamic);
+                assert_eq!(dims[1], DimExpr::Literal(768));
+                assert_eq!(dims[2], DimExpr::Inferred);
+            }
+            other => panic!("expected TensorShape, got {other:?}"),
+        }
+
+        let ret_ty = func.return_type.as_ref().unwrap();
+        match &ret_ty.kind {
+            TypeExprKind::TensorShape(dims) => {
+                assert_eq!(dims.len(), 1);
+                assert_eq!(dims[0], DimExpr::Dynamic);
+            }
+            other => panic!("expected TensorShape, got {other:?}"),
+        }
     }
 }

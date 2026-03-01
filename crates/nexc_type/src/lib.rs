@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use nexc_ast::*;
-use nexc_diag::{Diagnostic, DiagnosticSink, Severity};
+use nexc_diag::{Diagnostic, DiagnosticSink, Severity, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -24,6 +24,9 @@ pub enum Type {
     Nullable(Box<Type>),
     Function(Vec<Type>, Box<Type>),
     Enum(String),
+    /// Tensor with compile-time shape information.
+    /// `Tensor[Batch, 768]` → `Tensor([Named("Batch"), Literal(768)])`.
+    Tensor(Vec<DimExpr>),
     Unknown,
 }
 
@@ -68,6 +71,19 @@ impl Type {
                 format!("({}) -> {}", p.join(", "), ret.display_name())
             }
             Type::Enum(n) => n.clone(),
+            Type::Tensor(dims) => {
+                if dims.is_empty() {
+                    "Tensor".into()
+                } else {
+                    let ds: Vec<_> = dims.iter().map(|d| match d {
+                        DimExpr::Named(n) => n.clone(),
+                        DimExpr::Literal(v) => v.to_string(),
+                        DimExpr::Inferred => "_".into(),
+                        DimExpr::Dynamic => "?".into(),
+                    }).collect();
+                    format!("Tensor[{}]", ds.join(", "))
+                }
+            }
             Type::Unknown => "<unknown>".into(),
         }
     }
@@ -96,6 +112,8 @@ pub struct TypedModule {
     pub file: SourceFile,
     pub types: HashMap<String, Type>,
     pub functions: HashMap<String, FunctionSig>,
+    /// Dimension declarations: name → optional concrete value.
+    pub dim_decls: HashMap<String, Option<i64>>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -110,6 +128,7 @@ pub fn declare_types(file: &SourceFile, sink: &mut DiagnosticSink) -> TypedModul
         file: file.clone(),
         types: HashMap::new(),
         functions: HashMap::new(),
+        dim_decls: HashMap::new(),
         diagnostics: Vec::new(),
     };
     seed_builtin_types(&mut module.types);
@@ -127,6 +146,11 @@ pub fn declare_types(file: &SourceFile, sink: &mut DiagnosticSink) -> TypedModul
                 module
                     .types
                     .insert(c.name.clone(), Type::Named(c.name.clone()));
+            }
+            Item::Module(m) => {
+                module
+                    .types
+                    .insert(m.name.clone(), Type::Named(m.name.clone()));
             }
             Item::Struct(s) => {
                 module
@@ -173,6 +197,9 @@ pub fn declare_types(file: &SourceFile, sink: &mut DiagnosticSink) -> TypedModul
             // Item::Statement(Assign) instead of Item::Variable.  Infer the type
             // from the initializer literal so the codegen can correctly distinguish
             // float/int/string/bool globals.
+            Item::Dim(d) => {
+                module.dim_decls.insert(d.name.clone(), d.value);
+            }
             Item::Statement(Stmt::Expr(Expr::Assign { target, value, .. })) => {
                 if let Expr::Identifier { name, .. } = target.as_ref() {
                     let ty = infer_literal_type(value);
@@ -223,6 +250,7 @@ fn resolve_type_expr(ty: &TypeExpr) -> Type {
             let resolved_args: Vec<Type> = args.iter().map(|a| resolve_type_expr(a)).collect();
             Type::Generic(base.clone(), resolved_args)
         }
+        TypeExprKind::TensorShape(dims) => Type::Tensor(dims.clone()),
         TypeExprKind::Var => Type::Var,
         TypeExprKind::Unit => Type::Unit,
         TypeExprKind::Nullable(inner) => Type::Nullable(Box::new(resolve_type_expr(inner))),
@@ -270,11 +298,12 @@ pub fn check_bodies(typed: &mut TypedModule, sink: &mut DiagnosticSink) {
     let file_path = typed.file.path.clone();
     let global_types = typed.types.clone();
     let global_fns = typed.functions.clone();
+    let dim_decls = typed.dim_decls.clone();
 
     for item in &typed.file.items {
         match item {
             Item::Function(func) => {
-                check_function(func, &global_types, &global_fns, &file_path, sink);
+                check_function(func, &global_types, &global_fns, &dim_decls, &file_path, sink);
             }
             Item::Class(class) => {
                 for method in &class.methods {
@@ -288,7 +317,30 @@ pub fn check_bodies(typed: &mut TypedModule, sink: &mut DiagnosticSink) {
                             .unwrap_or(Type::Unknown);
                         local_types.insert(field.name.clone(), ty);
                     }
-                    check_function(method, &local_types, &global_fns, &file_path, sink);
+                    check_function(method, &local_types, &global_fns, &dim_decls, &file_path, sink);
+                }
+            }
+            Item::Module(m) => {
+                for method in &m.methods {
+                    let mut local_types = global_types.clone();
+                    local_types.insert("self".into(), Type::Named(m.name.clone()));
+                    // Module fields are typed by their layer_type
+                    for field in &m.fields {
+                        local_types.insert(
+                            field.name.clone(),
+                            Type::Named(field.layer_type.clone()),
+                        );
+                    }
+                    // Constructor params are available in methods
+                    for p in &m.params {
+                        let ty = p
+                            .type_hint
+                            .as_ref()
+                            .map(|t| resolve_type_expr(t))
+                            .unwrap_or(Type::Unknown);
+                        local_types.insert(p.name.clone(), ty);
+                    }
+                    check_function(method, &local_types, &global_fns, &dim_decls, &file_path, sink);
                 }
             }
             Item::Struct(s) => {
@@ -303,7 +355,7 @@ pub fn check_bodies(typed: &mut TypedModule, sink: &mut DiagnosticSink) {
                             .unwrap_or(Type::Unknown);
                         local_types.insert(field.name.clone(), ty);
                     }
-                    check_function(method, &local_types, &global_fns, &file_path, sink);
+                    check_function(method, &local_types, &global_fns, &dim_decls, &file_path, sink);
                 }
             }
             _ => {}
@@ -315,6 +367,7 @@ fn check_function(
     func: &FunctionDecl,
     global_types: &HashMap<String, Type>,
     global_fns: &HashMap<String, FunctionSig>,
+    dim_decls: &HashMap<String, Option<i64>>,
     file_path: &str,
     sink: &mut DiagnosticSink,
 ) {
@@ -328,6 +381,7 @@ fn check_function(
         variables: HashMap::new(),
         global_types: global_types.clone(),
         global_fns: global_fns.clone(),
+        dim_decls: dim_decls.clone(),
         expected_return: expected_return.clone(),
         file_path: file_path.into(),
     };
@@ -352,6 +406,7 @@ struct Scope {
     variables: HashMap<String, Type>,
     global_types: HashMap<String, Type>,
     global_fns: HashMap<String, FunctionSig>,
+    dim_decls: HashMap<String, Option<i64>>,
     expected_return: Type,
     file_path: String,
 }
@@ -590,9 +645,67 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
             }
             val_ty
         }
-        Expr::Call { callee, args, type_args, .. } => {
-            for arg in args {
-                infer_expr(arg, scope, sink);
+        Expr::Call { callee, args, type_args, span, .. } => {
+            let arg_types: Vec<Type> = args.iter().map(|a| infer_expr(a, scope, sink)).collect();
+            // Method call on tensor: receiver.method(args)
+            if let Expr::MemberAccess { receiver, name: method_name, .. } = callee.as_ref() {
+                let recv_ty = infer_expr(receiver, scope, sink);
+                if is_tensor_type(&recv_ty) {
+                    let recv_dims = tensor_dims(&recv_ty);
+                    match method_name.as_str() {
+                        "matmul" => {
+                            if let (Some(a_dims), Some(b_dims)) = (recv_dims, arg_types.first().and_then(|t| tensor_dims(t))) {
+                                if let Some(result_dims) = check_matmul_shapes(a_dims, b_dims, &scope.dim_decls, Some(*span), &scope.file_path, sink) {
+                                    return Type::Tensor(result_dims);
+                                }
+                            }
+                            return recv_ty;
+                        }
+                        "transpose" => {
+                            if let Some(dims) = recv_dims {
+                                // transpose(d1, d2) — swap dimensions
+                                if arg_types.len() == 2 {
+                                    if let (Type::Int, Type::Int) = (&arg_types[0], &arg_types[1]) {
+                                        // We'd need runtime values to swap; just preserve shape
+                                    }
+                                }
+                                return Type::Tensor(dims.clone());
+                            }
+                            return recv_ty;
+                        }
+                        "softmax" | "relu" | "gelu" | "sigmoid" | "tanh"
+                        | "contiguous" | "detach" | "cos" | "sin" | "abs"
+                        | "clamp" | "requires_grad" => {
+                            // Shape-preserving operations
+                            return recv_ty;
+                        }
+                        "view" | "view3" | "view4" | "reshape" => {
+                            // View changes shape — result shape is unknown without runtime values
+                            return Type::Named("Tensor".into());
+                        }
+                        "unsqueeze" => {
+                            if let Some(dims) = recv_dims {
+                                // Adds a dimension — result has one more dim
+                                let mut new_dims = dims.clone();
+                                new_dims.push(DimExpr::Literal(1));
+                                return Type::Tensor(new_dims);
+                            }
+                            return recv_ty;
+                        }
+                        "squeeze" => {
+                            // Removes a dimension — result shape unknown
+                            return Type::Named("Tensor".into());
+                        }
+                        "sum" | "mean" | "max" | "min" | "item" => {
+                            // Reduction — scalar or unknown shape
+                            return Type::Named("Tensor".into());
+                        }
+                        _ => {
+                            // Unknown method — return base tensor type
+                            return recv_ty;
+                        }
+                    }
+                }
             }
             if let Expr::Identifier { name, .. } = callee.as_ref() {
                 if let Some(sig) = scope.global_fns.get(name) {
@@ -683,6 +796,10 @@ fn infer_expr(expr: &Expr, scope: &mut Scope, sink: &mut DiagnosticSink) -> Type
             }
             Type::Unknown
         }
+        Expr::Pipe { lhs, rhs, .. } => {
+            infer_expr(lhs, scope, sink);
+            infer_expr(rhs, scope, sink)
+        }
         Expr::Unsupported { .. } => Type::Unknown,
     }
 }
@@ -722,7 +839,131 @@ fn types_compatible(source: &Type, target: &Type) -> bool {
         }
         _ => {}
     }
+    // Tensor shape compatibility: Named("Tensor") ↔ Tensor(dims) (gradual adoption)
+    match (source, target) {
+        (Type::Named(n), Type::Tensor(_)) | (Type::Tensor(_), Type::Named(n)) if n == "Tensor" => {
+            return true;
+        }
+        (Type::Tensor(_), Type::Tensor(_)) => {
+            // Both have shapes — compatible (mismatch warnings are emitted elsewhere)
+            return true;
+        }
+        _ => {}
+    }
     false
+}
+
+/// Check if a type is a tensor (either Named("Tensor") or Tensor(dims)).
+fn is_tensor_type(ty: &Type) -> bool {
+    match ty {
+        Type::Tensor(_) => true,
+        Type::Named(n) if n == "Tensor" => true,
+        _ => false,
+    }
+}
+
+/// Extract shape dims from a type, if it's a shaped tensor.
+fn tensor_dims(ty: &Type) -> Option<&Vec<DimExpr>> {
+    match ty {
+        Type::Tensor(dims) if !dims.is_empty() => Some(dims),
+        _ => None,
+    }
+}
+
+/// Resolve a DimExpr to a concrete i64 value, if possible.
+fn resolve_dim(d: &DimExpr, dim_decls: &HashMap<String, Option<i64>>) -> Option<i64> {
+    match d {
+        DimExpr::Literal(v) => Some(*v),
+        DimExpr::Named(name) => dim_decls.get(name).copied().flatten(),
+        DimExpr::Inferred | DimExpr::Dynamic => None,
+    }
+}
+
+/// Check if two dimensions are compatible. Returns false only if both are concrete and differ.
+fn dims_compatible(a: &DimExpr, b: &DimExpr, dim_decls: &HashMap<String, Option<i64>>) -> bool {
+    // Dynamic or Inferred always compatible
+    if matches!(a, DimExpr::Dynamic | DimExpr::Inferred) || matches!(b, DimExpr::Dynamic | DimExpr::Inferred) {
+        return true;
+    }
+    // Same named dim is compatible
+    if let (DimExpr::Named(na), DimExpr::Named(nb)) = (a, b) {
+        if na == nb {
+            return true;
+        }
+    }
+    // If both resolve to concrete values, compare
+    let va = resolve_dim(a, dim_decls);
+    let vb = resolve_dim(b, dim_decls);
+    match (va, vb) {
+        (Some(x), Some(y)) => x == y,
+        _ => true, // Can't verify → assume compatible
+    }
+}
+
+/// Format a DimExpr for display in diagnostics.
+fn format_dim(d: &DimExpr) -> String {
+    match d {
+        DimExpr::Named(n) => n.clone(),
+        DimExpr::Literal(v) => v.to_string(),
+        DimExpr::Inferred => "_".into(),
+        DimExpr::Dynamic => "?".into(),
+    }
+}
+
+/// Emit a shape warning diagnostic.
+fn shape_warning(
+    message: String,
+    span: Option<Span>,
+    file: &str,
+    sink: &mut DiagnosticSink,
+) {
+    sink.push(Diagnostic {
+        id: "shape_mismatch".into(),
+        severity: Severity::Warning,
+        span,
+        file: Some(file.into()),
+        message,
+        notes: Vec::new(),
+        suggestions: Vec::new(),
+    });
+}
+
+/// Check matmul shape compatibility: last dim of a must equal second-to-last dim of b.
+fn check_matmul_shapes(
+    a_dims: &[DimExpr],
+    b_dims: &[DimExpr],
+    dim_decls: &HashMap<String, Option<i64>>,
+    span: Option<Span>,
+    file: &str,
+    sink: &mut DiagnosticSink,
+) -> Option<Vec<DimExpr>> {
+    if a_dims.is_empty() || b_dims.is_empty() {
+        return None;
+    }
+    let a_last = a_dims.last().unwrap();
+    let b_contract = if b_dims.len() >= 2 {
+        &b_dims[b_dims.len() - 2]
+    } else {
+        &b_dims[0]
+    };
+    if !dims_compatible(a_last, b_contract, dim_decls) {
+        shape_warning(
+            format!(
+                "matmul shape mismatch: inner dimensions {} and {} are incompatible",
+                format_dim(a_last),
+                format_dim(b_contract)
+            ),
+            span,
+            file,
+            sink,
+        );
+    }
+    // Result shape: batch dims from a + last dim from b
+    let mut result = a_dims[..a_dims.len() - 1].to_vec();
+    if b_dims.len() >= 2 {
+        result.push(b_dims.last().unwrap().clone());
+    }
+    Some(result)
 }
 
 pub fn validate_inheritance(typed: &TypedModule, sink: &mut DiagnosticSink) {

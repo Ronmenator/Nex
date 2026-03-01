@@ -63,6 +63,15 @@ impl Printer {
             Item::Import(imp) => self.print_import(imp),
             Item::Function(f) => self.print_function(f, false),
             Item::Class(c) => self.print_class(c),
+            Item::Module(_m) => {} // TODO: module formatting
+            Item::Dim(d) => {
+                if let Some(val) = d.value {
+                    self.output.push_str(&format!("dim {} = {}", d.name, val));
+                } else {
+                    self.output.push_str(&format!("dim {}", d.name));
+                }
+                self.output.push('\n');
+            }
             Item::Interface(i) => self.print_interface(i),
             Item::Struct(s) => self.print_struct(s),
             Item::Enum(e) => self.print_enum(e),
@@ -463,6 +472,9 @@ fn format_expr(expr: &nexc_ast::Expr) -> String {
             format!("[{}]", elems.join(", "))
         }
         nexc_ast::Expr::Block(_) => "{ ... }".into(),
+        nexc_ast::Expr::Pipe { lhs, rhs, .. } => {
+            format!("{} |> {}", format_expr(lhs), format_expr(rhs))
+        }
         nexc_ast::Expr::Unsupported { raw, .. } => raw.clone(),
     }
 }
@@ -473,6 +485,15 @@ fn format_type_expr(ty: &nexc_ast::TypeExpr) -> String {
         nexc_ast::TypeExprKind::Generic(base, args) => {
             let params: Vec<String> = args.iter().map(format_type_expr).collect();
             format!("{}<{}>", base, params.join(", "))
+        }
+        nexc_ast::TypeExprKind::TensorShape(dims) => {
+            let ds: Vec<String> = dims.iter().map(|d| match d {
+                nexc_ast::DimExpr::Named(n) => n.clone(),
+                nexc_ast::DimExpr::Literal(v) => v.to_string(),
+                nexc_ast::DimExpr::Inferred => "_".into(),
+                nexc_ast::DimExpr::Dynamic => "?".into(),
+            }).collect();
+            format!("Tensor[{}]", ds.join(", "))
         }
         nexc_ast::TypeExprKind::Var => "Var".into(),
         nexc_ast::TypeExprKind::Unit => "Unit".into(),

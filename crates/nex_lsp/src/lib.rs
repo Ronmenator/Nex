@@ -156,8 +156,10 @@ pub fn goto_definition(source: &str, name: &str) -> Option<(String, usize)> {
         let item_name = match item {
             nexc_ast::Item::Function(f) => Some((&f.name, f.span)),
             nexc_ast::Item::Class(c) => Some((&c.name, c.span)),
+            nexc_ast::Item::Module(m) => Some((&m.name, m.span)),
             nexc_ast::Item::Interface(i) => Some((&i.name, i.span)),
             nexc_ast::Item::Struct(s) => Some((&s.name, s.span)),
+            nexc_ast::Item::Dim(d) => Some((&d.name, d.span)),
             _ => None,
         };
         if let Some((n, span)) = item_name {
@@ -197,8 +199,10 @@ fn collect_symbols(ast: &SourceFile) -> Vec<String> {
         let name = match item {
             nexc_ast::Item::Function(f) => Some(f.name.clone()),
             nexc_ast::Item::Class(c) => Some(c.name.clone()),
+            nexc_ast::Item::Module(m) => Some(m.name.clone()),
             nexc_ast::Item::Interface(i) => Some(i.name.clone()),
             nexc_ast::Item::Struct(s) => Some(s.name.clone()),
+            nexc_ast::Item::Dim(d) => Some(d.name.clone()),
             _ => None,
         };
         if let Some(n) = name {
@@ -213,10 +217,10 @@ fn collect_symbols(ast: &SourceFile) -> Vec<String> {
 // ---------------------------------------------------------------------------
 
 const KEYWORDS: &[&str] = &[
-    "if", "else", "while", "for", "try", "catch", "finally", "throw",
-    "return", "break", "continue", "using", "class", "interface", "struct",
-    "def", "var", "public", "shared", "virtual", "override", "static",
-    "alias", "import", "from", "as", "self",
+    "if", "else", "while", "for", "in", "try", "catch", "finally", "throw",
+    "return", "break", "continue", "using", "match", "async", "await", "enum",
+    "class", "interface", "struct", "def", "var", "public", "shared",
+    "virtual", "override", "static", "alias", "import", "from", "as", "self",
 ];
 
 const TYPES: &[&str] = &[

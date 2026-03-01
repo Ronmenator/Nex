@@ -54,10 +54,19 @@ pub struct TypeExpr {
     pub kind: TypeExprKind,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DimExpr {
+    Named(String),
+    Literal(i64),
+    Inferred,
+    Dynamic,
+}
+
 #[derive(Debug, Clone)]
 pub enum TypeExprKind {
     Named(String),
     Generic(String, Vec<TypeExpr>),
+    TensorShape(Vec<DimExpr>),
     Var,
     Unit,
     Nullable(Box<TypeExpr>),
@@ -160,6 +169,37 @@ pub struct StructDecl {
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<FunctionDecl>,
     pub attributes: Vec<Attribute>,
+    pub span: Span,
+}
+
+/// A field inside a `module` declaration.
+/// Syntax: `[attrs] name: LayerType(args)` or `name: LayerType[count](args)`
+#[derive(Debug, Clone)]
+pub struct ModuleFieldDecl {
+    pub name: Name,
+    pub layer_type: Name,
+    pub layer_args: Vec<Expr>,
+    /// For array fields like `blocks: TransformerBlock[N](args)`.
+    pub count: Option<Expr>,
+    pub attributes: Vec<Attribute>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModuleDecl {
+    pub name: Name,
+    pub visibility: Visibility,
+    pub params: Vec<ParamDecl>,
+    pub fields: Vec<ModuleFieldDecl>,
+    pub methods: Vec<FunctionDecl>,
+    pub attributes: Vec<Attribute>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct DimDecl {
+    pub name: Name,
+    pub value: Option<i64>,
     pub span: Span,
 }
 
@@ -319,6 +359,12 @@ pub enum Expr {
         rhs: Box<Expr>,
         span: Span,
     },
+    /// Pipe forward: `lhs |> rhs`. Desugars to `rhs(lhs)`.
+    Pipe {
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+        span: Span,
+    },
     Unary {
         op: UnaryOp,
         expr: Box<Expr>,
@@ -410,9 +456,11 @@ pub enum Item {
     Import(ImportDecl),
     Function(FunctionDecl),
     Class(ClassDecl),
+    Module(ModuleDecl),
     Interface(InterfaceDecl),
     Struct(StructDecl),
     Enum(EnumDecl),
+    Dim(DimDecl),
     Variable(VarDecl),
     Using(UsingDecl),
     Statement(Stmt),
