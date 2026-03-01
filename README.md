@@ -28,7 +28,7 @@ This downloads the latest release, extracts it to `~/.nex/`, and adds it to your
 - **3D game engine** — `nex3d` with sprites, 3D models, animation, audio, lighting, fonts, gamepad input, and more
 - **Machine learning** — `torch` library with tensors, neural networks, CUDA, and training utilities
 - **Declarative UI** — `.nexui` markup for desktop GUI applications
-- **Package manager** — install libraries from GitHub with `nex install`
+- **Package manager** — install libraries from the registry or GitHub with `nex install`
 - **Tooling** — formatter, linter, REPL, LSP, and VS Code extension
 
 ## Quick Start
@@ -66,6 +66,7 @@ Commands:
   build --lib [path]          Compile a library to a shared library (DLL)
   run [path] [-- args]        JIT compile and execute
   <file>.nex [args]           Shorthand for: nex run <file>.nex -- [args]
+  install --lib <name>        Install a standard library from the registry
   install <user/repo[:ver]>   Install a library from GitHub
   uninstall <name>            Remove a library from project.toml
   list                        List project dependencies
@@ -77,12 +78,17 @@ Commands:
 
 ## Standard Libraries
 
-Opt-in libraries that ship with Nex. Add them to your `project.toml` under `[libs]`:
+Opt-in libraries that ship with Nex. Install from the registry and add to your `project.toml`:
+
+```
+nex install --lib crypto
+```
 
 | Library | Description |
 |---------|-------------|
 | **crypto** | SHA-1, SHA-256, SHA-512, MD5, HMAC, Base64, AES-256-GCM, Ed25519 signatures, PBKDF2, Argon2 |
 | **http** | HTTP client (GET/POST) and HTTP/1.1 server with request parsing and response helpers |
+| **json** | Type-safe JSON serialization and deserialization |
 | **net** | TLS/SSL client (rustls) and WebSocket server (RFC 6455) |
 | **regex** | Regular expression compilation, matching, searching, and replacement |
 | **torch** | PyTorch tensors, neural networks, loss functions, optimizers, CUDA, training utilities |

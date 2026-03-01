@@ -31,9 +31,17 @@
     <li><strong>Native DLL</strong> (optional) &mdash; a compiled shared library (<code>.dll</code> / <code>.so</code>) containing the low-level implementation</li>
   </ul>
 
-  <h2>Adding a Library to Your Project</h2>
+  <h2>Installing a Library</h2>
 
-  <p>Reference the library in your <code>project.toml</code>:</p>
+  <p>The easiest way to add a standard library is with <code>nex install --lib</code>:</p>
+
+  <pre><code><span class="cmt"># Install from the Nex library registry</span>
+$ nex install --lib crypto
+$ nex install --lib json</code></pre>
+
+  <p>This downloads the library (source + native DLLs) to <code>~/.nex/libs/</code> and adds it to your <code>project.toml</code>. You can also browse and install libraries from the VS Code Command Palette with <strong>Nex: Browse Libraries</strong>.</p>
+
+  <p>Alternatively, reference a library by local path:</p>
 
   <pre><code>[libs]
 crypto = { path = "../libs/crypto" }
@@ -64,6 +72,11 @@ hash <span class="op">=</span> <span class="fn">sha256</span>(<span class="str">
     <div class="feature-card">
       <h4><a href="stdlib-http.html">http</a></h4>
       <p>HTTP client (GET/POST) and server with request routing, JSON/text/HTML responses.</p>
+    </div>
+
+    <div class="feature-card">
+      <h4><a href="stdlib-json.html">json</a></h4>
+      <p>Type-safe JSON serialization and deserialization via the <code>[Reflectable]</code> attribute.</p>
     </div>
 
     <div class="feature-card">

@@ -150,11 +150,36 @@ Nex REPL v0.1.154
   </div>
   <p>Runs the project's test suite. <em>(Planned — not yet implemented in v0.1.154.)</em></p>
 
+  <h3>nex install --lib &lt;name&gt;</h3>
+  <div class="signature">
+    nex install --lib &lt;name&gt;
+  </div>
+  <p>Installs a standard library from the Nex library registry. Downloads the prebuilt package (source files and native DLLs) to the global cache at <code>~/.nex/libs/</code> and adds the dependency to the current project's <code>project.toml</code>.</p>
+
+  <pre><code><span class="cmt"># Install the crypto library</span>
+$ nex install --lib crypto
+fetching library registry...
+downloading crypto-0.1.0-windows-x86_64.zip...
+installing crypto v0.1.0...
+installed crypto v0.1.0
+
+<span class="cmt"># Install a pure-Nex library</span>
+$ nex install --lib json</code></pre>
+
+  <p>Available standard libraries: <code>crypto</code>, <code>http</code>, <code>json</code>, <code>net</code>, <code>nex3d</code>, <code>nex_ui</code>, <code>regex</code>, <code>torch</code>. If the library name is not recognized, the command prints all available libraries with their descriptions.</p>
+
+  <p>The registry is hosted at the Nex documentation site. Each package includes <code>project.toml</code>, <code>src/*.nex</code> source files, and prebuilt native DLLs where applicable. Libraries with native code have platform-specific packages (currently Windows x86_64); pure-Nex libraries use a platform-independent package.</p>
+
+  <div class="callout info">
+    <div class="callout-title">VS Code Integration</div>
+    <p>The VS Code extension provides a <strong>Nex: Browse Libraries</strong> command in the Command Palette that fetches the registry and shows an interactive list. Select a library and it runs <code>nex install --lib</code> automatically.</p>
+  </div>
+
   <h3>nex install &lt;user/repo[:version]&gt;</h3>
   <div class="signature">
     nex install &lt;user/repo&gt; &nbsp; | &nbsp; nex install &lt;user/repo:version&gt;
   </div>
-  <p>Installs a library from GitHub. Downloads the library source to the global cache at <code>~/.nex/libs/</code>, checks for native DLL assets in GitHub release artifacts, and adds the dependency to the current project's <code>project.toml</code>.</p>
+  <p>Installs a third-party library from GitHub. Downloads the library source to the global cache at <code>~/.nex/libs/</code>, checks for native DLL assets in GitHub release artifacts, and adds the dependency to the current project's <code>project.toml</code>.</p>
 
   <pre><code><span class="cmt"># Install the latest tagged version</span>
 $ nex install nexlang/nex3d
@@ -220,10 +245,11 @@ Removed build/</code></pre>
   </div>
   <p>Creates a GitHub Release with a zip archive containing the complete Nex toolchain. The release package includes:</p>
   <ul>
-    <li><code>bin/</code> &mdash; <code>nex.exe</code>, <code>nexc.exe</code>, <code>nex-lsp.exe</code>, and <code>nex_ui_native.dll</code></li>
+    <li><code>bin/</code> &mdash; <code>nex.exe</code>, <code>nexc.exe</code>, <code>nex-lsp.exe</code></li>
     <li><code>libs/</code> &mdash; all standard libraries with their native DLLs and <code>.nex</code> source files</li>
     <li><code>config/</code> &mdash; <code>nex.toml</code> toolchain configuration</li>
   </ul>
+  <p>The release also uploads the VS Code extension (<code>.vsix</code> file) as a separate asset and packages all standard libraries into the <code>docs/libs/</code> registry for <code>nex install --lib</code>.</p>
 
   <pre><code><span class="cmt"># Create a release and publish to GitHub</span>
 $ cargo xtask release
