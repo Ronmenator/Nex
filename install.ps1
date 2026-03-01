@@ -69,15 +69,7 @@ if ($innerDirs.Count -eq 1) {
     $sourceDir = $extractDir
 }
 
-# 5. Kill running nex-lsp.exe (VS Code keeps it locked)
-$lspProcs = Get-Process -Name "nex-lsp" -ErrorAction SilentlyContinue
-if ($lspProcs) {
-    Write-Host "  Stopping nex-lsp.exe ($($lspProcs.Count) process(es))..." -ForegroundColor Yellow
-    $lspProcs | Stop-Process -Force
-    Start-Sleep -Milliseconds 500
-}
-
-# 6. Install - create ~/.nex and copy contents
+# 5. Install - create ~/.nex and copy contents
 if (Test-Path $nexHome) {
     # Back up existing bin if present
     $existingBin = Join-Path $nexHome "bin"
@@ -92,10 +84,30 @@ if (Test-Path $nexHome) {
 New-Item -ItemType Directory -Path $nexHome -Force | Out-Null
 
 # Copy bin/, libs/, config/
+# Kill nex-lsp.exe right before replacing bin/ so VS Code can't respawn it in time.
 foreach ($subdir in @("bin", "libs", "config")) {
     $src = Join-Path $sourceDir $subdir
     $dst = Join-Path $nexHome $subdir
     if (Test-Path $src) {
+        if ($subdir -eq "bin") {
+            # Kill nex-lsp and wait for the file handle to be fully released
+            Get-Process -Name "nex-lsp" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            $lspPath = Join-Path $dst "nex-lsp.exe"
+            for ($retry = 0; $retry -lt 20; $retry++) {
+                Start-Sleep -Milliseconds 200
+                # Try to exclusively open the file — if it succeeds, the handle is released
+                try {
+                    if (Test-Path $lspPath) {
+                        $f = [System.IO.File]::Open($lspPath, 'Open', 'ReadWrite', 'None')
+                        $f.Close()
+                    }
+                    break
+                } catch {
+                    # Still locked — kill again in case VS Code respawned it
+                    Get-Process -Name "nex-lsp" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
         if (Test-Path $dst) {
             Remove-Item -Recurse -Force $dst
         }
@@ -104,7 +116,7 @@ foreach ($subdir in @("bin", "libs", "config")) {
     }
 }
 
-# 7. Add to PATH
+# 6. Add to PATH
 $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($currentPath -split ";" | Where-Object { $_ -eq $nexBin }) {
     Write-Host "  PATH already contains $nexBin" -ForegroundColor DarkGray
@@ -114,10 +126,10 @@ if ($currentPath -split ";" | Where-Object { $_ -eq $nexBin }) {
     Write-Host "  Added $nexBin to PATH" -ForegroundColor Green
 }
 
-# 8. Clean up temp files
+# 7. Clean up temp files
 Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
 
-# 9. Verify
+# 8. Verify
 Write-Host ""
 $nexExe = Join-Path $nexBin "nex.exe"
 if (Test-Path $nexExe) {
