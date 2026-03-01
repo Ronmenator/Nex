@@ -104,12 +104,12 @@ public def squeeze(t: Int64) -> Int64 {
     return tensor_squeeze(t)
 }
 
-public def unsqueeze(t: Int64, dim: Int64) -> Int64 {
-    return tensor_unsqueeze(t, dim)
+public def unsqueeze(t: Int64, d: Int64) -> Int64 {
+    return tensor_unsqueeze(t, d)
 }
 
-public def shape_dim(t: Int64, dim: Int64) -> Int64 {
-    return tensor_shape_dim(t, dim)
+public def shape_dim(t: Int64, d: Int64) -> Int64 {
+    return tensor_shape_dim(t, d)
 }
 
 public def ndim(t: Int64) -> Int64 {
@@ -248,8 +248,8 @@ public def cos(t: Int64) -> Int64 {
 }
 
 // Applies softmax along the given dimension (tensor-level, not nn module).
-public def softmax(t: Int64, dim: Int64) -> Int64 {
-    return tensor_softmax(t, dim)
+public def softmax(t: Int64, d: Int64) -> Int64 {
+    return tensor_softmax(t, d)
 }
 
 // ===========================================================================
@@ -298,24 +298,24 @@ public def where_self(condition: Int64, x: Int64, y: Int64) -> Int64 {
 // Reduction with dimension
 // ===========================================================================
 
-public def sum_dim(t: Int64, dim: Int64, keepdim: Int64) -> Int64 {
-    return tensor_sum_dim(t, dim, keepdim)
+public def sum_dim(t: Int64, d: Int64, keepdim: Int64) -> Int64 {
+    return tensor_sum_dim(t, d, keepdim)
 }
 
-public def mean_dim(t: Int64, dim: Int64, keepdim: Int64) -> Int64 {
-    return tensor_mean_dim(t, dim, keepdim)
+public def mean_dim(t: Int64, d: Int64, keepdim: Int64) -> Int64 {
+    return tensor_mean_dim(t, d, keepdim)
 }
 
-public def argmax(t: Int64, dim: Int64) -> Int64 {
-    return tensor_argmax(t, dim)
+public def argmax(t: Int64, d: Int64) -> Int64 {
+    return tensor_argmax(t, d)
 }
 
-public def max_dim(t: Int64, dim: Int64) -> Int64 {
-    return tensor_max_dim(t, dim)
+public def max_dim(t: Int64, d: Int64) -> Int64 {
+    return tensor_max_dim(t, d)
 }
 
-public def min_dim(t: Int64, dim: Int64) -> Int64 {
-    return tensor_min_dim(t, dim)
+public def min_dim(t: Int64, d: Int64) -> Int64 {
+    return tensor_min_dim(t, d)
 }
 
 // ===========================================================================
@@ -323,19 +323,19 @@ public def min_dim(t: Int64, dim: Int64) -> Int64 {
 // ===========================================================================
 
 // Concatenates two tensors along the given dimension.
-public def cat(a: Int64, b: Int64, dim: Int64) -> Int64 {
-    return tensor_cat(a, b, dim)
+public def cat(a: Int64, b: Int64, d: Int64) -> Int64 {
+    return tensor_cat(a, b, d)
 }
 
 // Returns a narrowed view: a slice of length elements starting at start
 // along the given dimension.
-public def narrow(t: Int64, dim: Int64, start: Int64, length: Int64) -> Int64 {
-    return tensor_narrow(t, dim, start, length)
+public def narrow(t: Int64, d: Int64, start: Int64, length: Int64) -> Int64 {
+    return tensor_narrow(t, d, start, length)
 }
 
 // Selects elements along dim using the given index tensor.
-public def index_select(t: Int64, dim: Int64, index: Int64) -> Int64 {
-    return tensor_index_select(t, dim, index)
+public def index_select(t: Int64, d: Int64, index: Int64) -> Int64 {
+    return tensor_index_select(t, d, index)
 }
 
 // Flattens dimensions from start_dim to end_dim (inclusive).

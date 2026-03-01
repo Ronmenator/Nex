@@ -2,7 +2,7 @@
   "name": "nex-language",
   "displayName": "Nex Language",
   "description": "Language support for Nex (.nex): syntax highlighting, LSP, and build commands.",
-  "version": "0.1.199",
+  "version": "0.1.201",
   "publisher": "nex",
   "engines": {
     "vscode": "^1.85.0"
@@ -76,6 +76,7 @@
       { "command": "nex.newProject", "title": "Nex: New Project", "category": "Nex" },
       { "command": "nex.newLibrary", "title": "Nex: New Library", "category": "Nex" },
       { "command": "nex.installLib", "title": "Nex: Install Library", "category": "Nex" },
+      { "command": "nex.browseLibs", "title": "Nex: Browse Libraries", "category": "Nex" },
       { "command": "nex.listLibs", "title": "Nex: List Dependencies", "category": "Nex" }
     ]
   },

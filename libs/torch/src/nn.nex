@@ -10,110 +10,110 @@ public def sequential() -> Int64 {
 }
 
 // Adds a fully-connected (linear) layer to the module.
-public def linear(module: Int64, in_features: Int64, out_features: Int64) {
-    nn_linear(module, in_features, out_features)
+public def linear(mod: Int64, in_features: Int64, out_features: Int64) {
+    nn_linear(mod, in_features, out_features)
     return
 }
 
 // Adds a 2D convolution layer to the module.
-public def conv2d(module: Int64, in_channels: Int64, out_channels: Int64, kernel_size: Int64) {
-    nn_conv2d(module, in_channels, out_channels, kernel_size)
+public def conv2d(mod: Int64, in_channels: Int64, out_channels: Int64, kernel_size: Int64) {
+    nn_conv2d(mod, in_channels, out_channels, kernel_size)
     return
 }
 
 // Adds a ReLU activation layer.
-public def relu(module: Int64) {
-    nn_relu(module)
+public def relu(mod: Int64) {
+    nn_relu(mod)
     return
 }
 
 // Adds a sigmoid activation layer.
-public def sigmoid(module: Int64) {
-    nn_sigmoid(module)
+public def sigmoid(mod: Int64) {
+    nn_sigmoid(mod)
     return
 }
 
 // Adds a tanh activation layer.
-public def tanh(module: Int64) {
-    nn_tanh(module)
+public def tanh(mod: Int64) {
+    nn_tanh(mod)
     return
 }
 
 // Adds a softmax activation layer along the given dimension.
-public def softmax(module: Int64, dim: Int64) {
-    nn_softmax(module, dim)
+public def softmax(mod: Int64, d: Int64) {
+    nn_softmax(mod, d)
     return
 }
 
 // Adds a dropout layer with probability p.
-public def dropout(module: Int64, p: Float) {
-    nn_dropout(module, p)
+public def dropout(mod: Int64, p: Float) {
+    nn_dropout(mod, p)
     return
 }
 
 // Adds a 1D batch normalization layer.
-public def batch_norm(module: Int64, features: Int64) {
-    nn_batch_norm(module, features)
+public def batch_norm(mod: Int64, features: Int64) {
+    nn_batch_norm(mod, features)
     return
 }
 
 // Adds a layer normalization layer (normalizes across the feature dimension).
-public def layer_norm(module: Int64, normalized_shape: Int64) {
-    nn_layer_norm(module, normalized_shape)
+public def layer_norm(mod: Int64, normalized_shape: Int64) {
+    nn_layer_norm(mod, normalized_shape)
     return
 }
 
 // Adds a GELU activation layer (Gaussian Error Linear Unit).
-public def gelu(module: Int64) {
-    nn_gelu(module)
+public def gelu(mod: Int64) {
+    nn_gelu(mod)
     return
 }
 
 // Adds a fully-connected (linear) layer without bias to the module.
-public def linear_no_bias(module: Int64, in_features: Int64, out_features: Int64) {
-    nn_linear_no_bias(module, in_features, out_features)
+public def linear_no_bias(mod: Int64, in_features: Int64, out_features: Int64) {
+    nn_linear_no_bias(mod, in_features, out_features)
     return
 }
 
 // Adds an RMSNorm layer (Root Mean Square normalization).
-public def rms_norm(module: Int64, dim: Int64) {
-    nn_rms_norm(module, dim)
+public def rms_norm(mod: Int64, d: Int64) {
+    nn_rms_norm(mod, d)
     return
 }
 
 // Clips gradient norms across all parameters to prevent exploding gradients.
-public def clip_grad_norm(module: Int64, max_norm: Float) {
-    nn_clip_grad_norm(module, max_norm)
+public def clip_grad_norm(mod: Int64, max_norm: Float) {
+    nn_clip_grad_norm(mod, max_norm)
     return
 }
 
 // Initializes all parameters with normal distribution (mean=0, std=std).
-public def init_normal(module: Int64, std: Float) {
-    nn_init_normal(module, std)
+public def init_normal(mod: Int64, std: Float) {
+    nn_init_normal(mod, std)
     return
 }
 
 // Adds an embedding layer (maps integer indices to dense vectors).
 // Input tensors are cast to int64 internally.
-public def embedding(module: Int64, num_embeddings: Int64, embedding_dim: Int64) {
-    nn_embedding(module, num_embeddings, embedding_dim)
+public def embedding(mod: Int64, num_embeddings: Int64, embedding_dim: Int64) {
+    nn_embedding(mod, num_embeddings, embedding_dim)
     return
 }
 
 // Moves a module (and all its parameters) to a device ("cpu" or "cuda").
-public def to_device(module: Int64, device: String) {
-    nn_to_device(module, device)
+public def to_device(mod: Int64, device: String) {
+    nn_to_device(mod, device)
     return
 }
 
 // Runs a forward pass through the module.
-public def forward(module: Int64, input: Int64) -> Int64 {
-    return nn_forward(module, input)
+public def forward(mod: Int64, input: Int64) -> Int64 {
+    return nn_forward(mod, input)
 }
 
 // Frees a neural network module.
-public def free_module(module: Int64) {
-    nn_free(module)
+public def free_module(mod: Int64) {
+    nn_free(mod)
     return
 }
 
@@ -121,21 +121,21 @@ public def free_module(module: Int64) {
 // Combined layer builders — add a linear layer + activation in one call.
 // ===========================================================================
 
-public def linear_relu(module: Int64, in_f: Int64, out_f: Int64) {
-    nn_linear(module, in_f, out_f)
-    nn_relu(module)
+public def linear_relu(mod: Int64, in_f: Int64, out_f: Int64) {
+    nn_linear(mod, in_f, out_f)
+    nn_relu(mod)
     return
 }
 
-public def linear_sigmoid(module: Int64, in_f: Int64, out_f: Int64) {
-    nn_linear(module, in_f, out_f)
-    nn_sigmoid(module)
+public def linear_sigmoid(mod: Int64, in_f: Int64, out_f: Int64) {
+    nn_linear(mod, in_f, out_f)
+    nn_sigmoid(mod)
     return
 }
 
-public def linear_tanh(module: Int64, in_f: Int64, out_f: Int64) {
-    nn_linear(module, in_f, out_f)
-    nn_tanh(module)
+public def linear_tanh(mod: Int64, in_f: Int64, out_f: Int64) {
+    nn_linear(mod, in_f, out_f)
+    nn_tanh(mod)
     return
 }
 

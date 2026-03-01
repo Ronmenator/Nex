@@ -6,6 +6,16 @@ Supports `.nex` files with:
 - Commands: Build/Run/Test/Format
 - Hover documentation for all 22 standard library modules including `std.ui` and `std.torch`, and libraries such as `crypto`, `http`, `net`, and `nex3d`
 
+## Install from GitHub
+
+1. Go to the [latest release](https://github.com/Ronmenator/Nex/releases/latest)
+2. Download the `.vsix` file (e.g. `nex-language-0.1.199.vsix`)
+3. Install via the command line:
+   ```
+   code --install-extension nex-language-0.1.199.vsix
+   ```
+   Or in VS Code / Cursor: **Extensions** panel > `...` menu > **Install from VSIX...**
+
 ## Development
 1. `cd vscode-extension`
 2. `npm install`

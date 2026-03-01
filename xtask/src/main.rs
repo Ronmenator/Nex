@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -52,6 +53,7 @@ fn main() {
     match args.first().map(String::as_str) {
         Some("deploy") => deploy(&args[1..]),
         Some("release") => release(&args[1..]),
+        Some("package-libs") => package_libs_for_registry(),
         Some(cmd) => {
             eprintln!("error: unknown xtask command `{cmd}`");
             print_usage();
@@ -68,8 +70,9 @@ fn print_usage() {
     eprintln!("usage: cargo xtask <command> [options]");
     eprintln!();
     eprintln!("commands:");
-    eprintln!("  deploy    Build and deploy locally");
-    eprintln!("  release   Package and publish a GitHub release");
+    eprintln!("  deploy         Build and deploy locally");
+    eprintln!("  release        Package and publish a GitHub release");
+    eprintln!("  package-libs   Package libs into docs/libs/ for registry");
     eprintln!();
     eprintln!("deploy options:");
     eprintln!("  --patch   bump patch version (default): 0.1.0 -> 0.1.1");
@@ -380,7 +383,46 @@ fn release(args: &[String]) {
     );
     println!();
 
-    // 7. Create GitHub release via gh CLI
+    // 7. Build VS Code extension (.vsix)
+    let vscode_dir = root.join("vscode-extension");
+    let vsix_path = if vscode_dir.join("package.json").exists() {
+        println!("building  VS Code extension...");
+        let vsce_status = Command::new("npx")
+            .args(["@vscode/vsce", "package", "--no-git-tag-version", "--no-update-package-json"])
+            .current_dir(&vscode_dir)
+            .status();
+        match vsce_status {
+            Ok(s) if s.success() => {
+                let vsix_name = format!("nex-language-{version}.vsix");
+                let vsix = vscode_dir.join(&vsix_name);
+                if vsix.exists() {
+                    println!("created   {vsix_name}");
+                    Some(vsix)
+                } else {
+                    eprintln!("warning:  vsix not found at expected path, skipping");
+                    None
+                }
+            }
+            Ok(_) => {
+                eprintln!("warning:  vsce package failed, release will not include vsix");
+                None
+            }
+            Err(e) => {
+                eprintln!("warning:  failed to run npx @vscode/vsce: {e}");
+                eprintln!("hint:     npm install -g @vscode/vsce");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // 7b. Package libs for registry (docs/libs/)
+    println!("packaging libs for registry...");
+    package_libs_for_registry();
+    println!();
+
+    // 8. Create GitHub release via gh CLI
     println!("publishing GitHub release {tag}...");
 
     let mut gh_args = vec![
@@ -388,10 +430,15 @@ fn release(args: &[String]) {
         "create".to_string(),
         tag.clone(),
         zip_path.to_string_lossy().to_string(),
+    ];
+    if let Some(ref vsix) = vsix_path {
+        gh_args.push(vsix.to_string_lossy().to_string());
+    }
+    gh_args.extend([
         "--title".to_string(),
         format!("Nex {tag}"),
         "--generate-notes".to_string(),
-    ];
+    ]);
     if draft {
         gh_args.push("--draft".to_string());
     }
@@ -411,13 +458,307 @@ fn release(args: &[String]) {
         process::exit(1);
     }
 
-    // 8. Clean up staging
+    // 9. Clean up staging
     let _ = fs::remove_dir_all(&staging);
 
     println!();
     let draft_label = if draft { " (draft)" } else { "" };
     println!("released {tag}{draft_label}");
     println!("install:  irm https://raw.githubusercontent.com/Ronmenator/Nex/master/install.ps1 | iex");
+}
+
+// ---------------------------------------------------------------------------
+// Library registry packaging
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct Registry {
+    version: u32,
+    updated: String,
+    nex_version: String,
+    base_url: String,
+    libraries: Vec<RegistryLib>,
+}
+
+#[derive(serde::Serialize)]
+struct RegistryLib {
+    name: String,
+    version: String,
+    description: String,
+    has_native: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    native_name: Option<String>,
+    modules: Vec<String>,
+    platforms: HashMap<String, String>,
+}
+
+fn package_libs_for_registry() {
+    let root = project_root();
+    let libs_dir = root.join("libs");
+    let docs_libs_dir = root.join("docs").join("libs");
+    let toolchain_config = root.join("nex").join("config").join("nex.toml");
+
+    let config_text = fs::read_to_string(&toolchain_config).unwrap_or_default();
+    let nex_version =
+        parse_toolchain_version(&config_text).unwrap_or_else(|| "0.0.0".to_string());
+
+    fs::create_dir_all(&docs_libs_dir).expect("failed to create docs/libs/");
+
+    let mut registry_libs = Vec::new();
+
+    let mut lib_dirs: Vec<_> = fs::read_dir(&libs_dir)
+        .expect("failed to read libs/")
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+    lib_dirs.sort_by_key(|e| e.file_name());
+
+    for entry in &lib_dirs {
+        let lib_root = entry.path();
+        let toml_path = lib_root.join("project.toml");
+        let Ok(toml_text) = fs::read_to_string(&toml_path) else {
+            continue;
+        };
+
+        let lib_name = parse_name_field(&toml_text).unwrap_or_default();
+        if lib_name.is_empty() {
+            continue;
+        }
+        let lib_version = parse_version_field(&toml_text).unwrap_or_else(|| "0.1.0".to_string());
+        let native_name = parse_native_field(&toml_text);
+        let has_native = native_name.is_some();
+        let modules = enumerate_nex_modules(&lib_root.join("src"));
+        let description = lib_description(&lib_name);
+
+        let platform = if has_native { "windows-x86_64" } else { "any" };
+        let zip_name = format!("{lib_name}-{lib_version}-{platform}.zip");
+        let zip_path = docs_libs_dir.join(&zip_name);
+
+        create_lib_zip(&lib_root, &zip_path, &lib_name, &native_name);
+
+        let zip_size = fs::metadata(&zip_path).map(|m| m.len()).unwrap_or(0);
+        println!(
+            "packaged  {zip_name} ({:.1} KB)",
+            zip_size as f64 / 1024.0
+        );
+
+        let mut platforms = HashMap::new();
+        platforms.insert(platform.to_string(), zip_name);
+
+        registry_libs.push(RegistryLib {
+            name: lib_name,
+            version: lib_version,
+            description,
+            has_native,
+            native_name,
+            modules,
+            platforms,
+        });
+    }
+
+    let registry = Registry {
+        version: 1,
+        updated: utc_now_iso(),
+        nex_version,
+        base_url: "https://ronmenator.github.io/Nex/libs".to_string(),
+        libraries: registry_libs,
+    };
+
+    let json = serde_json::to_string_pretty(&registry).expect("failed to serialize registry");
+    let registry_path = docs_libs_dir.join("registry.json");
+    fs::write(&registry_path, &json).expect("failed to write registry.json");
+    println!("wrote     docs/libs/registry.json");
+}
+
+fn create_lib_zip(lib_root: &Path, zip_path: &Path, lib_name: &str, native_name: &Option<String>) {
+    let temp_dir = env::temp_dir().join(format!("nex-pkg-{lib_name}"));
+    let staging = temp_dir.join(lib_name);
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&staging).expect("failed to create temp staging dir");
+
+    // Copy project.toml
+    let _ = fs::copy(lib_root.join("project.toml"), staging.join("project.toml"));
+
+    // Copy src/*.nex
+    let src_dir = lib_root.join("src");
+    if src_dir.is_dir() {
+        let dst_src = staging.join("src");
+        fs::create_dir_all(&dst_src).ok();
+        for file in fs::read_dir(&src_dir).into_iter().flatten().flatten() {
+            let path = file.path();
+            if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("nex") {
+                fs::copy(&path, dst_src.join(file.file_name())).ok();
+            }
+        }
+    }
+
+    // Copy native DLLs (only nex_* / nex3d_* prefixed)
+    if let Some(ref _native) = native_name {
+        for file in fs::read_dir(lib_root).into_iter().flatten().flatten() {
+            let path = file.path();
+            if !path.is_file() {
+                continue;
+            }
+            let name = file.file_name();
+            let name_str = name.to_string_lossy();
+            let is_native = name_str.ends_with(".dll")
+                || name_str.ends_with(".so")
+                || name_str.ends_with(".dylib");
+            if is_native && (name_str.starts_with("nex_") || name_str.starts_with("nex3d_")) {
+                fs::copy(&path, staging.join(&*name)).ok();
+            }
+        }
+    }
+
+    // Create zip
+    if zip_path.exists() {
+        fs::remove_file(zip_path).ok();
+    }
+
+    #[cfg(windows)]
+    {
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "Compress-Archive -Path '{}\\*' -DestinationPath '{}' -Force",
+                    staging.to_string_lossy().replace('/', "\\"),
+                    zip_path.to_string_lossy().replace('/', "\\"),
+                ),
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .expect("failed to run Compress-Archive");
+        if !status.success() {
+            eprintln!("warning: failed to create zip for {lib_name}");
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let status = Command::new("zip")
+            .args(["-r", &zip_path.to_string_lossy(), lib_name])
+            .current_dir(&temp_dir)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .expect("failed to run zip");
+        if !status.success() {
+            eprintln!("warning: failed to create zip for {lib_name}");
+        }
+    }
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+fn enumerate_nex_modules(src_dir: &Path) -> Vec<String> {
+    let mut modules = Vec::new();
+    if let Ok(entries) = fs::read_dir(src_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("nex") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    modules.push(stem.to_string());
+                }
+            }
+        }
+    }
+    modules.sort();
+    modules
+}
+
+fn lib_description(name: &str) -> String {
+    match name {
+        "crypto" => "Cryptography: SHA, AES-256-GCM, Ed25519, HMAC, PBKDF2, Argon2, Base64.",
+        "http" => "HTTP client and server.",
+        "json" => "Type-safe JSON serialization and deserialization.",
+        "net" => "TLS client and WebSocket server.",
+        "nex3d" => "3D game engine: rendering, audio, input, physics, sprites.",
+        "nex_ui" => "Native desktop UI: widgets, canvas, dialogs, styling, events.",
+        "regex" => "Regular expression pattern matching.",
+        "torch" => "Machine learning via libtorch: tensors, neural networks, training.",
+        _ => "",
+    }
+    .to_string()
+}
+
+fn parse_name_field(toml: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once('=') {
+            if key.trim() == "name" {
+                let v = value.trim().trim_matches('"').trim_matches('\'');
+                if !v.is_empty() {
+                    return Some(v.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn parse_version_field(toml: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once('=') {
+            if key.trim() == "version" {
+                let v = value.trim().trim_matches('"').trim_matches('\'');
+                if !v.is_empty() {
+                    return Some(v.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn utc_now_iso() -> String {
+    #[cfg(windows)]
+    {
+        let output = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')",
+            ])
+            .output();
+        if let Ok(o) = output {
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let output = Command::new("date")
+            .args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
+            .output();
+        if let Ok(o) = output {
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+    }
+    "1970-01-01T00:00:00Z".to_string()
 }
 
 /// Copy lib directories into staging, including only .dll, .nex, and project.toml files.

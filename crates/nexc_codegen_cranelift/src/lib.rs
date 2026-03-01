@@ -1154,7 +1154,12 @@ fn build_reg_type_map(
                                 .find(|(k, _)| k.ends_with(&format!("::{target}")))
                                 .map(|(_, &v)| v)
                         })
-                        .or_else(|| runtime_func_return_type(target.as_str()));
+                        .or_else(|| runtime_func_return_type(target.as_str()))
+                        .or_else(|| {
+                            // Also try the stdlib-mapped name (e.g. env_args_get → nex_env_args_get)
+                            stdlib_function_name(target.as_str())
+                                .and_then(|rt_name| runtime_func_return_type(rt_name))
+                        });
                     let rt = rt.unwrap_or(RegType::Unknown);
                     map.insert(dst.clone(), rt);
                 }

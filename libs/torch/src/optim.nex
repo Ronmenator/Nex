@@ -12,13 +12,13 @@ public def DEFAULT_SGD_LR() -> Float { return 0.01f }
 // ===========================================================================
 
 // Creates an SGD optimizer for the given module.
-public def sgd(module: Int64, lr: Float) -> Int64 {
-    return optim_sgd(module, lr)
+public def sgd(mod: Int64, lr: Float) -> Int64 {
+    return optim_sgd(mod, lr)
 }
 
 // Creates an Adam optimizer for the given module.
-public def adam(module: Int64, lr: Float) -> Int64 {
-    return optim_adam(module, lr)
+public def adam(mod: Int64, lr: Float) -> Int64 {
+    return optim_adam(mod, lr)
 }
 
 // Performs one optimization step (updates weights).
@@ -50,11 +50,11 @@ public def free_optimizer(optimizer: Int64) {
 // ===========================================================================
 
 // Creates an Adam optimizer with the default learning rate (0.001).
-public def adam_default(module: Int64) -> Int64 {
-    return optim_adam(module, 0.001f)
+public def adam_default(mod: Int64) -> Int64 {
+    return optim_adam(mod, 0.001f)
 }
 
 // Creates an SGD optimizer with the default learning rate (0.01).
-public def sgd_default(module: Int64) -> Int64 {
-    return optim_sgd(module, 0.01f)
+public def sgd_default(mod: Int64) -> Int64 {
+    return optim_sgd(mod, 0.01f)
 }

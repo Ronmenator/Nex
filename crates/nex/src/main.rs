@@ -162,6 +162,19 @@ fn main() {
                 if code != 0 {
                     process::exit(code);
                 }
+            } else if args[0] == "--lib" {
+                // nex install --lib <name> ...
+                let lib_args: Vec<_> = args.iter().filter(|a| *a != "--lib").collect();
+                if lib_args.is_empty() {
+                    eprintln!("Usage: nex install --lib <name>");
+                    process::exit(1);
+                }
+                for name in &lib_args {
+                    let code = cmd_install_registry_lib(name);
+                    if code != 0 {
+                        process::exit(code);
+                    }
+                }
             } else {
                 // nex install <user/repo[:version]> ...
                 for spec in &args {
@@ -414,6 +427,7 @@ fn usage() {
     println!("  new <name> [--lib]          Create a new project (--lib for a library)");
     println!("  build [path]                Compile to a native executable (AOT)");
     println!("  build --lib [path]          Compile a library to a shared library (DLL)");
+    println!("  install --lib <name>        Install a standard library from the registry");
     println!("  install <user/repo[:ver]>   Install a library from GitHub");
     println!("  install                     Build release binaries and install to nex/bin/");
     println!("  uninstall <name>            Remove a library from project.toml");
@@ -1451,6 +1465,263 @@ fn add_lib_to_project_toml(project_toml: &Path, name: &str, version: &str, git_s
             .map_err(|e| format!("cannot write {}: {e}", project_toml.display()))?;
     } else {
         // No [libs] section exists — add one
+        let mut result = text.clone();
+        if !result.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push_str(&format!("\n[libs]\n{entry}\n"));
+        fs::write(project_toml, &result)
+            .map_err(|e| format!("cannot write {}: {e}", project_toml.display()))?;
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Registry-based library installation
+// ---------------------------------------------------------------------------
+
+const REGISTRY_URL: &str = "https://ronmenator.github.io/Nex/libs/registry.json";
+
+/// `nex install --lib <name>`
+fn cmd_install_registry_lib(name: &str) -> i32 {
+    println!("fetching library registry...");
+
+    let registry = match fetch_registry() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("nex install: {e}");
+            return 1;
+        }
+    };
+
+    let libraries = match registry.get("libraries").and_then(|v| v.as_array()) {
+        Some(libs) => libs,
+        None => {
+            eprintln!("nex install: invalid registry format");
+            return 1;
+        }
+    };
+
+    let lib = match libraries
+        .iter()
+        .find(|l| l.get("name").and_then(|n| n.as_str()) == Some(name))
+    {
+        Some(l) => l,
+        None => {
+            eprintln!("nex install: library `{name}` not found in registry\n");
+            eprintln!("available libraries:");
+            for lib in libraries {
+                let n = lib.get("name").and_then(|n| n.as_str()).unwrap_or("?");
+                let d = lib
+                    .get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("");
+                eprintln!("  {n:12} {d}");
+            }
+            return 1;
+        }
+    };
+
+    let version = lib
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("0.1.0");
+    let base_url = registry
+        .get("base_url")
+        .and_then(|u| u.as_str())
+        .unwrap_or("");
+
+    // Check if already installed
+    let cache_dir = nex_libs_dir().join(name);
+    if cache_dir.join("project.toml").exists() {
+        println!("{name} v{version} is already installed at {}", cache_dir.display());
+    } else {
+        // Determine platform and download URL
+        let platform = current_platform();
+        let platforms = lib.get("platforms").and_then(|p| p.as_object());
+        let zip_filename = platforms
+            .and_then(|p| p.get(&platform).or_else(|| p.get("any")))
+            .and_then(|v| v.as_str());
+
+        let Some(zip_filename) = zip_filename else {
+            eprintln!("nex install: no package available for platform `{platform}`");
+            return 1;
+        };
+
+        let download_url = format!("{base_url}/{zip_filename}");
+
+        println!("downloading {zip_filename}...");
+        let temp_zip = env::temp_dir().join(format!("nex-install-{zip_filename}"));
+
+        let status = process::Command::new("curl")
+            .args(["-sfL", "-o", &temp_zip.to_string_lossy(), &download_url])
+            .status();
+
+        match status {
+            Ok(s) if s.success() => {}
+            Ok(_) => {
+                eprintln!("nex install: failed to download {download_url}");
+                return 1;
+            }
+            Err(e) => {
+                eprintln!("nex install: failed to run curl: {e}");
+                return 1;
+            }
+        }
+
+        // Extract zip to ~/.nex/libs/
+        println!("installing {name} v{version}...");
+        let libs_dir = nex_libs_dir();
+        fs::create_dir_all(&libs_dir).ok();
+
+        if !extract_zip(&temp_zip, &libs_dir) {
+            eprintln!("nex install: failed to extract package");
+            let _ = fs::remove_file(&temp_zip);
+            return 1;
+        }
+
+        let _ = fs::remove_file(&temp_zip);
+
+        if !cache_dir.join("project.toml").exists() {
+            eprintln!("nex install: extraction succeeded but {name}/project.toml not found");
+            return 1;
+        }
+    }
+
+    // Update project.toml if we're in a project
+    let project_toml = PathBuf::from("project.toml");
+    if project_toml.exists() {
+        if let Err(e) = add_registry_lib_to_project_toml(&project_toml, name, version) {
+            eprintln!("warning: {e}");
+        }
+    }
+
+    println!("installed {name} v{version}");
+    0
+}
+
+fn fetch_registry() -> Result<serde_json::Value, String> {
+    let output = process::Command::new("curl")
+        .args(["-sfL", REGISTRY_URL])
+        .output()
+        .map_err(|e| format!("failed to run curl: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!("failed to fetch registry from {REGISTRY_URL}"));
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&text).map_err(|e| format!("invalid registry JSON: {e}"))
+}
+
+fn current_platform() -> String {
+    let os = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
+    let arch = if cfg!(target_arch = "x86_64") {
+        "x86_64"
+    } else if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "unknown"
+    };
+    format!("{os}-{arch}")
+}
+
+fn extract_zip(zip_path: &Path, dest_dir: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        let status = process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
+                    zip_path.to_string_lossy().replace('/', "\\"),
+                    dest_dir.to_string_lossy().replace('/', "\\"),
+                ),
+            ])
+            .status();
+        matches!(status, Ok(s) if s.success())
+    }
+    #[cfg(not(windows))]
+    {
+        let status = process::Command::new("unzip")
+            .args([
+                "-o",
+                &zip_path.to_string_lossy(),
+                "-d",
+                &dest_dir.to_string_lossy(),
+            ])
+            .status();
+        matches!(status, Ok(s) if s.success())
+    }
+}
+
+fn add_registry_lib_to_project_toml(
+    project_toml: &Path,
+    name: &str,
+    version: &str,
+) -> Result<(), String> {
+    let text = fs::read_to_string(project_toml)
+        .map_err(|e| format!("cannot read {}: {e}", project_toml.display()))?;
+
+    // Check if already listed
+    let mut in_libs = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_libs = trimmed == "[libs]";
+            continue;
+        }
+        if !in_libs {
+            continue;
+        }
+        if let Some((key, _)) = trimmed.split_once('=') {
+            if key.trim() == name {
+                // Already present — update version
+                let new_entry = format!("{name} = \"{version}\"");
+                let updated = text.replace(line, &new_entry);
+                fs::write(project_toml, &updated)
+                    .map_err(|e| format!("cannot write {}: {e}", project_toml.display()))?;
+                return Ok(());
+            }
+        }
+    }
+
+    // Not found — append
+    let entry = format!("{name} = \"{version}\"");
+    if text.contains("[libs]") {
+        let mut result = String::new();
+        let mut inserted = false;
+        let mut in_libs_section = false;
+        for line in text.lines() {
+            result.push_str(line);
+            result.push('\n');
+            let trimmed = line.trim();
+            if trimmed == "[libs]" {
+                in_libs_section = true;
+                continue;
+            }
+            if in_libs_section && !inserted && trimmed.starts_with('[') && trimmed != "[libs]" {
+                let last_newline = result.len() - line.len() - 1;
+                result.insert_str(last_newline, &format!("{entry}\n"));
+                inserted = true;
+                in_libs_section = false;
+            }
+        }
+        if !inserted {
+            result.push_str(&entry);
+            result.push('\n');
+        }
+        fs::write(project_toml, &result)
+            .map_err(|e| format!("cannot write {}: {e}", project_toml.display()))?;
+    } else {
         let mut result = text.clone();
         if !result.ends_with('\n') {
             result.push('\n');

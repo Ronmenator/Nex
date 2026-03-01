@@ -129,11 +129,54 @@ export async function activate(context: vscode.ExtensionContext) {
       if (name) runNexCommand(`new ${name} --lib`);
     }),
     vscode.commands.registerCommand("nex.installLib", async () => {
-      const spec = await vscode.window.showInputBox({
-        prompt: "Library to install (user/repo or user/repo:version)",
-        placeHolder: "nexlang/nex3d:0.1.0",
-      });
-      if (spec) runNexCommand(`install ${spec}`);
+      const choice = await vscode.window.showQuickPick(
+        [
+          { label: "Browse Standard Libraries", description: "Install from the Nex registry" },
+          { label: "Install from GitHub", description: "Enter user/repo:version" },
+        ],
+        { placeHolder: "How would you like to install a library?" }
+      );
+      if (!choice) return;
+      if (choice.label === "Browse Standard Libraries") {
+        vscode.commands.executeCommand("nex.browseLibs");
+      } else {
+        const spec = await vscode.window.showInputBox({
+          prompt: "Library to install (user/repo or user/repo:version)",
+          placeHolder: "nexlang/nex3d:0.1.0",
+        });
+        if (spec) runNexCommand(`install ${spec}`);
+      }
+    }),
+    vscode.commands.registerCommand("nex.browseLibs", async () => {
+      const registryUrl = "https://ronmenator.github.io/Nex/libs/registry.json";
+      try {
+        const res = await fetch(registryUrl);
+        if (!res.ok) {
+          vscode.window.showErrorMessage(`Failed to fetch library registry: ${res.statusText}`);
+          return;
+        }
+        const registry: any = await res.json();
+        const libraries: any[] = registry.libraries || [];
+        if (libraries.length === 0) {
+          vscode.window.showInformationMessage("No libraries available in the registry.");
+          return;
+        }
+        const items: vscode.QuickPickItem[] = libraries.map((lib: any) => ({
+          label: lib.name,
+          description: `v${lib.version}${lib.has_native ? " (native)" : ""}`,
+          detail: lib.description,
+        }));
+        const selected = await vscode.window.showQuickPick(items, {
+          placeHolder: "Select a library to install",
+          matchOnDescription: true,
+          matchOnDetail: true,
+        });
+        if (selected) {
+          runNexCommand(`install --lib ${selected.label}`);
+        }
+      } catch (err) {
+        vscode.window.showErrorMessage(`Error fetching libraries: ${err}`);
+      }
     }),
     vscode.commands.registerCommand("nex.listLibs", () => runNexCommand("list")),
   );

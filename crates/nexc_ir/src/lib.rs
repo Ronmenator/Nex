@@ -3309,7 +3309,19 @@ pub fn lower_typed_module_with_prefix(
                         .unwrap_or(Type::Unknown);
                     (p.name.clone(), ty)
                 }).collect();
-                let mut init_body = Vec::new();
+                // Register module parameter types so lower_expr() can resolve
+                // struct field access (e.g. config.vocab_size) in field initializers.
+                for (pname, pty) in &params {
+                    if let Type::Named(name) = pty {
+                        lowering.var_types.insert(pname.clone(), name.clone());
+                    }
+                }
+
+                // Build init function with multiple blocks to support array field loops.
+                let mut init_blocks: Vec<IrBlock> = Vec::new();
+                let mut current_insts: Vec<IrInstruction> = Vec::new();
+                let mut current_label = "entry".to_string();
+                let mut init_block_counter = 0usize;
 
                 for field in &m.fields {
                     let gname = format!("%{}.{}", m.name, field.name);
@@ -3319,32 +3331,95 @@ pub fn lower_typed_module_with_prefix(
                         "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
                     );
 
-                    if field.count.is_some() {
-                        // Array field: blocks: SubModule[N](args)
-                        // Create a list, loop N times, init each sub-module, add to list
+                    if let Some(count_expr) = &field.count {
+                        // Array field: create list, loop N times, init sub-module, add to list
                         let list_tmp = format!("%__mod_list_{}", field.name);
-                        init_body.push(IrInstruction::Call {
+                        current_insts.push(IrInstruction::Call {
                             dst: Some(list_tmp.clone()),
                             target: "nex_list_new".into(),
                             args: vec![],
                         });
-                        // For now, array fields store the list pointer in the global.
-                        // The loop to populate it will be generated when we have
-                        // runtime-known counts. For compile-time constant counts,
-                        // unroll here.
-                        init_body.push(IrInstruction::Store {
+                        current_insts.push(IrInstruction::Store {
                             dst: gname,
-                            src: IrValue::Register(list_tmp),
+                            src: IrValue::Register(list_tmp.clone()),
                         });
+                        // Lower count expression and store
+                        lowering.current_block.clear();
+                        let count_val = lowering.lower_expr(count_expr);
+                        current_insts.extend(lowering.current_block.drain(..));
+                        let count_reg = format!("%__mod_count_{}", field.name);
+                        let idx_reg = format!("%__mod_idx_{}", field.name);
+                        current_insts.push(IrInstruction::Store {
+                            dst: count_reg.clone(), src: count_val,
+                        });
+                        current_insts.push(IrInstruction::Store {
+                            dst: idx_reg.clone(), src: IrValue::IntConst(0),
+                        });
+                        init_block_counter += 1;
+                        let header_lbl = format!("__init_loop_hdr_{}", init_block_counter);
+                        let body_lbl   = format!("__init_loop_body_{}", init_block_counter);
+                        let exit_lbl   = format!("__init_loop_exit_{}", init_block_counter);
+                        current_insts.push(IrInstruction::Jump { target: header_lbl.clone() });
+                        init_blocks.push(IrBlock { label: current_label, instructions: current_insts });
+                        current_insts = Vec::new();
+
+                        // Header: idx < count ?
+                        let cond_tmp = format!("%__mod_cond_{}", field.name);
+                        current_insts.push(IrInstruction::BinOp {
+                            dst: cond_tmp.clone(), op: "lt".into(),
+                            lhs: IrValue::Register(idx_reg.clone()),
+                            rhs: IrValue::Register(count_reg.clone()),
+                        });
+                        current_insts.push(IrInstruction::Branch {
+                            cond: IrValue::Register(cond_tmp),
+                            then_label: body_lbl.clone(),
+                            else_label: exit_lbl.clone(),
+                        });
+                        init_blocks.push(IrBlock { label: header_lbl.clone(), instructions: current_insts });
+                        current_insts = Vec::new();
+
+                        // Body: init sub-module, add to list, increment
+                        let sub_tmp = format!("%__mod_arr_sub_{}", field.name);
+                        let mut sub_args = Vec::new();
+                        for a in &field.layer_args {
+                            lowering.current_block.clear();
+                            sub_args.push(lowering.lower_expr(a));
+                            current_insts.extend(lowering.current_block.drain(..));
+                        }
+                        current_insts.push(IrInstruction::Call {
+                            dst: Some(sub_tmp.clone()),
+                            target: format!("{}::init", field.layer_type),
+                            args: sub_args,
+                        });
+                        current_insts.push(IrInstruction::Call {
+                            dst: None,
+                            target: "nex_list_add".into(),
+                            args: vec![
+                                IrValue::Register(list_tmp),
+                                IrValue::Register(sub_tmp),
+                            ],
+                        });
+                        let next_tmp = format!("%__mod_next_{}", field.name);
+                        current_insts.push(IrInstruction::BinOp {
+                            dst: next_tmp.clone(), op: "add".into(),
+                            lhs: IrValue::Register(idx_reg.clone()),
+                            rhs: IrValue::IntConst(1),
+                        });
+                        current_insts.push(IrInstruction::Store {
+                            dst: idx_reg, src: IrValue::Register(next_tmp),
+                        });
+                        current_insts.push(IrInstruction::Jump { target: header_lbl });
+                        init_blocks.push(IrBlock { label: body_lbl, instructions: current_insts });
+                        current_insts = Vec::new();
+                        current_label = exit_lbl;
                     } else if is_builtin_layer {
                         // Built-in layer: nn_sequential_new() + nn_<layer>(module, args...)
                         let seq_tmp = format!("%__mod_seq_{}", field.name);
-                        init_body.push(IrInstruction::Call {
+                        current_insts.push(IrInstruction::Call {
                             dst: Some(seq_tmp.clone()),
                             target: "nn_sequential_new".into(),
                             args: vec![],
                         });
-                        // Map layer type to FFI init function
                         let ffi_name = match field.layer_type.as_str() {
                             "Linear" => "nn_linear",
                             "LinearNoBias" => "nn_linear_no_bias",
@@ -3363,95 +3438,155 @@ pub fn lower_typed_module_with_prefix(
                         };
                         let mut ffi_args = vec![IrValue::Register(seq_tmp.clone())];
                         for arg in &field.layer_args {
+                            lowering.current_block.clear();
                             ffi_args.push(lowering.lower_expr(arg));
+                            current_insts.extend(lowering.current_block.drain(..));
                         }
-                        init_body.push(IrInstruction::Call {
+                        current_insts.push(IrInstruction::Call {
                             dst: None,
                             target: ffi_name.into(),
                             args: ffi_args,
                         });
-                        init_body.push(IrInstruction::Store {
+                        current_insts.push(IrInstruction::Store {
                             dst: gname,
                             src: IrValue::Register(seq_tmp),
                         });
                     } else {
                         // User-defined module: call SubModule::init(args)
                         let sub_tmp = format!("%__mod_sub_{}", field.name);
-                        let sub_args: Vec<IrValue> = field.layer_args.iter()
-                            .map(|a| lowering.lower_expr(a))
-                            .collect();
-                        init_body.push(IrInstruction::Call {
+                        let mut sub_args = Vec::new();
+                        for a in &field.layer_args {
+                            lowering.current_block.clear();
+                            sub_args.push(lowering.lower_expr(a));
+                            current_insts.extend(lowering.current_block.drain(..));
+                        }
+                        current_insts.push(IrInstruction::Call {
                             dst: Some(sub_tmp.clone()),
                             target: format!("{}::init", field.layer_type),
                             args: sub_args,
                         });
-                        init_body.push(IrInstruction::Store {
+                        current_insts.push(IrInstruction::Store {
                             dst: gname,
                             src: IrValue::Register(sub_tmp),
                         });
                     }
                 }
-                init_body.push(IrInstruction::Return(None));
+                current_insts.push(IrInstruction::Return(None));
+                init_blocks.push(IrBlock { label: current_label, instructions: current_insts });
 
                 functions.push(IrFunction {
                     name: prefix_name(format!("{}::init", m.name)),
                     params,
                     return_type: Type::Unit,
-                    blocks: vec![IrBlock {
-                        label: "entry".into(),
-                        instructions: init_body,
-                    }],
+                    blocks: init_blocks,
                     span: Some(m.span),
                     file: Some(file_path.clone()),
                 });
 
-                // Auto-generate to_device method
-                let mut td_body = Vec::new();
-                for field in &m.fields {
-                    let gname = format!("%{}.{}", m.name, field.name);
-                    let load_tmp = format!("%__td_load_{}", field.name);
-                    td_body.push(IrInstruction::Load {
-                        dst: load_tmp.clone(),
-                        src: gname,
-                    });
-                    let is_builtin = matches!(field.layer_type.as_str(),
-                        "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
-                        "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
-                        "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
-                    );
-                    if is_builtin && field.count.is_none() {
-                        td_body.push(IrInstruction::Call {
-                            dst: None,
-                            target: "nn_to_device".into(),
-                            args: vec![
-                                IrValue::Register(load_tmp),
-                                IrValue::Register("%device".into()),
-                            ],
+                // Auto-generate to_device method (multi-block for array fields)
+                {
+                    let mut td_blocks: Vec<IrBlock> = Vec::new();
+                    let mut td_insts: Vec<IrInstruction> = Vec::new();
+                    let mut td_label = "entry".to_string();
+                    let mut td_blk = 0usize;
+                    for field in &m.fields {
+                        let gname = format!("%{}.{}", m.name, field.name);
+                        let load_tmp = format!("%__td_load_{}", field.name);
+                        td_insts.push(IrInstruction::Load {
+                            dst: load_tmp.clone(), src: gname,
                         });
-                    } else if !is_builtin && field.count.is_none() {
-                        // User-defined sub-module: call SubModule::to_device
-                        td_body.push(IrInstruction::Call {
-                            dst: None,
-                            target: format!("{}::to_device", field.layer_type),
-                            args: vec![
-                                IrValue::Register("%device".into()),
-                            ],
-                        });
+                        let is_builtin = matches!(field.layer_type.as_str(),
+                            "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                            "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                            "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                        );
+                        if field.count.is_some() {
+                            // Array field: iterate list, call SubModule::to_device for each
+                            td_blk += 1;
+                            let len_tmp = format!("%__td_len_{}", field.name);
+                            let idx_tmp = format!("%__td_idx_{}", field.name);
+                            td_insts.push(IrInstruction::Call {
+                                dst: Some(len_tmp.clone()),
+                                target: "nex_list_length".into(),
+                                args: vec![IrValue::Register(load_tmp.clone())],
+                            });
+                            td_insts.push(IrInstruction::Store {
+                                dst: idx_tmp.clone(), src: IrValue::IntConst(0),
+                            });
+                            let hdr = format!("__td_hdr_{td_blk}");
+                            let bdy = format!("__td_bdy_{td_blk}");
+                            let ext = format!("__td_ext_{td_blk}");
+                            td_insts.push(IrInstruction::Jump { target: hdr.clone() });
+                            td_blocks.push(IrBlock { label: td_label, instructions: td_insts });
+                            td_insts = Vec::new();
+                            // header
+                            let cnd = format!("%__td_cnd_{}", field.name);
+                            td_insts.push(IrInstruction::BinOp {
+                                dst: cnd.clone(), op: "lt".into(),
+                                lhs: IrValue::Register(idx_tmp.clone()),
+                                rhs: IrValue::Register(len_tmp),
+                            });
+                            td_insts.push(IrInstruction::Branch {
+                                cond: IrValue::Register(cnd),
+                                then_label: bdy.clone(), else_label: ext.clone(),
+                            });
+                            td_blocks.push(IrBlock { label: hdr.clone(), instructions: td_insts });
+                            td_insts = Vec::new();
+                            // body
+                            let elem = format!("%__td_elem_{}", field.name);
+                            td_insts.push(IrInstruction::Call {
+                                dst: Some(elem.clone()),
+                                target: "nex_list_get".into(),
+                                args: vec![
+                                    IrValue::Register(load_tmp),
+                                    IrValue::Register(idx_tmp.clone()),
+                                ],
+                            });
+                            td_insts.push(IrInstruction::Call {
+                                dst: None,
+                                target: format!("{}::to_device", field.layer_type),
+                                args: vec![IrValue::Register("%device".into())],
+                            });
+                            let nxt = format!("%__td_nxt_{}", field.name);
+                            td_insts.push(IrInstruction::BinOp {
+                                dst: nxt.clone(), op: "add".into(),
+                                lhs: IrValue::Register(idx_tmp.clone()),
+                                rhs: IrValue::IntConst(1),
+                            });
+                            td_insts.push(IrInstruction::Store {
+                                dst: idx_tmp, src: IrValue::Register(nxt),
+                            });
+                            td_insts.push(IrInstruction::Jump { target: hdr });
+                            td_blocks.push(IrBlock { label: bdy, instructions: td_insts });
+                            td_insts = Vec::new();
+                            td_label = ext;
+                        } else if is_builtin {
+                            td_insts.push(IrInstruction::Call {
+                                dst: None, target: "nn_to_device".into(),
+                                args: vec![
+                                    IrValue::Register(load_tmp),
+                                    IrValue::Register("%device".into()),
+                                ],
+                            });
+                        } else {
+                            td_insts.push(IrInstruction::Call {
+                                dst: None,
+                                target: format!("{}::to_device", field.layer_type),
+                                args: vec![IrValue::Register("%device".into())],
+                            });
+                        }
                     }
-                    // TODO: handle array fields
+                    td_insts.push(IrInstruction::Return(None));
+                    td_blocks.push(IrBlock { label: td_label, instructions: td_insts });
+                    functions.push(IrFunction {
+                        name: prefix_name(format!("{}::to_device", m.name)),
+                        params: vec![("device".into(), Type::String)],
+                        return_type: Type::Unit,
+                        blocks: td_blocks,
+                        span: Some(m.span),
+                        file: Some(file_path.clone()),
+                    });
                 }
-                td_body.push(IrInstruction::Return(None));
-                functions.push(IrFunction {
-                    name: prefix_name(format!("{}::to_device", m.name)),
-                    params: vec![("device".into(), Type::String)],
-                    return_type: Type::Unit,
-                    blocks: vec![IrBlock {
-                        label: "entry".into(),
-                        instructions: td_body,
-                    }],
-                    span: Some(m.span),
-                    file: Some(file_path.clone()),
-                });
 
                 // Auto-generate free method
                 let mut free_body = Vec::new();
@@ -3488,54 +3623,113 @@ pub fn lower_typed_module_with_prefix(
                     file: Some(file_path.clone()),
                 });
 
-                // Auto-generate init_weights method
-                let mut iw_body = Vec::new();
-                for field in &m.fields {
-                    let gname = format!("%{}.{}", m.name, field.name);
-                    let load_tmp = format!("%__iw_load_{}", field.name);
-                    iw_body.push(IrInstruction::Load {
-                        dst: load_tmp.clone(),
-                        src: gname,
-                    });
-                    let is_builtin = matches!(field.layer_type.as_str(),
-                        "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
-                        "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
-                        "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
-                    );
-                    if is_builtin && field.count.is_none() {
-                        iw_body.push(IrInstruction::Call {
-                            dst: None,
-                            target: "nn_init_normal".into(),
-                            args: vec![
-                                IrValue::Register(load_tmp),
-                                IrValue::Register("%std".into()),
-                            ],
+                // Auto-generate init_weights method (multi-block for array fields)
+                {
+                    let mut iw_blocks: Vec<IrBlock> = Vec::new();
+                    let mut iw_insts: Vec<IrInstruction> = Vec::new();
+                    let mut iw_label = "entry".to_string();
+                    let mut iw_blk = 0usize;
+                    for field in &m.fields {
+                        let gname = format!("%{}.{}", m.name, field.name);
+                        let load_tmp = format!("%__iw_load_{}", field.name);
+                        iw_insts.push(IrInstruction::Load {
+                            dst: load_tmp.clone(), src: gname,
                         });
+                        let is_builtin = matches!(field.layer_type.as_str(),
+                            "Linear" | "LinearNoBias" | "Embedding" | "RMSNorm" |
+                            "LayerNorm" | "Dropout" | "ReLU" | "GELU" | "Conv2d" |
+                            "BatchNorm" | "Sigmoid" | "Tanh" | "Softmax"
+                        );
+                        if field.count.is_some() {
+                            // Array field: iterate list, call SubModule::init_weights for each
+                            iw_blk += 1;
+                            let len_r = format!("%__iw_len_{}", field.name);
+                            let idx_r = format!("%__iw_idx_{}", field.name);
+                            iw_insts.push(IrInstruction::Call {
+                                dst: Some(len_r.clone()),
+                                target: "nex_list_length".into(),
+                                args: vec![IrValue::Register(load_tmp.clone())],
+                            });
+                            iw_insts.push(IrInstruction::Store {
+                                dst: idx_r.clone(), src: IrValue::IntConst(0),
+                            });
+                            let hdr = format!("__iw_hdr_{iw_blk}");
+                            let bdy = format!("__iw_bdy_{iw_blk}");
+                            let ext = format!("__iw_ext_{iw_blk}");
+                            iw_insts.push(IrInstruction::Jump { target: hdr.clone() });
+                            iw_blocks.push(IrBlock { label: iw_label, instructions: iw_insts });
+                            iw_insts = Vec::new();
+                            let cnd = format!("%__iw_cnd_{}", field.name);
+                            iw_insts.push(IrInstruction::BinOp {
+                                dst: cnd.clone(), op: "lt".into(),
+                                lhs: IrValue::Register(idx_r.clone()),
+                                rhs: IrValue::Register(len_r),
+                            });
+                            iw_insts.push(IrInstruction::Branch {
+                                cond: IrValue::Register(cnd),
+                                then_label: bdy.clone(), else_label: ext.clone(),
+                            });
+                            iw_blocks.push(IrBlock { label: hdr.clone(), instructions: iw_insts });
+                            iw_insts = Vec::new();
+                            // body: call SubModule::init_weights(std)
+                            iw_insts.push(IrInstruction::Call {
+                                dst: None,
+                                target: format!("{}::init_weights", field.layer_type),
+                                args: vec![IrValue::Register("%std".into())],
+                            });
+                            let nxt = format!("%__iw_nxt_{}", field.name);
+                            iw_insts.push(IrInstruction::BinOp {
+                                dst: nxt.clone(), op: "add".into(),
+                                lhs: IrValue::Register(idx_r.clone()),
+                                rhs: IrValue::IntConst(1),
+                            });
+                            iw_insts.push(IrInstruction::Store {
+                                dst: idx_r, src: IrValue::Register(nxt),
+                            });
+                            iw_insts.push(IrInstruction::Jump { target: hdr });
+                            iw_blocks.push(IrBlock { label: bdy, instructions: iw_insts });
+                            iw_insts = Vec::new();
+                            iw_label = ext;
+                        } else if is_builtin {
+                            iw_insts.push(IrInstruction::Call {
+                                dst: None, target: "nn_init_normal".into(),
+                                args: vec![
+                                    IrValue::Register(load_tmp),
+                                    IrValue::Register("%std".into()),
+                                ],
+                            });
+                        } else {
+                            // User-defined sub-module: call SubModule::init_weights
+                            iw_insts.push(IrInstruction::Call {
+                                dst: None,
+                                target: format!("{}::init_weights", field.layer_type),
+                                args: vec![IrValue::Register("%std".into())],
+                            });
+                        }
                     }
+                    iw_insts.push(IrInstruction::Return(None));
+                    iw_blocks.push(IrBlock { label: iw_label, instructions: iw_insts });
+                    functions.push(IrFunction {
+                        name: prefix_name(format!("{}::init_weights", m.name)),
+                        params: vec![("std".into(), Type::Float)],
+                        return_type: Type::Unit,
+                        blocks: iw_blocks,
+                        span: Some(m.span),
+                        file: Some(file_path.clone()),
+                    });
                 }
-                iw_body.push(IrInstruction::Return(None));
-                functions.push(IrFunction {
-                    name: prefix_name(format!("{}::init_weights", m.name)),
-                    params: vec![("std".into(), Type::Float)],
-                    return_type: Type::Unit,
-                    blocks: vec![IrBlock {
-                        label: "entry".into(),
-                        instructions: iw_body,
-                    }],
-                    span: Some(m.span),
-                    file: Some(file_path.clone()),
-                });
 
                 // Auto-generate setup_optimizer method from [Optim] attributes.
-                // Scans module fields for [Optim("type", "key=val", ...)] attrs
-                // and creates one optimizer per annotated field, returning a List.
+                // For array fields, iterate the list and create one optimizer per element.
                 let has_optim_attrs = m.fields.iter().any(|f|
                     f.attributes.iter().any(|a| a.name == "Optim")
                 );
                 if has_optim_attrs {
-                    let mut so_body = Vec::new();
-                    // Create the result list
-                    so_body.push(IrInstruction::Call {
+                    let mut so_blocks: Vec<IrBlock> = Vec::new();
+                    let mut so_insts: Vec<IrInstruction> = Vec::new();
+                    let mut so_label = "entry".to_string();
+                    let mut so_blk = 0usize;
+                    so_insts.push(IrInstruction::Call {
                         dst: Some("%__optim_list".into()),
                         target: "nex_list_new".into(),
                         args: vec![],
@@ -3547,12 +3741,10 @@ pub fn lower_typed_module_with_prefix(
                             let optim_type = attr.args[0].to_lowercase();
                             let gname = format!("%{}.{}", m.name, field.name);
                             let load_tmp = format!("%__so_load_{}", field.name);
-                            so_body.push(IrInstruction::Load {
-                                dst: load_tmp.clone(),
-                                src: gname,
+                            so_insts.push(IrInstruction::Load {
+                                dst: load_tmp.clone(), src: gname,
                             });
 
-                            // Parse key=value pairs from attribute args
                             let mut lr = 0.001_f64;
                             let mut beta1 = 0.9_f64;
                             let mut beta2 = 0.999_f64;
@@ -3570,64 +3762,222 @@ pub fn lower_typed_module_with_prefix(
                                 }
                             }
 
-                            let opt_tmp = format!("%__so_opt_{}", field.name);
-                            match optim_type.as_str() {
-                                "adamw" => {
-                                    so_body.push(IrInstruction::Call {
-                                        dst: Some(opt_tmp.clone()),
-                                        target: "optim_adamw".into(),
-                                        args: vec![
-                                            IrValue::Register(load_tmp),
-                                            IrValue::FloatConst(lr),
-                                            IrValue::FloatConst(beta1),
-                                            IrValue::FloatConst(beta2),
-                                            IrValue::FloatConst(wd),
-                                        ],
-                                    });
+                            if field.count.is_some() {
+                                // Array field: iterate list, create optimizer per element
+                                so_blk += 1;
+                                let len_r = format!("%__so_len_{}", field.name);
+                                let idx_r = format!("%__so_idx_{}", field.name);
+                                so_insts.push(IrInstruction::Call {
+                                    dst: Some(len_r.clone()),
+                                    target: "nex_list_length".into(),
+                                    args: vec![IrValue::Register(load_tmp.clone())],
+                                });
+                                so_insts.push(IrInstruction::Store {
+                                    dst: idx_r.clone(), src: IrValue::IntConst(0),
+                                });
+                                let hdr = format!("__so_hdr_{so_blk}");
+                                let bdy = format!("__so_bdy_{so_blk}");
+                                let ext = format!("__so_ext_{so_blk}");
+                                so_insts.push(IrInstruction::Jump { target: hdr.clone() });
+                                so_blocks.push(IrBlock { label: so_label, instructions: so_insts });
+                                so_insts = Vec::new();
+                                // header
+                                let cnd = format!("%__so_cnd_{}", field.name);
+                                so_insts.push(IrInstruction::BinOp {
+                                    dst: cnd.clone(), op: "lt".into(),
+                                    lhs: IrValue::Register(idx_r.clone()),
+                                    rhs: IrValue::Register(len_r),
+                                });
+                                so_insts.push(IrInstruction::Branch {
+                                    cond: IrValue::Register(cnd),
+                                    then_label: bdy.clone(), else_label: ext.clone(),
+                                });
+                                so_blocks.push(IrBlock { label: hdr.clone(), instructions: so_insts });
+                                so_insts = Vec::new();
+                                // body: get all_modules from sub-module, iterate and create optimizers
+                                let elem = format!("%__so_elem_{}", field.name);
+                                so_insts.push(IrInstruction::Call {
+                                    dst: Some(elem.clone()),
+                                    target: "nex_list_get".into(),
+                                    args: vec![
+                                        IrValue::Register(load_tmp),
+                                        IrValue::Register(idx_r.clone()),
+                                    ],
+                                });
+                                // Get all_modules list from the sub-module
+                                let sub_mods = format!("%__so_submods_{}", field.name);
+                                so_insts.push(IrInstruction::Call {
+                                    dst: Some(sub_mods.clone()),
+                                    target: format!("{}::all_modules", field.layer_type),
+                                    args: vec![],
+                                });
+                                let sub_len = format!("%__so_sublen_{}", field.name);
+                                so_insts.push(IrInstruction::Call {
+                                    dst: Some(sub_len.clone()),
+                                    target: "nex_list_length".into(),
+                                    args: vec![IrValue::Register(sub_mods.clone())],
+                                });
+                                // Inner loop: create optimizer for each sub-module's module
+                                let inner_idx = format!("%__so_ii_{}", field.name);
+                                so_insts.push(IrInstruction::Store {
+                                    dst: inner_idx.clone(), src: IrValue::IntConst(0),
+                                });
+                                so_blk += 1;
+                                let ihdr = format!("__so_ihdr_{so_blk}");
+                                let ibdy = format!("__so_ibdy_{so_blk}");
+                                let iext = format!("__so_iext_{so_blk}");
+                                so_insts.push(IrInstruction::Jump { target: ihdr.clone() });
+                                so_blocks.push(IrBlock { label: bdy.clone(), instructions: so_insts });
+                                so_insts = Vec::new();
+                                // inner header
+                                let icnd = format!("%__so_icnd_{}", field.name);
+                                so_insts.push(IrInstruction::BinOp {
+                                    dst: icnd.clone(), op: "lt".into(),
+                                    lhs: IrValue::Register(inner_idx.clone()),
+                                    rhs: IrValue::Register(sub_len),
+                                });
+                                so_insts.push(IrInstruction::Branch {
+                                    cond: IrValue::Register(icnd),
+                                    then_label: ibdy.clone(), else_label: iext.clone(),
+                                });
+                                so_blocks.push(IrBlock { label: ihdr.clone(), instructions: so_insts });
+                                so_insts = Vec::new();
+                                // inner body: get module handle, create optimizer, add to list
+                                let ielem = format!("%__so_ielem_{}", field.name);
+                                so_insts.push(IrInstruction::Call {
+                                    dst: Some(ielem.clone()),
+                                    target: "nex_list_get".into(),
+                                    args: vec![
+                                        IrValue::Register(sub_mods),
+                                        IrValue::Register(inner_idx.clone()),
+                                    ],
+                                });
+                                let iopt = format!("%__so_iopt_{}", field.name);
+                                match optim_type.as_str() {
+                                    "adamw" => {
+                                        so_insts.push(IrInstruction::Call {
+                                            dst: Some(iopt.clone()),
+                                            target: "optim_adamw".into(),
+                                            args: vec![
+                                                IrValue::Register(ielem),
+                                                IrValue::FloatConst(lr),
+                                                IrValue::FloatConst(beta1),
+                                                IrValue::FloatConst(beta2),
+                                                IrValue::FloatConst(wd),
+                                            ],
+                                        });
+                                    }
+                                    "adam" => {
+                                        so_insts.push(IrInstruction::Call {
+                                            dst: Some(iopt.clone()),
+                                            target: "optim_adam".into(),
+                                            args: vec![
+                                                IrValue::Register(ielem),
+                                                IrValue::FloatConst(lr),
+                                            ],
+                                        });
+                                    }
+                                    _ => {
+                                        so_insts.push(IrInstruction::Call {
+                                            dst: Some(iopt.clone()),
+                                            target: "optim_sgd".into(),
+                                            args: vec![
+                                                IrValue::Register(ielem),
+                                                IrValue::FloatConst(lr),
+                                            ],
+                                        });
+                                    }
                                 }
-                                "adam" => {
-                                    so_body.push(IrInstruction::Call {
-                                        dst: Some(opt_tmp.clone()),
-                                        target: "optim_adam".into(),
-                                        args: vec![
-                                            IrValue::Register(load_tmp),
-                                            IrValue::FloatConst(lr),
-                                        ],
-                                    });
+                                so_insts.push(IrInstruction::Call {
+                                    dst: None, target: "nex_list_add".into(),
+                                    args: vec![
+                                        IrValue::Register("%__optim_list".into()),
+                                        IrValue::Register(iopt),
+                                    ],
+                                });
+                                let inxt = format!("%__so_inxt_{}", field.name);
+                                so_insts.push(IrInstruction::BinOp {
+                                    dst: inxt.clone(), op: "add".into(),
+                                    lhs: IrValue::Register(inner_idx.clone()),
+                                    rhs: IrValue::IntConst(1),
+                                });
+                                so_insts.push(IrInstruction::Store {
+                                    dst: inner_idx, src: IrValue::Register(inxt),
+                                });
+                                so_insts.push(IrInstruction::Jump { target: ihdr });
+                                so_blocks.push(IrBlock { label: ibdy, instructions: so_insts });
+                                so_insts = Vec::new();
+                                // inner exit → increment outer idx
+                                let nxt = format!("%__so_nxt_{}", field.name);
+                                so_insts.push(IrInstruction::BinOp {
+                                    dst: nxt.clone(), op: "add".into(),
+                                    lhs: IrValue::Register(idx_r.clone()),
+                                    rhs: IrValue::IntConst(1),
+                                });
+                                so_insts.push(IrInstruction::Store {
+                                    dst: idx_r, src: IrValue::Register(nxt),
+                                });
+                                so_insts.push(IrInstruction::Jump { target: hdr });
+                                so_blocks.push(IrBlock { label: iext, instructions: so_insts });
+                                so_insts = Vec::new();
+                                so_label = ext;
+                            } else {
+                                // Single field: create one optimizer
+                                let opt_tmp = format!("%__so_opt_{}", field.name);
+                                match optim_type.as_str() {
+                                    "adamw" => {
+                                        so_insts.push(IrInstruction::Call {
+                                            dst: Some(opt_tmp.clone()),
+                                            target: "optim_adamw".into(),
+                                            args: vec![
+                                                IrValue::Register(load_tmp),
+                                                IrValue::FloatConst(lr),
+                                                IrValue::FloatConst(beta1),
+                                                IrValue::FloatConst(beta2),
+                                                IrValue::FloatConst(wd),
+                                            ],
+                                        });
+                                    }
+                                    "adam" => {
+                                        so_insts.push(IrInstruction::Call {
+                                            dst: Some(opt_tmp.clone()),
+                                            target: "optim_adam".into(),
+                                            args: vec![
+                                                IrValue::Register(load_tmp),
+                                                IrValue::FloatConst(lr),
+                                            ],
+                                        });
+                                    }
+                                    _ => {
+                                        so_insts.push(IrInstruction::Call {
+                                            dst: Some(opt_tmp.clone()),
+                                            target: "optim_sgd".into(),
+                                            args: vec![
+                                                IrValue::Register(load_tmp),
+                                                IrValue::FloatConst(lr),
+                                            ],
+                                        });
+                                    }
                                 }
-                                "sgd" | _ => {
-                                    so_body.push(IrInstruction::Call {
-                                        dst: Some(opt_tmp.clone()),
-                                        target: "optim_sgd".into(),
-                                        args: vec![
-                                            IrValue::Register(load_tmp),
-                                            IrValue::FloatConst(lr),
-                                        ],
-                                    });
-                                }
+                                so_insts.push(IrInstruction::Call {
+                                    dst: None, target: "nex_list_add".into(),
+                                    args: vec![
+                                        IrValue::Register("%__optim_list".into()),
+                                        IrValue::Register(opt_tmp),
+                                    ],
+                                });
                             }
-                            // Add optimizer to list
-                            so_body.push(IrInstruction::Call {
-                                dst: None,
-                                target: "nex_list_add".into(),
-                                args: vec![
-                                    IrValue::Register("%__optim_list".into()),
-                                    IrValue::Register(opt_tmp),
-                                ],
-                            });
                         }
                     }
-                    so_body.push(IrInstruction::Return(Some(
+                    so_insts.push(IrInstruction::Return(Some(
                         IrValue::Register("%__optim_list".into()),
                     )));
+                    so_blocks.push(IrBlock { label: so_label, instructions: so_insts });
                     functions.push(IrFunction {
                         name: prefix_name(format!("{}::setup_optimizer", m.name)),
                         params: vec![],
                         return_type: Type::Named("List".into()),
-                        blocks: vec![IrBlock {
-                            label: "entry".into(),
-                            instructions: so_body,
-                        }],
+                        blocks: so_blocks,
                         span: Some(m.span),
                         file: Some(file_path.clone()),
                     });

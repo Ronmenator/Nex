@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "updated": "2026-03-01T12:38:13Z",
+  "nex_version": "0.1.201",
+  "base_url": "https://ronmenator.github.io/Nex/libs",
+  "libraries": [
+    {
+      "name": "crypto",
+      "version": "0.1.0",
+      "description": "Cryptography: SHA, AES-256-GCM, Ed25519, HMAC, PBKDF2, Argon2, Base64.",
+      "has_native": true,
+      "native_name": "nex_crypto_native",
+      "modules": [
+        "aes",
+        "encode",
+        "hash",
+        "hmac",
+        "kdf",
+        "random",
+        "sign"
+      ],
+      "platforms": {
+        "windows-x86_64": "crypto-0.1.0-windows-x86_64.zip"
+      }
+    },
+    {
+      "name": "http",
+      "version": "0.1.0",
+      "description": "HTTP client and server.",
+      "has_native": true,
+      "native_name": "nex_http_native",
+      "modules": [
+        "client",
+        "server"
+      ],
+      "platforms": {
+        "windows-x86_64": "http-0.1.0-windows-x86_64.zip"
+      }
+    },
+    {
+      "name": "json",
+      "version": "0.1.0",
+      "description": "Type-safe JSON serialization and deserialization.",
+      "has_native": false,
+      "modules": [
+        "Json"
+      ],
+      "platforms": {
+        "any": "json-0.1.0-any.zip"
+      }
+    },
+    {
+      "name": "net",
+      "version": "0.1.0",
+      "description": "TLS client and WebSocket server.",
+      "has_native": false,
+      "modules": [
+        "tls",
+        "websocket"
+      ],
+      "platforms": {
+        "any": "net-0.1.0-any.zip"
+      }
+    },
+    {
+      "name": "nex3d",
+      "version": "0.1.0",
+      "description": "3D game engine: rendering, audio, input, physics, sprites.",
+      "has_native": true,
+      "native_name": "nex3d_native",
+      "modules": [
+        "anim",
+        "audio",
+        "bounds",
+        "camera",
+        "color",
+        "draw",
+        "engine",
+        "font",
+        "gamepad",
+        "input",
+        "light",
+        "math",
+        "model",
+        "rendertarget",
+        "sprite",
+        "states",
+        "texture",
+        "time"
+      ],
+      "platforms": {
+        "windows-x86_64": "nex3d-0.1.0-windows-x86_64.zip"
+      }
+    },
+    {
+      "name": "nex_ui",
+      "version": "0.1.0",
+      "description": "Native desktop UI: widgets, canvas, dialogs, styling, events.",
+      "has_native": true,
+      "native_name": "nex_ui_native",
+      "modules": [
+        "app",
+        "binding",
+        "canvas",
+        "dialog",
+        "event",
+        "style",
+        "widget"
+      ],
+      "platforms": {
+        "windows-x86_64": "nex_ui-0.1.0-windows-x86_64.zip"
+      }
+    },
+    {
+      "name": "regex",
+      "version": "0.1.0",
+      "description": "Regular expression pattern matching.",
+      "has_native": true,
+      "native_name": "nex_regex_native",
+      "modules": [
+        "pattern"
+      ],
+      "platforms": {
+        "windows-x86_64": "regex-0.1.0-windows-x86_64.zip"
+      }
+    },
+    {
+      "name": "torch",
+      "version": "0.1.0",
+      "description": "Machine learning via libtorch: tensors, neural networks, training.",
+      "has_native": true,
+      "native_name": "nex_torch_native",
+      "modules": [
+        "loss",
+        "model",
+        "nn",
+        "optim",
+        "schedule",
+        "tensor",
+        "train"
+      ],
+      "platforms": {
+        "windows-x86_64": "torch-0.1.0-windows-x86_64.zip"
+      }
+    }
+  ]
+}
