@@ -877,6 +877,14 @@ static NATIVE_SYMBOL_NAMES: &[&str] = &[
     "nex_regex_find",
     "nex_regex_replace",
     "nex_regex_free",
+    // BPE tokenizer
+    "nex_torch_tokenizer_from_file",
+    "nex_torch_tokenizer_encode",
+    "nex_torch_tokenizer_decode",
+    "nex_torch_tokenizer_decode_single",
+    "nex_torch_tokenizer_vocab_size",
+    "nex_torch_tokenizer_free",
+    "nex_torch_tensor_load_raw_i64",
 ];
 
 // ---------------------------------------------------------------------------
@@ -1003,7 +1011,9 @@ fn runtime_func_return_type(name: &str) -> Option<RegType> {
         | "nex_char_to_str" | "nex_byte_to_str"
         | "nex_file_read_all" | "nex_io_file_read_all"
         | "nex_readline"
-        | "nex_env_get" | "nex_env_args_get" | "nex_env_cwd" => return Some(RegType::String),
+        | "nex_env_get" | "nex_env_args_get" | "nex_env_cwd"
+        | "nex_torch_tokenizer_decode" | "nex_torch_tokenizer_decode_single"
+        | "nex_torch_tensor_to_string" => return Some(RegType::String),
         _ => {}
     }
     // Map functions
@@ -1149,8 +1159,8 @@ fn build_reg_type_map(
                         IrValue::IntConst(_) => RegType::Int,
                         IrValue::FloatConst(_) => RegType::Float,
                         IrValue::BoolConst(_) => RegType::Bool,
-                        IrValue::Register(r) => map.get(r).copied().unwrap_or(RegType::Unknown),
-                        IrValue::NullConst => RegType::Unknown,
+                        IrValue::Register(r) => map.get(r).copied().unwrap_or(RegType::Int),
+                        IrValue::NullConst => RegType::Int,
                     };
                     map.insert(dst.clone(), ty);
                 }
@@ -1167,7 +1177,10 @@ fn build_reg_type_map(
                             stdlib_function_name(target.as_str())
                                 .and_then(|rt_name| runtime_func_return_type(rt_name))
                         });
-                    let rt = rt.unwrap_or(RegType::Unknown);
+                    // Default to Int (not Unknown) — every Call with a dst
+                    // returns an i64 value.  Unknown would propagate through
+                    // BinOp chains and could mistype downstream registers.
+                    let rt = rt.unwrap_or(RegType::Int);
                     map.insert(dst.clone(), rt);
                 }
                 IrInstruction::BinOp { dst, op, lhs, rhs, .. } => {
@@ -1191,7 +1204,7 @@ fn build_reg_type_map(
                             } else if lty == RegType::Float || rty == RegType::Float {
                                 RegType::Float
                             } else {
-                                lty
+                                RegType::Int
                             }
                         }
                         _ => RegType::Bool,
@@ -1630,10 +1643,24 @@ fn emit_instruction<M: Module>(
             // Propagate result type so downstream instructions (Store, Call,
             // etc.) see the correct RegType even when the static pre-pass
             // was conservative.
-            if is_float {
-                reg_types.insert(dst.clone(), RegType::Float);
-            } else if lhs_type == RegType::String || rhs_type == RegType::String {
-                reg_types.insert(dst.clone(), RegType::String);
+            // Arithmetic (add/sub/mul/div/mod): String > Float > Int
+            // Comparison/logical (eq/ne/lt/le/gt/ge/and/or): always Bool
+            // Bitwise (bitand/bitor/bitxor/shl/shr): always Int
+            let op_s = op.as_str();
+            let is_arith = matches!(op_s, "add" | "sub" | "mul" | "div" | "mod");
+            let is_bitwise = matches!(op_s, "bitand" | "bitor" | "bitxor" | "shl" | "shr");
+            if is_arith {
+                if lhs_type == RegType::String || rhs_type == RegType::String {
+                    reg_types.insert(dst.clone(), RegType::String);
+                } else if is_float {
+                    reg_types.insert(dst.clone(), RegType::Float);
+                }
+                // Int arithmetic: don't overwrite — pre-pass has it right
+            } else if is_bitwise {
+                reg_types.insert(dst.clone(), RegType::Int);
+            } else {
+                // Comparison / logical ops always produce Bool (i64 0/1)
+                reg_types.insert(dst.clone(), RegType::Bool);
             }
             set_var(builder, module, dst, result, vars, global_data);
             false
@@ -1751,12 +1778,13 @@ fn emit_instruction<M: Module>(
                     let call = builder.ins().call(func_ref, &coerced);
                     if let Some(d) = dst {
                         let rv = coerce_return_value(builder, call);
-                        // Dynamically update reg_types from the actual Cranelift
-                        // signature.  This catches cases the static pre-pass missed
-                        // (e.g. cross-module name collisions, unrecognised FFI names).
-                        if let Some(rt) = sig_return_reg_type(builder, func_ref) {
-                            reg_types.insert(d.clone(), rt);
-                        }
+                        // Use semantic return type from runtime_func_return_type
+                        // (handles String-returning FFI), then fall back to
+                        // Cranelift signature (F64 → Float), then default to Int.
+                        let rt = runtime_func_return_type(rt_name)
+                            .or_else(|| sig_return_reg_type(builder, func_ref))
+                            .unwrap_or(RegType::Int);
+                        reg_types.insert(d.clone(), rt);
                         set_var(builder, module, d, rv, vars, global_data);
                     }
                 }
@@ -1802,9 +1830,12 @@ fn emit_instruction<M: Module>(
                 if let Some(d) = dst {
                     let rv = coerce_return_value(builder, call);
                     // Dynamically update reg_types from the actual signature.
-                    if let Some(rt) = sig_return_reg_type(builder, func_ref) {
-                        reg_types.insert(d.clone(), rt);
-                    }
+                    // F64 returns → Float; otherwise default to Int so
+                    // downstream BinOp sees a concrete type even when the
+                    // static pre-pass missed the target.
+                    let rt = sig_return_reg_type(builder, func_ref)
+                        .unwrap_or(RegType::Int);
+                    reg_types.insert(d.clone(), rt);
                     set_var(builder, module, d, rv, vars, global_data);
                 }
             } else {
@@ -1836,10 +1867,15 @@ fn emit_instruction<M: Module>(
                         } else {
                             builder.ins().iconst(types::I64, 0)
                         };
+                        // Track call_indirect returns as Int so downstream
+                        // BinOp/Store see the correct type (closure returns
+                        // are always i64).
+                        reg_types.insert(d.clone(), RegType::Int);
                         set_var(builder, module, d, rv, vars, global_data);
                     }
                 } else if let Some(d) = dst {
                     let z = builder.ins().iconst(types::I64, 0);
+                    reg_types.insert(d.clone(), RegType::Int);
                     set_var(builder, module, d, z, vars, global_data);
                 }
             }
@@ -1854,6 +1890,7 @@ fn emit_instruction<M: Module>(
         } => {
             if let Some(d) = dst {
                 let z = builder.ins().iconst(types::I64, 0);
+                reg_types.insert(d.clone(), RegType::Int);
                 set_var(builder, module, d, z, vars, global_data);
             }
             false
@@ -2842,6 +2879,14 @@ fn torch_function_name(name: &str) -> Option<&'static str> {
         "torch_manual_seed" => Some("nex_torch_manual_seed"),
         "torch_version" => Some("nex_torch_version"),
         "tensor_to_string" => Some("nex_torch_tensor_to_string"),
+        // BPE tokenizer
+        "tokenizer_from_file" => Some("nex_torch_tokenizer_from_file"),
+        "tokenizer_encode" => Some("nex_torch_tokenizer_encode"),
+        "tokenizer_decode" => Some("nex_torch_tokenizer_decode"),
+        "tokenizer_decode_single" => Some("nex_torch_tokenizer_decode_single"),
+        "tokenizer_vocab_size" => Some("nex_torch_tokenizer_vocab_size"),
+        "tokenizer_free" => Some("nex_torch_tokenizer_free"),
+        "tensor_load_raw_i64" => Some("nex_torch_tensor_load_raw_i64"),
         _ => None,
     }
 }
@@ -3979,6 +4024,14 @@ fn declare_runtime_imports<M: Module>(
         ("nex_torch_optim_step_and_zero", &sig_void_ptr),
         ("nex_torch_nn_set_training", &sig_void_ptr2),  // (module, flag)
         ("nex_torch_nn_scale_gradients", &sig_void_i64_f64), // (module, scale)
+        // BPE tokenizer
+        ("nex_torch_tokenizer_from_file", &sig_ptr_ptr),        // (path) -> handle
+        ("nex_torch_tokenizer_encode", &sig_ptr_ptr2),          // (handle, text) -> tensor
+        ("nex_torch_tokenizer_decode", &sig_ptr_ptr2),          // (handle, tensor) -> string
+        ("nex_torch_tokenizer_decode_single", &sig_ptr_ptr2),   // (handle, token_id) -> string
+        ("nex_torch_tokenizer_vocab_size", &sig_ptr_ptr),       // (handle) -> int
+        ("nex_torch_tokenizer_free", &sig_void_ptr),            // (handle)
+        ("nex_torch_tensor_load_raw_i64", &sig_ptr_ptr),        // (path) -> tensor
     ];
 
     // Helper: declare an import only if not already declared, and if it passes

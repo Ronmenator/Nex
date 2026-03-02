@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 [dependencies]
 libc = "0.2"
 tch = "0.23"
+tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }

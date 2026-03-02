@@ -1081,3 +1081,124 @@ pub unsafe extern "C" fn nex_torch_tensor_to_string(t: *mut Tensor) -> *mut c_ch
     if t.is_null() { return str_to_cstr("null"); }
     str_to_cstr(&format!("{:?}", *t))
 }
+
+// ---------------------------------------------------------------------------
+// BPE Tokenizer (via HuggingFace tokenizers crate)
+// ---------------------------------------------------------------------------
+
+use tokenizers::Tokenizer as HFTokenizer;
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tokenizer_from_file(
+    path_str: *const c_char,
+) -> *mut HFTokenizer {
+    let path = cstr_to_str(path_str);
+    match HFTokenizer::from_file(path) {
+        Ok(tok) => Box::into_raw(Box::new(tok)),
+        Err(e) => {
+            eprintln!("tokenizer_from_file error: {e}");
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tokenizer_encode(
+    tok: *mut HFTokenizer,
+    text: *const c_char,
+) -> *mut Tensor {
+    if tok.is_null() || text.is_null() { return ptr::null_mut(); }
+    let tokenizer = &*tok;
+    let input = cstr_to_str(text);
+    match tokenizer.encode(input, false) {
+        Ok(encoding) => {
+            let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
+            Box::into_raw(Box::new(Tensor::from_slice(&ids)))
+        }
+        Err(e) => {
+            eprintln!("tokenizer_encode error: {e}");
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tokenizer_decode(
+    tok: *mut HFTokenizer,
+    t: *mut Tensor,
+) -> *mut c_char {
+    if tok.is_null() || t.is_null() { return str_to_cstr(""); }
+    let tokenizer = &*tok;
+    let numel = (*t).numel();
+    let cpu_t = (*t).to_device(Device::Cpu).to_kind(Kind::Int64);
+    let mut ids: Vec<u32> = Vec::with_capacity(numel);
+    for i in 0..numel {
+        ids.push(cpu_t.int64_value(&[i as i64]) as u32);
+    }
+    match tokenizer.decode(&ids, false) {
+        Ok(text) => str_to_cstr(&text),
+        Err(e) => {
+            eprintln!("tokenizer_decode error: {e}");
+            str_to_cstr("")
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tokenizer_decode_single(
+    tok: *mut HFTokenizer,
+    token_id: i64,
+) -> *mut c_char {
+    if tok.is_null() { return str_to_cstr(""); }
+    let tokenizer = &*tok;
+    match tokenizer.decode(&[token_id as u32], false) {
+        Ok(text) => str_to_cstr(&text),
+        Err(e) => {
+            eprintln!("tokenizer_decode_single error: {e}");
+            str_to_cstr("")
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tokenizer_vocab_size(
+    tok: *mut HFTokenizer,
+) -> i64 {
+    if tok.is_null() { return 0; }
+    (*tok).get_vocab_size(true) as i64
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tokenizer_free(
+    tok: *mut HFTokenizer,
+) {
+    if !tok.is_null() { drop(Box::from_raw(tok)); }
+}
+
+// ---------------------------------------------------------------------------
+// Load pre-tokenized binary data as a tensor
+// ---------------------------------------------------------------------------
+
+#[no_mangle]
+pub unsafe extern "C" fn nex_torch_tensor_load_raw_i64(
+    path_str: *const c_char,
+) -> *mut Tensor {
+    let path = cstr_to_str(path_str);
+    match std::fs::read(path) {
+        Ok(bytes) => {
+            if bytes.len() % 8 != 0 {
+                eprintln!("tensor_load_raw_i64: file size not multiple of 8");
+                return ptr::null_mut();
+            }
+            let n = bytes.len() / 8;
+            let data: Vec<i64> = (0..n)
+                .map(|i| i64::from_le_bytes(bytes[i*8..(i+1)*8].try_into().unwrap()))
+                .collect();
+            Box::into_raw(Box::new(Tensor::from_slice(&data)))
+        }
+        Err(e) => {
+            eprintln!("tensor_load_raw_i64 error: {e}");
+            ptr::null_mut()
+        }
+    }
+}
