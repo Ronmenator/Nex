@@ -2118,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "nex"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nex_repl",
  "nexc_ast",
@@ -2132,7 +2132,7 @@ dependencies = [
 
 [[package]]
 name = "nex3d_native"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "bytemuck",
  "gilrs",
@@ -2147,7 +2147,7 @@ dependencies = [
 
 [[package]]
 name = "nex_crypto_native"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -2164,7 +2164,7 @@ dependencies = [
 
 [[package]]
 name = "nex_http_native"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "libc",
  "minreq",
@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "nex_lsp"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2186,7 +2186,7 @@ dependencies = [
 
 [[package]]
 name = "nex_regex_native"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "libc",
  "regex",
@@ -2194,7 +2194,7 @@ dependencies = [
 
 [[package]]
 name = "nex_repl"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_codegen_llvm_jit",
  "nexc_driver",
@@ -2202,7 +2202,7 @@ dependencies = [
 
 [[package]]
 name = "nex_runtime"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "base64 0.22.1",
  "libc",
@@ -2216,14 +2216,14 @@ dependencies = [
 
 [[package]]
 name = "nex_std"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nex_runtime",
 ]
 
 [[package]]
 name = "nex_torch_native"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "libc",
  "tch",
@@ -2232,7 +2232,7 @@ dependencies = [
 
 [[package]]
 name = "nex_ui_native"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "cosmic-text",
  "crossterm",
@@ -2245,7 +2245,7 @@ dependencies = [
 
 [[package]]
 name = "nexc"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_diag",
  "nexc_driver",
@@ -2253,14 +2253,14 @@ dependencies = [
 
 [[package]]
 name = "nexc_ast"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_diag",
 ]
 
 [[package]]
 name = "nexc_codegen_cranelift"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "cranelift-codegen",
  "cranelift-frontend",
@@ -2276,7 +2276,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_codegen_llvm"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2286,7 +2286,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_codegen_llvm_jit"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_diag",
  "nexc_ir",
@@ -2294,11 +2294,11 @@ dependencies = [
 
 [[package]]
 name = "nexc_diag"
-version = "0.1.220"
+version = "0.1.223"
 
 [[package]]
 name = "nexc_driver"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_codegen_cranelift",
@@ -2316,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_fmt"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2326,7 +2326,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_ir"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2336,7 +2336,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_layout"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2345,14 +2345,14 @@ dependencies = [
 
 [[package]]
 name = "nexc_lex"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_diag",
 ]
 
 [[package]]
 name = "nexc_lint"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2360,7 +2360,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_meta"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_diag",
  "serde",
@@ -2369,7 +2369,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_parse"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2378,7 +2378,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_resolve"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2386,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "nexc_type"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2396,7 +2396,7 @@ dependencies = [
 
 [[package]]
 name = "nexui_lower"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_ast",
  "nexc_diag",
@@ -2405,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "nexui_parse"
-version = "0.1.220"
+version = "0.1.223"
 dependencies = [
  "nexc_diag",
 ]

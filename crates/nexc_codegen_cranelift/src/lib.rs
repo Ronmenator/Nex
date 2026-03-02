@@ -1829,13 +1829,15 @@ fn emit_instruction<M: Module>(
                 let call = builder.ins().call(func_ref, &coerced);
                 if let Some(d) = dst {
                     let rv = coerce_return_value(builder, call);
-                    // Dynamically update reg_types from the actual signature.
-                    // F64 returns → Float; otherwise default to Int so
-                    // downstream BinOp sees a concrete type even when the
-                    // static pre-pass missed the target.
-                    let rt = sig_return_reg_type(builder, func_ref)
-                        .unwrap_or(RegType::Int);
-                    reg_types.insert(d.clone(), rt);
+                    // Only overwrite reg_types when the Cranelift signature
+                    // proves F64 return (runtime imports with F64 sigs).
+                    // User-defined functions always use I64 sigs even for
+                    // Float returns, so we must NOT clobber the pre-pass
+                    // type here — build_reg_type_map already got it right
+                    // from func_return_types.
+                    if let Some(rt) = sig_return_reg_type(builder, func_ref) {
+                        reg_types.insert(d.clone(), rt);
+                    }
                     set_var(builder, module, d, rv, vars, global_data);
                 }
             } else {
